@@ -1,3 +1,17 @@
+@font-face {
+    font-family: 'MiFuenteKanit-Bold';
+    src: url('/fonts/Kanit-Bold.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;  
+}
+
+body {
+    font-family: 'MiFuenteKanit-Bold', sans-serif;
+}
+
+
+
+
 #menu {
 	background: #261893;
 	height: 45px;
