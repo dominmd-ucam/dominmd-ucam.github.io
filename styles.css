@@ -14,6 +14,7 @@ body {
 	height: 45px;
 	padding-left: 18px;
 	border-radius: 0px;
+	
 }
 #menu ul, #menu li {
 	margin: 0 auto;
@@ -22,7 +23,7 @@ body {
 }
 #menu ul {
 	width: 100%;
-	text-align: left;
+	text-align: center;
 }
 #menu li {
 	display: inline-block;
@@ -109,6 +110,41 @@ body {
 
 .material-icons {
     font-size: 48px;
-    color: red;
+    color: red;       
 }
 
+/* PIE DE PAGINA */
+
+/* Estilo básico del pie de página */
+#footer {
+    background-color: #261893; /* Color de fondo del pie */
+    padding: 20px 0;
+    text-align: center;
+    color: #FFFFFF;
+    position: relative;
+    bottom: 0;
+    width: 100%;
+}
+
+/* Estilos para los iconos de redes sociales */
+.social-icons a {
+    text-decoration: none;
+    color: #FFFFFF;
+    margin: 0 10px; /* Espacio entre los iconos */
+}
+
+.social-icons i {
+    font-size: 32px; /* Tamaño de los iconos */
+    transition: color 0.3s ease; /* Transición para el hover */
+}
+
+/* Cambio de color en hover */
+.social-icons a:hover i {
+    color: #DBFF5E; /* Cambia el color del icono al pasar el cursor */
+}
+
+/* Texto del pie de página */
+#footer p {
+    margin-top: 15px;
+    font-size: 14px;
+}
