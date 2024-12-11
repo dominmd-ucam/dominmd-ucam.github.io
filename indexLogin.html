@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link rel="stylesheet" href="styleLogin.css">
+    <link rel="stylesheet" href="styleMenu.css">
+    <script type="module" src="scriptLogin.js" defer></script>
+
+    <title>Login UcamViajes</title>
+</head>
+
+<body>
+
+    <!-- ************** SIDEBAR MENU ************* -->
+
+    <nav class="sidebar">
+        <div class="sidebar-inner">
+            <header class="sidebar-header">
+                <button type="button" class="sidebar-burger" onclick="toggleSidebar()">
+                    <i class='bx bx-menu'></i>
+                </button>
+                <img src="logo.png" alt="" class="sidebar-logo">
+            </header>
+
+            <nav class="sidebar-menu">
+                <button type="button">
+                    <i class='bx bx-home' ></i>
+                    <span>Home</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-user' ></i>
+                    <span>Login</span>
+                </button>
+                <button type="button" class="has-border">
+                    <i class='bx bx-cog' ></i>
+                    <span>Ajustes</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-shape-circle'></i>
+                    <span>Blockchain</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-data' ></i>
+                    <span>Databases</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-speaker' ></i>
+                    <span>AudioVibe</span>
+                </button>
+                <button type="button" class="has-border">
+                    <i class='bx bx-music' ></i>
+                    <span>Soundblast</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-folder' ></i>
+                    <span>Folders</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-layer' ></i>
+                    <span>Levels</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-lock' ></i>
+                    <span>Security</span>
+                </button>
+            </nav>
+
+
+        </div>
+    </nav>
+
+    <script type="text/javascript">
+        const toggleSidebar = () => document.body.classList.toggle("open");
+    </script>
+
+    <!-- *****  LOGIN ****** -->
+
+    <div class="container">
+        <div class="signup-section">
+            <header>Signup</header>
+
+            <div class="social-buttons">
+                <button><i class='bx bxl-google'></i> Use Google</button>
+                <button><i class='bx bxl-apple'></i> Use Apple</button>
+            </div>
+
+            <div class="separator">
+                <div class="line"></div>
+                <p>Or</p>
+                <div class="line"></div>
+            </div>
+
+            <form>
+                <input type="text" placeholder="Full name" required>
+                <input type="email" placeholder="Email address" required>
+                <input type="password" placeholder="Password" required>
+                <a href="#">Forget Password?</a>
+                <button type="submit" class="btn">Signup</button>
+            </form>
+
+        </div>
+
+        <div class="login-section">
+            <header>Login</header>
+
+            <div class="social-buttons">
+                <button><i class='bx bxl-google'></i> Use Google</button>
+                <button><i class='bx bxl-apple'></i> Use Apple</button>
+            </div>
+
+            <div class="separator">
+                <div class="line"></div>
+                <p>Or</p>
+                <div class="line"></div>
+            </div>
+
+            <form>
+                <input type="email" placeholder="Email address" required>
+                <input type="password" placeholder="Password" required>
+                <a href="#">Forget Password?</a>
+                <button type="submit" class="btn">Login</button>
+            </form>
+
+        </div>
+
+    </div>
+
+
+</body>
+
+</html>

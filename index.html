@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <!-- ************ METAS UTILIZADOS ************** -->
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Proyecto final Lenguaje de Marcas 1 Evaluacion.">
+    <meta name="keywords" content="Lenguaje de Marcas UcamViajes">
+    <meta name="author" content="Domingo Martinez Diaz - 2º DAW">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:title" content="Proyecto Final 1 Eval Domingo">
+    <meta property="og:description" content="Web para encontrar destinos y organizar viajes a tu gusto.">
+    <meta property="og:image" content="/logo.png">
+    <meta property="og:url" content="https://dominmd-ucam.github.io/">
+
+    <meta name="robots" content="noindex" />
+    <meta name="googlebot" content="noindex" />
+    <meta name="googlebot-news" content="noindex" />
+    <meta name="slurp" content="noindex" />
+    <meta name="msnbot" content="noindex" />
+
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'> <!-- link a los iconos que vamos a utilizar -->
+    <link rel="stylesheet" href="style.css">
+    <script src="index.js" defer></script>
+
+    <!-- Viajes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Swiper/6.4.5/swiper-bundle.min.js"></script>
+    <link rel="stylesheet" href="styleCards.css">
+    
+    <!-- SIDEBAR MENU -->
+    <link rel="stylesheet" href="styleMenu.css">
+
+    <!-- COOKIES CSS -->
+    <link rel="stylesheet" href="styleCookies.css">
+
+    <title>UcamViajes.com</title>
+</head>
+<body>
+
+    <!-- ************ COOKIES ************ -->
+    <div class="aviso-cookies" id="aviso-cookies">
+		<img class="galleta" src="cookie.svg" alt="Galleta">
+		<h3 class="titulo">Cookies</h3>
+		<p class="parrafo">Utilizamos cookies propias y de terceros para mejorar nuestros servicios.</p>
+		<button class="boton" id="btn-aceptar-cookies">De acuerdo</button>
+		<a class="enlace" href="https://www.modelosycontratos.com/modelo-aviso-cookies-pagina-web/">Aviso de Cookies</a>
+	</div>
+	<div class="fondo-aviso-cookies" id="fondo-aviso-cookies"></div>
+
+    <!-- ************** SIDEBAR MENU ************* -->
+
+    <nav class="sidebar">
+        <div class="sidebar-inner">
+            <header class="sidebar-header">
+                <button type="button" class="sidebar-burger" onclick="toggleSidebar()">
+                    <i class='bx bx-menu'></i>
+                </button>
+                <img src="logo.png" alt="" class="sidebar-logo">
+            </header>
+
+            <nav class="sidebar-menu">
+                <button type="button">
+                    <i class='bx bx-home' ></i>
+                    <span>Home</span>
+                    
+                </button>
+                <button type="button">
+                    <i class='bx bx-user' ></i>
+                    <span>Login</span>
+                </button>
+                <button type="button" class="has-border">
+                    <i class='bx bx-cog' ></i>
+                    <span>Ajustes</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-shape-circle'></i>
+                    <span>Blockchain</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-data' ></i>
+                    <span>Databases</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-speaker' ></i>
+                    <span>AudioVibe</span>
+                </button>
+                <button type="button" class="has-border">
+                    <i class='bx bx-music' ></i>
+                    <span>Soundblast</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-folder' ></i>
+                    <span>Folders</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-layer' ></i>
+                    <span>Levels</span>
+                </button>
+                <button type="button">
+                    <i class='bx bx-lock' ></i>
+                    <span>Security</span>
+                </button>
+            </nav>
+
+
+        </div>
+    </nav>
+
+    <script type="text/javascript">
+        const toggleSidebar = () => document.body.classList.toggle("open");
+    </script>
+
+    <!-- ************** API ************ -->
+
+    <div class="container">
+        <div class="left-info">
+            <div class="pic-gradient"></div>
+                <div class="today-info">
+                        <h2>Friday</h2>
+                        <span>28 July 2023</span>
+                        <div>
+                            <i class='bx bx-current-location'></i>
+                            <span>Paris, FR</span>
+                        </div>
+                </div>
+                <div class="today-weather">
+                    <i class='bx bx-sun' ></i>
+                    <h1 class="weather-temp">
+                        25ºC
+                    </h1>
+                    <h3>Sunny</h3>
+
+                </div>
+            </div>
+
+        <div class="right-info">
+            <div class="day-info">
+                <div>
+                    <span class="title">PRECIPITATION</span>
+                    <span class="value">4 %</span>
+                </div>
+                <div>
+                    <span class="title">HUMIDITY</span>
+                    <span class="value">34 %</span>
+                </div>
+                <div>
+                    <span class="title">WIND SPEED</span>
+                    <span class="value">6 km/h</span>
+                </div>
+            </div>
+            
+            <ul class="days-list">
+                <li>
+                    <i class='bx bx-cloud'></i>
+                    <span>Sat</span>
+                    <span class="day-temp">23ºC</span>
+                </li>
+                <li>
+                    <i class='bx bx-sun' ></i>
+                    <span>Sun</span>
+                    <span class="day-temp">28°C</span>
+                </li>
+                <li>
+                    <i class='bx bx-cloud-rain' ></i>
+                    <span>Mon</span>
+                    <span class="day-temp">02°C</span>
+                </li>
+                <li>
+                    <i class='bx bx-cloud-drizzle'></i>
+                    <span>Tue</span>
+                    <span class="day-temp">14°C</span>
+                </li>
+            </ul>
+
+            <div class="btn-container">
+                <button class="loc-button">Buscar</button>
+            </div>
+
+
+        </div>
+
+
+    </div>
+
+
+    <!-- *************** CARDS Swiper ********************** -->
+    
+    <div class="swiper-container">
+        <div class="swiper-wrapper">
+            <div class="slider-item swiper-slide">
+                <div class="slider-image-wrapper">
+                    <img src="1.jpg" alt="SliderImg" class="slider-image">
+                </div>
+                <div class="slider-item-content">
+                    <h1>Maldivas</h1>
+                    <p>Disfruta de playas cristalinas, bungalows sobre el agua y snorkel en arrecifes vibrantes. ¡Un paraíso de ensueño! </p>
+                </div>
+            </div>
+
+            <div class="slider-item swiper-slide">
+                <div class="slider-image-wrapper">
+                    <img src="2.jpg" alt="SliderImg" class="slider-image">
+                </div>
+                <div class="slider-item-content">
+                    <h1>Crucero Islas Griegas</h1>
+                    <p>Navega por aguas turquesas, explora encantadores pueblos blancos y disfruta de la magia de la cultura griega. </p>
+                </div>
+            </div>
+
+            <div class="slider-item swiper-slide">
+                <div class="slider-image-wrapper">
+                    <img src="3.jpg" alt="SliderImg" class="slider-image">
+                </div>
+                <div class="slider-item-content">
+                    <h1>Camino de Santiago</h1>
+                    <p>Vive una experiencia espiritual única, caminando entre paisajes impresionantes y disfrutando de la rica gastronomía española. </p>
+                </div>
+            </div>
+
+            <div class="slider-item swiper-slide">
+                <div class="slider-image-wrapper">
+                    <img src="4.jpg" alt="SliderImg" class="slider-image">
+                </div>
+                <div class="slider-item-content">
+                    <h1>Machu Picchu</h1>
+                    <p>Descubre la majestuosidad de la antigua ciudad inca, rodeada de montañas verdes y misterio histórico. </p>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="slider-buttons">
+            <button class="swiper-button-prev">Prev</button>
+            <button class="swiper-button-next">Next</button>
+        </div>
+        <div class="swiper-pagination"></div>
+
+
+    </div>
+
+    <!-- Footer -->
+  <footer class="footer">
+    <p>&copy; 2024 UcamViajes. Todos los derechos reservados.</p>
+    <div class="social-icons">
+      <a href="https://facebook.com" target="_blank"><i class='bx bxl-facebook'></i></a>
+      <a href="https://instagram.com" target="_blank"><i class='bx bxl-instagram'></i></a>
+      <a href="https://twitter.com" target="_blank"><i class='bx bxl-twitter'></i></a>
+      <a href="mailto:viajes@ucam.com"><i class='bx bxl-envelope'></i></a>
+    </div>
+  </footer>
+</body>
+</html>
