@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Mapa UcamViajes</title>
+    <script src="mapdata.js" defer></script>
+    <script src="worldmap.js" defer></script>
+	<link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'> <!-- link a los iconos que vamos a utilizar -->
+	<link rel="stylesheet" href="styleMapa.css">
+
+	<!-- SIDEBAR MENU -->
+    <link rel="stylesheet" href="styleMenu.css">
+
+	<!-- BOTONES -->
+    <script src="botones.js" defer></script>
+
+  </head>
+	<body>
+
+		<div>
+			<div id="map"></div>
+		</div>
+
+		<!-- ************** SIDEBAR MENU ************* -->
+
+		<nav class="sidebar">
+			<div class="sidebar-inner">
+				<header class="sidebar-header">
+					<button type="button" class="sidebar-burger" onclick="toggleSidebar()">
+						<i class='bx bx-menu'></i>
+					</button>
+					<img src="logo.png" alt="" class="sidebar-logo">
+				</header>
+	
+				<nav class="sidebar-menu">
+					<button type="button">
+						<i class='bx bx-home' ></i>
+						<span>Home</span>
+						
+					</button>
+					<button type="button">
+						<i class='bx bx-user' ></i>
+						<span>Login</span>
+					</button>
+					<button type="button" class="has-border">
+						<i class='bx bx-cog' ></i>
+						<span>Ajustes</span>
+					</button>
+					<button type="button">
+						<i class='bx bx-map'></i>
+						<span>Mapa</span>
+					</button>
+					<button type="button">
+						<i class='bx bx-briefcase-alt'></i>
+						<span>FASFAS!</span>
+					</button>
+					<button type="button">
+						<i class='bx bx-car'></i>
+						<span>BlablaCar</span>
+					</button>
+					<button type="button" class="has-border">
+						<i class='bx bx-music' ></i>
+						<span>Playlist</span>
+					</button>
+					<button type="button">
+						<i class='bx bx-folder' ></i>
+						<span>Archivo</span>
+					</button>
+					<button type="button">
+						<i class='bx bx-id-card'></i>
+						<span>Documentación</span>
+					</button>
+					<button type="button">
+						<i class='bx bx-lock' ></i>
+						<span>Seguro</span>
+					</button>
+				</nav>
+	
+	
+			</div>
+		</nav>
+	
+		<script type="text/javascript">
+			const toggleSidebar = () => document.body.classList.toggle("open");
+		</script>
+
+	    <!-- Footer -->
+		<footer class="footer">
+			<p>&copy; 2024 UcamViajes. Todos los derechos reservados.</p>
+			<div class="social-icons">
+			  <a href="https://facebook.com" target="_blank"><i class='bx bxl-facebook'></i></a>
+			  <a href="https://instagram.com" target="_blank"><i class='bx bxl-instagram'></i></a>
+			  <a href="https://twitter.com" target="_blank"><i class='bx bxl-twitter'></i></a>
+			  <a href="mailto:viajes@ucam.com"><i class='bx bxl-envelope'></i></a>
+			</div>
+		  </footer>
+			
+	</body>
+</html>
+      
+    
+

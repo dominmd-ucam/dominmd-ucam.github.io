@@ -11,14 +11,6 @@ signupButton.addEventListener('click', () => {
 });
 
 
-/* BOTON Home */
-
-const btn_home = document.querySelector('button i.bx-home'); // Selecciona el icono dentro del botón
-
-btn_home.addEventListener('click', () => {
-    window.location.href = 'index.html'; // Redirige al archivo indexLogin.html
-});
-
 
 /********************/
 

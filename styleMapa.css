@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+body {
+    background-color: #37474f;
+    font-family: 'Poppins', sans-serif;
+}
+
+#map {
+    font-family: 'Poppins', sans-serif;
+    position: fixed;
+    top: 0;
+    left: 100px;
+    height: 110vh; /* vh (viewport height) es el 100% de la altura de la pantalla */
+    width: 110vw;  /* vw (viewport width) es el 100% del ancho de la pantalla */
+}
+
+/*Estilos del footer */
+
+
+.footer {
+    font-family: 'Poppins', sans-serif;
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 100%;
+    height: 6%;
+    /* Ajusta al ancho restante si hay un div al lado */
+    background-color: linear-gradient(135deg, #5c6bc0 10%, #0d47a1 100%);
+    color: #fff;
+    padding: 10px 20px;
+    text-align: center;
+    z-index: 1000;
+    /* Asegura que esté por encima del contenido */
+}
+
+.footer p {
+    margin: 0;
+}
+
+.social-icons {
+    margin: 5px 0;
+}
+
+.social-icons a {
+    color: #fff;
+    margin: 0 10px;
+    text-decoration: none;
+    font-size: 24px;
+}
+
+.social-icons a:hover {
+    color: #303f9f;
+}
+

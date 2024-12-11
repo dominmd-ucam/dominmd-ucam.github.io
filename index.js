@@ -179,11 +179,3 @@ botonAceptarCookies.addEventListener('click', () => {
 
 	dataLayer.push({'event': 'cookies-aceptadas'});
 });
-
-/* BOTON LOGIN */
-
-const btn_login = document.querySelector('button i.bx-user'); // Selecciona el icono dentro del botón
-
-btn_login.addEventListener('click', () => {
-    window.location.href = 'indexLogin.html'; // Redirige al archivo indexLogin.html
-});
