@@ -168,8 +168,8 @@ body {
 
 
 .footer {
-    position: fixed;
-    bottom: 0;
+    position: absolute;
+    bottom: 3rem;
     right: 0;
     width: 100%;
     height: 6%;

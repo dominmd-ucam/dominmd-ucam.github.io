@@ -2,7 +2,7 @@
 
 body {
     background-color: #37474f;
-    font-family: 'Poppins', sans-serif;
+    
 }
 
 #map {
@@ -19,8 +19,8 @@ body {
 
 .footer {
     font-family: 'Poppins', sans-serif;
-    position: fixed;
-    bottom: 0;
+    position: absolute;
+    bottom: 1rem;
     right: 0;
     width: 100%;
     height: 6%;
