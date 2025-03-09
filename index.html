@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tu Portfolio</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="nav-links">
+                <a href="#" class="active">Inicio</a>
+                <a href="#">Mis Libros</a>
+                <a href="#">Blog</a>
+                <a href="#">Ponencias</a>
+                <a href="#">Proyectos</a>
+            </div>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="hero-content">
+                <div class="hero-text">
+                    <h1>Domingo Martínez Díaz</h1>
+                    <h2>Software Engineer</h2>
+                    <p>Ayudando a desarrolladores a construir mejores aplicaciones. Enseñando sobre desarrollo web, frameworks y tecnologías modernas.</p>
+                </div>
+                <div class="hero-image">
+                    <img src="img/Foto.JPG" alt="Tu Foto de Perfil">
+                </div>
+            </div>
+        </section>
+
+        <section class="featured-posts">
+            <h2>Publicaciones Destacadas</h2>
+            <div class="post-grid">
+                <div class="post-card" style="border-color: #d8b4fe;">
+                    <h3>Todo Sobre Desarrollo Web</h3>
+                    <p>Sistemas de Diseño, Frameworks y Bibliotecas de Componentes</p>
+                    <div class="post-stats">
+                        <span><i class="fas fa-eye"></i> 103,085</span>
+                    </div>
+                </div>
+                <div class="post-card" style="border-color: #a5f3fc;">
+                    <h3>Frameworks Modernos de JavaScript</h3>
+                    <p>El Futuro de la Infraestructura JavaScript</p>
+                    <div class="post-stats">
+                        <span><i class="fas fa-eye"></i> 89,196</span>
+                    </div>
+                </div>
+                <div class="post-card" style="border-color: #fed7aa;">
+                    <h3>Técnicas de Gestión de Estado</h3>
+                    <p>Pasado, Presente y Futuro del Estado de Aplicaciones</p>
+                    <div class="post-stats">
+                        <span><i class="fas fa-eye"></i> 76,870</span>
+                    </div>
+                </div>
+            </div>
+            <div class="read-all">
+                <a href="#">Leer todas las publicaciones <i class="fas fa-arrow-right"></i></a>
+            </div>
+        </section>
+
+        <section class="projects">
+            <h2>Mis Proyectos</h2>
+            <div class="card-grid">
+                <a class="card" href="https://github.com/dominmd-ucam/Validacion-de-Formulario-con-Cypress" target="_blank">
+                    <div class="card__background" style="background-image: url(https://images.unsplash.com/photo-1515879218367-8466d910aaa4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80)"></div>
+                    <div class="card__content">
+                        <p class="card__category">Testing</p>
+                        <h3 class="card__heading">Validación de Formulario con Cypress</h3>
+                    </div>
+                </a>
+                <a class="card" href="https://dominmd-ucam.github.io/XML-ATOM/" target="_blank">
+                    <div class="card__background" style="background-image: url(https://images.unsplash.com/photo-1526628953301-3e589a6a8b74?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=800&q=60)"></div>
+                    <div class="card__content">
+                        <p class="card__category">XML</p>
+                        <h3 class="card__heading">Procesamiento de Fuentes ATOM y RSS</h3>
+                    </div>
+                </a>
+                <a class="card" href="https://dominmd-ucam.github.io/Acesibilidad/" target="_blank">
+                    <div class="card__background" style="background-image: url(https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=800&q=60)"></div>
+                    <div class="card__content">
+                        <p class="card__category">Accesibilidad</p>
+                        <h3 class="card__heading">Prompt de Accesibilidad</h3>
+                    </div>
+                </a>
+                <a class="card" href="https://dominmd-ucam.github.io/XSLT-Facturas/" target="_blank">
+                    <div class="card__background" style="background-image: url(https://images.unsplash.com/photo-1544383835-bda2bc66a55d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=800&q=60)"></div>
+                    <div class="card__content">
+                        <p class="card__category">XSLT</p>
+                        <h3 class="card__heading">Transformación de Facturas XML a XHTML</h3>
+                    </div>
+                </a>
+                <a class="card" href="https://dominmd-ucam.github.io/WebScraping/" target="_blank">
+                    <div class="card__background" style="background-image: url(https://images.unsplash.com/photo-1558494949-ef010cbdcc31?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=800&q=60)"></div>
+                    <div class="card__content">
+                        <p class="card__category">Web Scraping</p>
+                        <h3 class="card__heading">Web Scraping Tool</h3>
+                    </div>
+                </a>
+                <a class="card" href="https://dominmd-ucam.github.io/Web-de-Viajes/" target="_blank">
+                    <div class="card__background" style="background-image: url(https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=800&q=60)"></div>
+                    <div class="card__content">
+                        <p class="card__category">Diseño Web</p>
+                        <h3 class="card__heading">Web Viajes</h3>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        <section class="courses">
+            <h2>GDG on Campus UCAM</h2>
+            <p>GDG on Campus UCAM Catholic University of Murcia is an independent group; our activities and the opinions expressed here should in no way be linked to Google, the corporation. To learn more about the GDG program, visit https://developers.google.com/community</p>
+            
+            <div class="course-item">
+                <div class="course-number">01</div>
+                <div class="course-info">
+                    <h3>GDG Murcia - Noches Tech con GDG #3</h3>
+                </div>
+                <div class="course-duration">1:30:00</div>
+            </div>
+            
+            <div class="course-item">
+                <div class="course-number">02</div>
+                <div class="course-info">
+                    <h3>Semana de la Ciencia y la Tecnología - Charla Inteligencia Artificial</h3>
+                </div>
+                <div class="course-duration">3:00:00</div>
+            </div>
+            
+            <div class="course-item">
+                <div class="course-number">03</div>
+                <div class="course-info">
+                    <h3>Semana de la Ciencia y la Tecnología - Charla Ciberseguridad</h3>
+                </div>
+                <div class="course-duration">3:00:00</div>
+            </div>
+            
+            <div class="course-item">
+                <div class="course-number">04</div>
+                <div class="course-info">
+                    <h3>Semana de la Ciencia y la Tecnología - Charla Raspberry Pi</h3>
+                </div>
+                <div class="course-duration">1:00:00</div>
+            </div>
+            
+            <div class="course-item">
+                <div class="course-number">05</div>
+                <div class="course-info">
+                    <h3>Taller JavaScript #1</h3>
+                </div>
+                <div class="course-duration">1:30:00</div>
+            </div>
+            
+            <div class="course-item">
+                <div class="course-number">06</div>
+                <div class="course-info">
+                    <h3>Python desde Cero: Taller Básico para Principiantes</h3>
+                </div>
+                <div class="course-duration">0:40:00</div>
+            </div>
+            
+            <div class="course-item">
+                <div class="course-number">07</div>
+                <div class="course-info">
+                    <h3>Introducción a GitHub: Colabora y Comparte tu Código</h3>
+                </div>
+                <div class="course-duration">1:15:00</div>
+            </div>
+            
+            <div class="course-item">
+                <div class="course-number">08</div>
+                <div class="course-info">
+                    <h3>Refuerzo de SQL</h3>
+                </div>
+                <div class="course-duration">1:00:00</div>
+            </div>
+            
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2023 Domingo Martínez Díaz. Todos los derechos reservados.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
