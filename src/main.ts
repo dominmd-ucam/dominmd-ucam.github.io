@@ -6,6 +6,7 @@ import { buildScenery } from './world/props';
 import { buildGrass } from './world/grass';
 import { buildLandmarks } from './world/landmarks';
 import { buildLife } from './world/life';
+import { buildDiorama } from './world/diorama';
 import { Ambience } from './audio';
 import { DayCycle, type Preset } from './world/dayCycle';
 import { Player } from './player';
@@ -44,6 +45,8 @@ scene.add(water.mesh);
 const { palms, obstacles } = buildScenery(scene);
 const landmarks = buildLandmarks(scene);
 obstacles.push(...landmarks.obstacles);
+const diorama = buildDiorama(scene);
+obstacles.push(...diorama.obstacles);
 const life = buildLife(scene);
 scene.fog = new THREE.FogExp2('#cfe9f5', 0.0042);
 const audio = new Ambience();
@@ -85,6 +88,12 @@ resize();
 /* bucle */
 const clock = new THREE.Clock();
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+const camHead = new THREE.Vector3();
+function camBlocked(p: THREE.Vector3): boolean {
+  if (p.y > 9) return false;
+  for (const o of obstacles) if (o.r >= 1.4 && Math.hypot(p.x - o.x, p.z - o.z) < o.r + 0.6) return true;
+  return false;
+}
 let shownPrompt: string | null = null;
 let first = true;
 
@@ -109,6 +118,8 @@ function frame() {
     pp.z + Math.cos(input.yaw) * cp * input.dist,
   );
   camPos.y = Math.max(camPos.y, heightAt(camPos.x, camPos.z) + 0.8, 0.6);
+  // la cámara se acerca al jugador si hay una roca, el barco o la cabaña de por medio
+  for (let k = 0; k < 14 && camBlocked(camPos); k++) camPos.lerp(camHead.set(pp.x, pp.y + 1.5, pp.z), 0.12);
   camLook.set(pp.x, pp.y + 1.3, pp.z);
   if (first) camera.position.copy(camPos);
   else camera.position.lerp(camPos, 1 - Math.exp(-14 * dt));
@@ -117,6 +128,7 @@ function frame() {
   day.update(dt, pp, camera);
   terrainTime.value = t;
   landmarks.update(t, day.night);
+  diorama.update(t);
   life.update(t, dt, pp, day.night, day.waterEnv.horizon);
   audio.setNight(day.night);
   (scene.fog as THREE.FogExp2).color.copy(day.fogColor);
