@@ -1,10 +1,13 @@
 import * as THREE from 'three';
-import { heightAt } from './world/terrain';
+import { heightAt, onDock, DOCK } from './world/terrain';
+import { waveHeight } from './world/water';
 import type { Obstacle } from './world/props';
 import type { Input } from './input';
 
 const SPEED = 6.5;
-const MIN_GROUND = -0.65; // más profundo que esto = agua demasiado honda
+const MAX_DEPTH = -3.4;  // límite de profundidad a nado
+const SWIM_FROM = -0.55; // por debajo de esto, nada en vez de andar
+const LIMIT = 46;        // borde del mundo
 
 export class Player {
   group = new THREE.Group();
@@ -44,17 +47,20 @@ export class Player {
     this.group.position.set(start[0], heightAt(start[0], start[1]), start[1]);
   }
 
-  update(dt: number, input: Input) {
+  swimming = false;
+
+  update(dt: number, input: Input, t: number) {
     const sy = Math.sin(input.yaw), cy = Math.cos(input.yaw);
     // dirección relativa a la cámara
     const wx = input.move.x * cy - input.move.y * sy;
     const wz = -input.move.x * sy - input.move.y * cy;
-    const target = new THREE.Vector2(wx, wz).multiplyScalar(SPEED);
+    const target = new THREE.Vector2(wx, wz).multiplyScalar(this.swimming ? SPEED * 0.6 : SPEED);
     this.vel.lerp(target, 1 - Math.exp(-12 * dt));
 
     const p = this.group.position;
     const tryMove = (nx: number, nz: number) => {
-      if (heightAt(nx, nz) < MIN_GROUND) return false;
+      if (Math.hypot(nx, nz) > LIMIT) return false;
+      if (!onDock(nx, nz) && heightAt(nx, nz) < MAX_DEPTH) return false;
       for (const o of this.obstacles) {
         if (Math.hypot(nx - o.x, nz - o.z) < o.r + 0.35) return false;
       }
@@ -67,7 +73,10 @@ export class Player {
     else this.vel.set(0, 0);
 
     const h = heightAt(p.x, p.z);
-    p.y = Math.max(h, -0.4); // chapotea en la orilla sin hundirse
+    const dock = onDock(p.x, p.z);
+    this.swimming = !dock && h < SWIM_FROM;
+    const targetY = dock ? DOCK.y : this.swimming ? waveHeight(p.x, p.z, t) * 0.7 - 0.85 : Math.max(h, -0.4);
+    p.y += (targetY - p.y) * (1 - Math.exp(-(dock || this.swimming ? 10 : 40) * dt));
 
     const speed = this.vel.length();
     if (speed > 0.4) {
@@ -79,9 +88,18 @@ export class Player {
     }
     this.phase += speed * dt * 1.7;
     const k = Math.min(1, speed / SPEED), s = Math.sin(this.phase) * 0.9 * k;
-    this.legL.rotation.x = s; this.legR.rotation.x = -s;
-    this.armL.rotation.x = -s * 0.8; this.armR.rotation.x = s * 0.8;
-    this.body.position.y = Math.abs(Math.cos(this.phase)) * 0.06 * k;
-    this.body.rotation.x = 0.06 * k;
+    if (this.swimming) {
+      // braza: cuerpo inclinado hacia delante, brazos en círculo y patada corta
+      const sw = Math.sin(t * 5.5) ;
+      this.armL.rotation.x = -2.2 + Math.sin(t * 5.5) * 0.9 * (0.4 + k); this.armR.rotation.x = -2.2 - Math.sin(t * 5.5) * 0.9 * (0.4 + k);
+      this.legL.rotation.x = sw * 0.35 * (0.4 + k); this.legR.rotation.x = -sw * 0.35 * (0.4 + k);
+      this.body.rotation.x = 0.55 * Math.min(1, 0.4 + k);
+      this.body.position.y = 0.05 + Math.sin(t * 2.2) * 0.03;
+    } else {
+      this.legL.rotation.x = s; this.legR.rotation.x = -s;
+      this.armL.rotation.x = -s * 0.8; this.armR.rotation.x = s * 0.8;
+      this.body.position.y = Math.abs(Math.cos(this.phase)) * 0.06 * k;
+      this.body.rotation.x = 0.06 * k;
+    }
   }
 }

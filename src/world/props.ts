@@ -16,7 +16,7 @@ const leafGeo = (() => {
   const g = new THREE.PlaneGeometry(1, 1, 4, 10);
   const p = g.attributes.position as THREE.BufferAttribute;
   const col = new Float32Array(p.count * 3);
-  const dark = new THREE.Color('#2f8a4a'), light = new THREE.Color('#7dd36a'), c = new THREE.Color();
+  const dark = new THREE.Color('#2fae4a'), light = new THREE.Color('#8fe86a'), c = new THREE.Color();
   for (let i = 0; i < p.count; i++) {
     const u = p.getY(i) + 0.5; // 0 base → 1 punta
     const w = p.getX(i);
@@ -33,8 +33,8 @@ const leafGeo = (() => {
   g.computeVertexNormals();
   return g;
 })();
-const leafMat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.7 });
-const trunkMat = std('#a2724a');
+const leafMat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.7, flatShading: true });
+const trunkMat = std('#b97a4a', { flatShading: true });
 const cocoMat = std('#5b3b22');
 
 export interface Palm { group: THREE.Group; crown: THREE.Group; phase: number }
@@ -50,16 +50,22 @@ export function makePalm(x: number, z: number, scale: number, rnd: () => number)
     pts.push(new THREE.Vector3(Math.cos(dir) * lean * u * u, u * H, Math.sin(dir) * lean * u * u));
   }
   const curve = new THREE.CatmullRomCurve3(pts);
-  const trunk = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.22, 8), trunkMat);
-  trunk.castShadow = true;
-  group.add(trunk);
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.38, 0.5, 8), trunkMat);
-  base.position.y = 0.15; group.add(base);
-
+  // tronco escalonado: anillos de cono apilados siguiendo la curva
+  const rings = 11, up = new THREE.Vector3(0, 1, 0);
+  for (let i = 0; i < rings; i++) {
+    const a = curve.getPoint(i / rings), b = curve.getPoint((i + 1) / rings), v = b.clone().sub(a);
+    const rb = 0.36 - i * 0.016, rt = rb - 0.03;
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, v.length() * 1.18, 7), trunkMat);
+    seg.position.copy(a).add(b).multiplyScalar(0.5);
+    seg.quaternion.setFromUnitVectors(up, v.normalize());
+    seg.rotateY(i * 0.7);
+    seg.castShadow = true;
+    group.add(seg);
+  }
   const crown = new THREE.Group();
   crown.position.copy(pts[pts.length - 1]);
   group.add(crown);
-  const n = 9;
+  const n = 10;
   for (let i = 0; i < n; i++) {
     const leaf = new THREE.Mesh(leafGeo, leafMat);
     leaf.rotation.y = (i / n) * Math.PI * 2 + rnd() * 0.3;
@@ -96,18 +102,18 @@ export function buildScenery(scene: THREE.Scene) {
   }
 
   // rocas
-  const rockMat = std('#8d96a0', { roughness: 0.9 });
+  const rockMats = [std('#c9795a', { flatShading: true }), std('#b86a4f', { flatShading: true }), std('#a7adb4', { flatShading: true })];
   for (let i = 0; i < 22; i++) {
     const a = rnd() * Math.PI * 2, f = i < 12 ? 0.9 + rnd() * 0.2 : 0.3 + rnd() * 0.55;
     const r = islandRadius(a) * f, x = Math.cos(a) * r, z = Math.sin(a) * r;
     const h = heightAt(x, z);
     if (h < -0.8 || h > 3.4) continue;
     const s = 0.35 + rnd() * 0.8;
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), rockMat);
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), rockMats[i % 3]);
     const q = m.geometry.attributes.position as THREE.BufferAttribute;
     for (let k = 0; k < q.count; k++) {
       // el desplazamiento depende de la posición (no del índice) para no abrir grietas en las costuras
-      const j = 1 + Math.sin(q.getX(k) * 91.7 + q.getY(k) * 47.3 + q.getZ(k) * 63.1 + i) * 0.09;
+      const j = 1 + Math.sin(q.getX(k) * 91.7 + q.getY(k) * 47.3 + q.getZ(k) * 63.1 + i) * 0.16;
       q.setXYZ(k, q.getX(k) * j, q.getY(k) * j, q.getZ(k) * j);
     }
     m.geometry.computeVertexNormals();

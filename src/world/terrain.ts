@@ -22,8 +22,50 @@ function fbm(x: number, y: number): number {
   return s;
 }
 
+const BAY_A = 1.75;   // cala al sur
+const HEAD_A = -2.35; // promontorio rocoso con el faro
+const angDiff = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
 export function islandRadius(a: number): number {
-  return ISLAND_R + 3 * Math.sin(3 * a) + 2 * Math.cos(5 * a + 1);
+  let r = ISLAND_R + 3 * Math.sin(3 * a) + 2 * Math.cos(5 * a + 1);
+  r -= 11 * Math.exp(-((angDiff(a, BAY_A) / 0.34) ** 2));
+  r += 4 * Math.exp(-((angDiff(a, HEAD_A) / 0.5) ** 2));
+  return r;
+}
+
+/** Colina del faro. */
+export const HILL: [number, number] = [-9, -9];
+/** Islote cercano, alcanzable a nado. */
+export const ISLET: [number, number] = [-33, 20];
+
+/** Caminos de arena: polilíneas entre el punto de inicio, las estaciones y el faro. */
+const PATHS: [number, number][][] = [
+  [[6, 13], [8, 9], [4, 4], [0, 0]],
+  [[0, 0], [10, 8]],
+  [[0, 0], [16, -4]],
+  [[0, 0], [4, -14]],
+  [[0, 0], [-12, 6]],
+  [[0, 0], [-7, -6]],
+];
+function segDist(px: number, pz: number, ax: number, az: number, bx: number, bz: number) {
+  const dx = bx - ax, dz = bz - az;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1)));
+  return Math.hypot(px - (ax + t * dx), pz - (az + t * dz));
+}
+/** 1 sobre el camino, 0 fuera (con borde suave). */
+export function pathMask(x: number, z: number): number {
+  let d = 99;
+  for (const poly of PATHS) for (let i = 0; i < poly.length - 1; i++) d = Math.min(d, segDist(x, z, poly[i][0], poly[i][1], poly[i + 1][0], poly[i + 1][1]));
+  return 1 - THREE.MathUtils.smoothstep(d, 0.45, 1.15);
+}
+
+/** Muelle: sale de la costa en el ángulo DOCK.a y se adentra DOCK.len metros. */
+export const DOCK = { a: -0.9, len: 11, width: 1.7, y: 0.55 };
+export function dockStart() { return islandRadius(DOCK.a) - 2.2; }
+export function onDock(x: number, z: number): boolean {
+  const c = Math.cos(DOCK.a), s = Math.sin(DOCK.a);
+  const u = x * c + z * s - dockStart(), v = -x * s + z * c;
+  return u >= 0 && u <= DOCK.len && Math.abs(v) <= DOCK.width / 2;
 }
 
 /** Altura del terreno (el nivel del mar es y = 0). */
@@ -32,18 +74,24 @@ export function heightAt(x: number, z: number): number {
   const t = 1 - r / islandRadius(a);
   let h: number;
   if (t < 0) h = Math.max(HMIN, t * 10 - 0.3);
-  else h = Math.pow(t, 0.6) * 2.2 - 0.3;
+  else h = Math.pow(t, 0.4) * 2.4 - 0.3;
   const k = Math.min(1, Math.max(0, t * 3));
-  h += 5 * Math.exp(-((x + 7) ** 2 + (z + 7) ** 2) / 60) * k;
+  // colina rocosa del faro (con meseta arriba)
+  const hd = ((x - HILL[0]) ** 2 + (z - HILL[1]) ** 2);
+  h += 7.2 * Math.exp(-hd / 44) * k;
   h += (fbm(x * 0.12, z * 0.12) - 0.5) * 1.2 * k;
+  // islote de arena
+  const isd = (x - ISLET[0]) ** 2 + (z - ISLET[1]) ** 2;
+  h = Math.max(h, 1.7 * Math.exp(-isd / 22) - 0.5);
   return h;
 }
 
-const C_WET = new THREE.Color('#bfa774');
-const C_SAND = new THREE.Color('#f2dfa8');
+const C_WET = new THREE.Color('#b59a62');
+const C_SAND = new THREE.Color('#e6c987');
 const C_GRASS = new THREE.Color('#79c55a');
 const C_GRASS2 = new THREE.Color('#4a9e50');
-const C_ROCK = new THREE.Color('#8e8878');
+const C_ROCK = new THREE.Color('#b98260');
+const C_PATH = new THREE.Color('#e2cf9b');
 
 export function buildTerrain(): THREE.Mesh {
   const seg = 256;
@@ -61,13 +109,29 @@ export function buildTerrain(): THREE.Mesh {
     c.copy(C_WET).lerp(C_SAND, THREE.MathUtils.smoothstep(h, -0.4, 0.35));
     c.lerp(C_GRASS, THREE.MathUtils.smoothstep(h, 0.85, 1.25));
     c.lerp(C_GRASS2, THREE.MathUtils.smoothstep(h, 1.6, 3.2) * 0.8 + n * 0.25);
-    c.lerp(C_ROCK, THREE.MathUtils.smoothstep(1 - nor.getY(i), 0.18, 0.4) * (h > 0.6 ? 1 : 0));
+    c.lerp(C_ROCK, Math.max(THREE.MathUtils.smoothstep(1 - nor.getY(i), 0.3, 0.5) * (h > 0.6 ? 1 : 0), THREE.MathUtils.smoothstep(h, 5.2, 7.2) * 0.8));
+    c.lerp(C_PATH, pathMask(x, z) * THREE.MathUtils.smoothstep(h, 0.6, 1.1) * 0.9);
     c.multiplyScalar(0.94 + n * 0.12);
     col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }));
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  const uTime = { value: 0 };
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uTime = uTime;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nuniform float uTime;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float under = smoothstep(0.15, -0.3, vWPos.y) * (1.0 - smoothstep(-0.7, -2.6, vWPos.y));
+        float ca = sin(vWPos.x * 1.9 + uTime * 1.1) + sin(vWPos.z * 2.1 - uTime * 0.9) + sin((vWPos.x + vWPos.z) * 1.3 + uTime * 0.7);
+        diffuseColor.rgb += vec3(0.45, 0.8, 0.75) * pow(1.0 - abs(ca) / 3.0, 6.0) * under * 0.3;`);
+  };
+  const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
+  mesh.userData.uTime = uTime;
   return mesh;
 }
 

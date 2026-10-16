@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { heightAt } from './terrain';
+import { heightAt, pathMask } from './terrain';
 
 /** Hierba instanciada con viento en el vertex shader: una sola draw call. */
 export function buildGrass(count: number): { mesh: THREE.InstancedMesh; update(t: number): void } {
@@ -41,7 +41,7 @@ export function buildGrass(count: number): { mesh: THREE.InstancedMesh; update(t
   let n = 0, guard = 0;
   while (n < count && guard++ < count * 12) {
     const x = (Math.random() - 0.5) * 60, z = (Math.random() - 0.5) * 60, h = heightAt(x, z);
-    if (h < 1.0 || h > 3.6) continue;
+    if (h < 1.0 || h > 5.4 || pathMask(x, z) > 0.25) continue;
     const hh = 0.35 + Math.random() * 0.55;
     p.set(x, h - 0.02, z);
     q.setFromAxisAngle(up, Math.random() * Math.PI * 2);

@@ -12,8 +12,9 @@ export class UI {
   onClose: () => void = () => {};
   onPromptClick: () => void = () => {};
   onTime: (p: Preset | 'auto') => void = () => {};
+  onMute: () => boolean = () => false;
   private clockEl = $('clock');
-  private timeBtns = [...document.querySelectorAll<HTMLButtonElement>('#timebar button')];
+  private timeBtns = [...document.querySelectorAll<HTMLButtonElement>('#timebar button[data-preset]')];
   private lastClock = '';
   private lastAuto: boolean | null = null;
 
@@ -22,6 +23,8 @@ export class UI {
     this.modal.addEventListener('pointerdown', (e) => { if (e.target === this.modal) this.closeProject(); });
     this.prompt.addEventListener('click', () => this.onPromptClick());
     for (const b of this.timeBtns) b.addEventListener('click', () => this.onTime(b.dataset.preset as Preset | 'auto'));
+    const mute = $('muteBtn');
+    mute.addEventListener('click', () => { mute.textContent = this.onMute() ? '🔇' : '🔊'; });
     addEventListener('keydown', (e) => { if (e.key === 'Escape' && !this.modal.hidden) this.closeProject(); });
   }
 

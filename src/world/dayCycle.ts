@@ -24,6 +24,8 @@ export class DayCycle {
   readonly waterEnv: WaterEnv = { sunDir: new THREE.Vector3(), sunColor: new THREE.Color(), zenith: new THREE.Color(), horizon: new THREE.Color(), light: 1 };
   /** exposición que aplica el postprocesado */
   exposure = 0.5;
+  /** color del sol/cielo para tintar nubes y niebla */
+  readonly fogColor = new THREE.Color();
   /** 0 de día → 1 de noche cerrada */
   night = 0;
 
@@ -84,8 +86,8 @@ export class DayCycle {
     this.night = 1 - S(e, -0.25, 0.08);
 
     const su = this.sky.material.uniforms;
-    su.turbidity.value = 4 + gold * 4;
-    su.rayleigh.value = 1.5 + gold * 1.6;
+    su.turbidity.value = 2.6 + gold * 5;
+    su.rayleigh.value = 2.1 + gold * 1.4;
     su.mieCoefficient.value = 0.004 + gold * 0.004;
     su.mieDirectionalG.value = 0.85;
     su.sunPosition.value.copy(this.sunDir);
@@ -108,8 +110,9 @@ export class DayCycle {
     w.sunDir.copy(e > -0.1 ? this.sunDir : this.sunDir.clone().negate());
     w.sunColor.copy(this.sun.color).lerp(C('#a8c0ff'), this.night).multiplyScalar(0.4 + 0.6 * (1 - this.night));
     w.zenith.copy(C('#0a1636')).lerp(C('#6fb7ee'), day).lerp(C('#7a79c4'), gold * 0.35);
-    w.horizon.copy(C('#152748')).lerp(C('#cfe9f5'), day).lerp(this.tmp.set('#ffb98a'), gold * 0.7);
+    w.horizon.copy(C('#152748')).lerp(C('#cfe6f3'), day).lerp(this.tmp.set('#ffb98a'), gold * 0.7);
     w.light = 0.18 + 0.82 * day;
+    this.fogColor.copy(w.horizon);
 
     // el mapa de entorno (IBL) se regenera solo cuando el cielo ha cambiado de verdad
     if (Math.abs(e - this.envAt) > 0.04) this.refreshEnv(e);
