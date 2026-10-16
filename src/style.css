@@ -37,6 +37,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0a1e2c; col
 .prompt:hover { filter: brightness(1.06); }
 @keyframes pop { from { opacity: 0; transform: translateX(-50%) translateY(10px) scale(.9); } }
 
+/* hora del día */
+.timebar { position: fixed; top: max(16px, env(safe-area-inset-top)); right: 16px; display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 14px; border-radius: 99px; background: var(--glass); border: 1px solid var(--glass-line); backdrop-filter: blur(12px) saturate(1.3); -webkit-backdrop-filter: blur(12px) saturate(1.3); }
+.timebar output { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 15px; margin-right: 6px; min-width: 3.2em; }
+.timebar button { width: 34px; height: 34px; border: 0; border-radius: 50%; font-size: 16px; line-height: 1; cursor: pointer; background: transparent; transition: background .2s, transform .2s; }
+.timebar button:hover { background: rgba(255,255,255,.16); transform: scale(1.08); }
+.timebar button.on { background: rgba(255,184,77,.3); }
+@media (max-width: 560px) { .brand span { display: none; } .timebar output { display: none; } }
+
 /* joystick */
 #joy { position: fixed; z-index: 5; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); pointer-events: none; }
 #joy i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.55); transform: translate(-50%, -50%); }

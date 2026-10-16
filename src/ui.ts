@@ -1,4 +1,5 @@
 import type { Project } from './interactables';
+import type { Preset } from './world/dayCycle';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -10,11 +11,17 @@ export class UI {
   private hint = $('hint');
   onClose: () => void = () => {};
   onPromptClick: () => void = () => {};
+  onTime: (p: Preset | 'auto') => void = () => {};
+  private clockEl = $('clock');
+  private timeBtns = [...document.querySelectorAll<HTMLButtonElement>('#timebar button')];
+  private lastClock = '';
+  private lastAuto: boolean | null = null;
 
   constructor() {
     $('mClose').addEventListener('click', () => this.closeProject());
     this.modal.addEventListener('pointerdown', (e) => { if (e.target === this.modal) this.closeProject(); });
     this.prompt.addEventListener('click', () => this.onPromptClick());
+    for (const b of this.timeBtns) b.addEventListener('click', () => this.onTime(b.dataset.preset as Preset | 'auto'));
     addEventListener('keydown', (e) => { if (e.key === 'Escape' && !this.modal.hidden) this.closeProject(); });
   }
 
@@ -30,6 +37,14 @@ export class UI {
     if (!p) { this.prompt.hidden = true; return; }
     this.prompt.hidden = false;
     this.prompt.innerHTML = `<kbd>E</kbd> ${p.title}`;
+  }
+
+  setClock(text: string, auto: boolean) {
+    if (text !== this.lastClock) { this.clockEl.textContent = text; this.lastClock = text; }
+    if (auto !== this.lastAuto) {
+      this.lastAuto = auto;
+      for (const b of this.timeBtns) if (b.dataset.preset === 'auto') b.classList.toggle('on', auto);
+    }
   }
 
   get isOpen() { return !this.modal.hidden; }

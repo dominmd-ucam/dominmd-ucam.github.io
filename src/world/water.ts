@@ -32,8 +32,9 @@ uniform float uWorld;
 uniform vec2 uRange;
 uniform vec3 uShallow;
 uniform vec3 uDeep;
-uniform vec3 uSky;
+uniform vec3 uZenith;
 uniform vec3 uHorizon;
+uniform float uLight;
 uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 varying vec3 vWorld;
@@ -49,8 +50,11 @@ void main() {
   vec3 V = normalize(cameraPosition - vWorld);
   vec3 col = mix(uShallow, uDeep, smoothstep(0.0, 4.5, depth));
 
+  col *= uLight;
+  vec3 R = reflect(-V, N);
+  vec3 skyRef = mix(uHorizon, uZenith, pow(clamp(R.y, 0.0, 1.0), 0.45));
   float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-  col = mix(col, uSky, fres * 0.55);
+  col = mix(col, skyRef, 0.12 + fres * 0.6);
   float spec = pow(max(dot(reflect(-uSunDir, N), V), 0.0), 120.0);
   col += uSunColor * spec * 0.9;
 
@@ -58,7 +62,7 @@ void main() {
   float edge = 1.0 - smoothstep(0.0, 0.5 + 0.14 * n + 0.12 * sin(uTime * 1.3 + depth * 6.0), depth);
   float bands = smoothstep(0.55, 0.7, sin(depth * 18.0 - uTime * 1.6) * 0.5 + 0.5) * (1.0 - smoothstep(0.4, 1.4, depth)) * 0.35;
   float foam = clamp(edge + bands, 0.0, 1.0);
-  col = mix(col, vec3(1.0), foam * 0.85);
+  col = mix(col, vec3(0.2 + 0.8 * uLight), foam * 0.85);
 
   float alpha = max(mix(0.55, 0.96, smoothstep(0.0, 2.2, depth)), foam);
   float dist = length(cameraPosition - vWorld);
@@ -68,9 +72,11 @@ void main() {
   #include <colorspace_fragment>
 }`;
 
+export interface WaterEnv { sunDir: THREE.Vector3; sunColor: THREE.Color; zenith: THREE.Color; horizon: THREE.Color; light: number }
+
 export interface Water {
   mesh: THREE.Mesh;
-  update(t: number, center: THREE.Vector3): void;
+  update(t: number, center: THREE.Vector3, env: WaterEnv): void;
 }
 
 export function buildWater(sunDir: THREE.Vector3): Water {
@@ -83,8 +89,9 @@ export function buildWater(sunDir: THREE.Vector3): Water {
     uRange: { value: new THREE.Vector2(HEIGHT_RANGE[0], HEIGHT_RANGE[1]) },
     uShallow: { value: new THREE.Color('#5fe6d2') },
     uDeep: { value: new THREE.Color('#0a6c9c') },
-    uSky: { value: new THREE.Color('#a9dcff') },
+    uZenith: { value: new THREE.Color('#6fb7ee') },
     uHorizon: { value: new THREE.Color('#cfe9f5') },
+    uLight: { value: 1 },
     uSunDir: { value: sunDir.clone() },
     uSunColor: { value: new THREE.Color('#fff2cf') },
   };
@@ -93,8 +100,13 @@ export function buildWater(sunDir: THREE.Vector3): Water {
   mesh.frustumCulled = false;
   return {
     mesh,
-    update(t, center) {
+    update(t, center, env) {
       uniforms.uTime.value = t;
+      uniforms.uSunDir.value.copy(env.sunDir);
+      uniforms.uSunColor.value.copy(env.sunColor);
+      uniforms.uZenith.value.copy(env.zenith);
+      uniforms.uHorizon.value.copy(env.horizon);
+      uniforms.uLight.value = env.light;
       // el plano sigue al jugador (en pasos de 3 m) para mantener la densidad de olas cerca de la cámara
       mesh.position.x = Math.round(center.x / 3) * 3;
       mesh.position.z = Math.round(center.z / 3) * 3;

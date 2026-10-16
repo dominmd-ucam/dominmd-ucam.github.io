@@ -13,6 +13,14 @@
     <div class="brand"><b>Domin</b><span>Portfolio · Playa del Desarrollador</span></div>
     <div class="hint" id="hint">WASD / flechas para moverte · arrastra para girar la cámara · rueda para el zoom</div>
     <button class="prompt" id="prompt" hidden></button>
+    <div class="timebar" id="timebar" role="group" aria-label="Hora del día">
+      <output id="clock">11:00</output>
+      <button data-preset="morning" title="Mañana">🌅</button>
+      <button data-preset="noon" title="Mediodía">☀️</button>
+      <button data-preset="sunset" title="Atardecer">🌇</button>
+      <button data-preset="night" title="Noche">🌙</button>
+      <button data-preset="auto" title="Ciclo automático" class="on">⏱</button>
+    </div>
   </div>
   <div id="joy" hidden><i></i></div>
   <section id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mTitle">

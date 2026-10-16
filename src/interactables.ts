@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import data from './data/projects.json';
 import { heightAt } from './world/terrain';
 import { makeStation, type Obstacle, type ProjectType } from './world/props';
+import { loadModel } from './assets/loader';
+import type { Tier } from './quality';
 
 export interface Project {
   id: string;
@@ -21,7 +23,7 @@ export class Interactables {
   stations: Station[] = [];
   nearest: Station | null = null;
 
-  constructor(scene: THREE.Scene, obstacles: Obstacle[]) {
+  constructor(scene: THREE.Scene, obstacles: Obstacle[], tier: Tier) {
     for (const project of data as Project[]) {
       const [x, z] = project.position;
       const { group, accent, tick } = makeStation(project.type);
@@ -31,7 +33,14 @@ export class Interactables {
       scene.add(group);
       obstacles.push({ x, z, r: 1.0 });
 
-      const marker = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 0), new THREE.MeshBasicMaterial({ color: accent }));
+      // si existe public/models/station-<tipo>.glb sustituye al objeto procedural (que queda como respaldo)
+      void loadModel(`station-${project.type}`, tier).then((model) => {
+        if (!model) return;
+        for (const child of [...group.children]) if (!(child as THREE.Light).isLight) group.remove(child);
+        group.add(model);
+      });
+
+      const marker = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 0), new THREE.MeshBasicMaterial({ color: accent.clone().multiplyScalar(4) }));
       marker.position.set(x, y + 3.7, z);
       scene.add(marker);
       const beam = new THREE.Mesh(
