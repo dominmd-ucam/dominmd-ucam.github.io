@@ -1,0 +1,38 @@
+[
+  {
+    "id": "web-demo",
+    "type": "web",
+    "title": "Proyecto web (ejemplo)",
+    "description": "Aquí irá un demo simulado de una de mis webs: navegable, con datos de ejemplo.",
+    "tech": ["TypeScript", "React", "API REST"],
+    "repo": "https://github.com/",
+    "position": [10, 8]
+  },
+  {
+    "id": "bot-demo",
+    "type": "bot",
+    "title": "Bot (ejemplo)",
+    "description": "Conversación guionizada con uno de mis bots, como si estuviera en Discord o Telegram.",
+    "tech": ["Node.js", "Discord API"],
+    "repo": "https://github.com/",
+    "position": [-12, 6]
+  },
+  {
+    "id": "plugin-demo",
+    "type": "plugin",
+    "title": "Plugin (ejemplo)",
+    "description": "Panel simulado del plugin dentro de su aplicación anfitriona.",
+    "tech": ["Java", "Paper API"],
+    "repo": "https://github.com/",
+    "position": [4, -14]
+  },
+  {
+    "id": "cli-demo",
+    "type": "cli",
+    "title": "Herramienta de consola (ejemplo)",
+    "description": "Sesión de terminal grabada y reproducida junto a la hoguera.",
+    "tech": ["Python", "Docker"],
+    "repo": "https://github.com/",
+    "position": [16, -4]
+  }
+]

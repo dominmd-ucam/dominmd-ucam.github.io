@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Playa del Desarrollador · Portfolio</title>
+  <meta name="description" content="Portfolio interactivo en 3D: explora la playa y descubre mis proyectos." />
+</head>
+<body>
+  <canvas id="gl"></canvas>
+  <div id="loader"><div class="ld-card"><h1>Playa del Desarrollador</h1><div class="ld-bar"><i></i></div><p>Preparando la isla…</p></div></div>
+  <div id="hud" hidden>
+    <div class="brand"><b>Domin</b><span>Portfolio · Playa del Desarrollador</span></div>
+    <div class="hint" id="hint">WASD / flechas para moverte · arrastra para girar la cámara · rueda para el zoom</div>
+    <button class="prompt" id="prompt" hidden></button>
+  </div>
+  <div id="joy" hidden><i></i></div>
+  <section id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <div class="m-card">
+      <button class="m-close" id="mClose" aria-label="Cerrar">✕</button>
+      <span class="m-tag" id="mTag"></span>
+      <h2 id="mTitle"></h2>
+      <p id="mDesc"></p>
+      <div class="m-demo" id="mDemo"></div>
+      <div class="m-chips" id="mChips"></div>
+      <div class="m-actions"><a id="mRepo" target="_blank" rel="noopener">Ver en GitHub</a></div>
+    </div>
+  </section>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
