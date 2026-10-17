@@ -264,7 +264,7 @@ input.onEscape = () => { if (!blocked()) menu.show(); };
 ui.onPromptClick = interact;
 ui.onAvatar = () => { if (!menu.open && !dialogue.open && !ui.isOpen) avatarUI?.toggle(); };
 dialogue.onStart = () => achievements.unlock('friend');
-dialogue.onAction = (a) => { if (a === 'showPaths') interactables.pulse(4.5, clock.elapsedTime); };
+dialogue.onAction = (a) => { if (a === 'showPaths') interactables.pulse(4.5, timer.getElapsed()); };
 
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -291,7 +291,9 @@ function checkZones(p: THREE.Vector3) {
 }
 
 /* ---------- bucle ---------- */
-const clock = new THREE.Clock();
+// THREE.Timer sustituye a Clock (obsoleto): con connect() ignora el tiempo en que la pestaña está oculta y no da un salto enorme al volver
+const timer = new THREE.Timer();
+timer.connect(document);
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), camHead = new THREE.Vector3();
 function camBlocked(p: THREE.Vector3): boolean {
   if (trees.blocks(p)) return true;
@@ -303,8 +305,10 @@ let shownPrompt: string | null = null;
 let first = true, frameNo = 0, traveled = 0, swimT = 0, zoneT = 0, rippleT = 0, wasWet = false;
 const last = player.group.position.clone();
 
-function frame() {
-  const raw = clock.getDelta(), dt = Math.min(raw, 0.05), t = clock.elapsedTime;
+function frame(timestamp: number) {
+  if (first) timer.reset(); // el primer fotograma llega tras una carga larga: sin esto el primer delta sería de varios segundos
+  timer.update(timestamp);
+  const raw = Math.max(0, timer.getDelta()), dt = Math.min(raw, 0.05), t = timer.getElapsed();
   adaptive.tick(raw * 1000, settings.value.resolution === 'auto');
   input.enabled = !blocked();
   input.update();
