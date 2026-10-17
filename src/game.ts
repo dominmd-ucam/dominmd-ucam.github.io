@@ -229,14 +229,19 @@ settings.onChange((_, key) => applySettings(key));
 /* ---------- interacción ---------- */
 const blocked = () => menu.open || dialogue.open || ui.isOpen || (guestbook?.open ?? false) || (avatarUI?.open ?? false);
 type Target = { kind: 'station'; project: Project } | { kind: 'npc' } | { kind: 'guestbook' } | null;
+const NPC_TARGET: Target = { kind: 'npc' }, GUESTBOOK_TARGET: Target = { kind: 'guestbook' };
+const stationTargets = new Map<Project, Target>(); // se llama cada fotograma: no se crean objetos nuevos
 function pickTarget(): Target {
   const s = interactables.nearest;
   const dS = s ? Math.hypot(player.group.position.x - s.group.position.x, player.group.position.z - s.group.position.z) : 99;
   const dN = guide.distanceTo(player.group.position);
   const dG = infoPoint ? infoPoint.distanceTo(player.group.position) : 99;
-  if (dG < InfoPoint.REACH && dG <= dN && dG <= dS) return { kind: 'guestbook' };
-  if (dN < CatGuide.REACH && dN <= dS) return { kind: 'npc' };
-  return s ? { kind: 'station', project: s.project } : null;
+  if (dG < InfoPoint.REACH && dG <= dN && dG <= dS) return GUESTBOOK_TARGET;
+  if (dN < CatGuide.REACH && dN <= dS) return NPC_TARGET;
+  if (!s) return null;
+  let t = stationTargets.get(s.project);
+  if (!t) { t = { kind: 'station', project: s.project }; stationTargets.set(s.project, t); }
+  return t;
 }
 function interact() {
   if (blocked()) return;

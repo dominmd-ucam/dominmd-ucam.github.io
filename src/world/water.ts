@@ -96,7 +96,7 @@ const WAVES: [number, number, number, number, number][] = [[1, 0.3, 0.16, 0.35, 
 /** Misma altura de ola que calcula el shader: sirve para barcas, nado y criaturas. */
 export function waveHeight(x: number, z: number, t: number): number {
   let h = 0;
-  for (const [dx, dz, amp, k, sp] of WAVES) { const l = Math.hypot(dx, dz); h += amp * Math.sin(((dx * x + dz * z) / l) * k + t * sp); }
+  for (let i = 0; i < WAVES.length; i++) { const w = WAVES[i], l = Math.hypot(w[0], w[1]); h += w[2] * Math.sin(((w[0] * x + w[1] * z) / l) * w[3] + t * w[4]); }
   return h;
 }
 

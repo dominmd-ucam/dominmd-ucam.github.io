@@ -3,7 +3,7 @@ import { heightAt, onDock, DOCK } from './world/terrain';
 import { waveHeight } from './world/water';
 import type { Obstacle } from './world/props';
 import type { Input } from './input';
-import type { Avatar } from './avatar/avatar';
+import type { Avatar, Motion } from './avatar/avatar';
 
 const SPEED = 6.5;
 const MAX_DEPTH = -3.4;  // límite de profundidad a nado
@@ -50,6 +50,7 @@ export class Player {
 
   swimming = false;
   private tgt = new THREE.Vector2();
+  private motion: Motion = { speed: 0, swimming: false, t: 0 };
   avatar: Avatar | null = null;
   private holder = new THREE.Group();
   /** altura objetivo del avatar y giro para que mire a +Z del jugador (se ajusta según el modelo) */
@@ -103,7 +104,8 @@ export class Player {
       this.heading += d * (1 - Math.exp(-14 * dt));
       this.group.rotation.y = this.heading;
     }
-    this.avatar?.update(dt, { speed: speed / SPEED, swimming: this.swimming, t });
+    const mo = this.motion; mo.speed = speed / SPEED; mo.swimming = this.swimming; mo.t = t;
+    this.avatar?.update(dt, mo);
     this.phase += speed * dt * 1.7;
     const k = Math.min(1, speed / SPEED), s = Math.sin(this.phase) * 0.9 * k;
     if (this.swimming) {

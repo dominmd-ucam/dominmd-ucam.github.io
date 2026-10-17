@@ -5,7 +5,7 @@ import type { PeerRow } from '../net/presence';
 
 const MAX_GHOSTS = 30;
 
-interface Ghost { group: THREE.Group; body: THREE.Group; target: THREE.Vector3; rot: number; m: number; w: boolean; seen: number; phase: number; fade: number; label: THREE.Sprite; name: string }
+interface Ghost { id: string; mat: THREE.MeshBasicMaterial; group: THREE.Group; body: THREE.Group; target: THREE.Vector3; rot: number; m: number; w: boolean; seen: number; phase: number; fade: number; label: THREE.Sprite; name: string }
 
 function nameSprite(text: string): THREE.Sprite {
   const c = document.createElement('canvas'); c.width = 256; c.height = 64;
@@ -89,12 +89,12 @@ export class Ghosts {
     group.add(label);
     group.position.set(r.x, heightAt(r.x, r.z), r.z);
     this.scene.add(group);
-    return { group, body, target: new THREE.Vector3(r.x, 0, r.z), rot: r.r, m: r.m, w: r.w, seen: 0, phase: Math.random() * 6, fade: 0, label, name: r.name };
+    return { id: r.id, mat, group, body, target: new THREE.Vector3(r.x, 0, r.z), rot: r.r, m: r.m, w: r.w, seen: 0, phase: Math.random() * 6, fade: 0, label, name: r.name };
   }
 
   update(dt: number, t: number, now: number) {
-    for (const [id, g] of this.ghosts) {
-      if (now - g.seen > 6000) { this.remove(id); continue; } // sin noticias durante 6 s: se fue
+    for (const g of this.ghosts.values()) {
+      if (now - g.seen > 6000) { this.remove(g.id); continue; } // sin noticias durante 6 s: se fue
       const p = g.group.position;
       const k = 1 - Math.exp(-8 * dt);
       p.x += (g.target.x - p.x) * k; p.z += (g.target.z - p.z) * k;
@@ -106,12 +106,11 @@ export class Ghosts {
       g.phase += dt * (3 + g.m * 8);
       g.body.position.y = Math.abs(Math.sin(g.phase)) * 0.07 * Math.min(1, g.m) + Math.sin(t * 1.6 + g.phase * 0.1) * 0.04;
       g.body.rotation.x = g.w ? 0.7 : 0;
-      g.fade = Math.min(1, g.fade + dt * 1.5);
-      g.group.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (m.isMesh) (m.material as THREE.MeshBasicMaterial).opacity = 0.5 * g.fade;
-      });
-      (g.label.material as THREE.SpriteMaterial).opacity = g.fade;
+      if (g.fade < 1) { // el fundido de entrada dura ~0,7 s; después la opacidad ya no cambia
+        g.fade = Math.min(1, g.fade + dt * 1.5);
+        g.mat.opacity = 0.5 * g.fade; // los cuatro cuerpos comparten el material
+        (g.label.material as THREE.SpriteMaterial).opacity = g.fade;
+      }
     }
   }
 }

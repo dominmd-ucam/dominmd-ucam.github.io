@@ -103,9 +103,12 @@ export function buildTrees(scene: THREE.Scene, obstacles: Obstacle[], count: num
   return {
     update: (t, cam) => { uTime.value = t; if (cam) assignLods(cam); },
     /** ¿está el punto (la cámara) dentro de alguna copa? */
-    blocks: (p) => spots.some((s) => {
-      const y0 = heightAt(s.x, s.z) + 2.0 * s.s;
-      return p.y > y0 && p.y < y0 + 5.5 * s.s && Math.hypot(p.x - s.x, p.z - s.z) < 2.9 * s.s;
-    }),
+    blocks: (p) => {
+      for (let i = 0; i < spots.length; i++) {
+        const s = spots[i], y0 = heightAt(s.x, s.z) + 2.0 * s.s;
+        if (p.y > y0 && p.y < y0 + 5.5 * s.s && Math.hypot(p.x - s.x, p.z - s.z) < 2.9 * s.s) return true;
+      }
+      return false;
+    },
   };
 }

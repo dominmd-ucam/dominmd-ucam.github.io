@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Avatar } from '../avatar/avatar';
+import { Avatar, type Motion } from '../avatar/avatar';
 import { defaultConfig, type AvatarConfig } from '../avatar/config';
 import { heightAt } from './terrain';
 import type { Obstacle } from './props';
@@ -10,6 +10,7 @@ export class CatGuide {
   readonly pos: THREE.Vector3;
   private avatar: Avatar | null = null;
   private wave = 0;
+  private motion: Motion = { speed: 0, swimming: false, t: 0 }; // reutilizado en cada fotograma
   private greeted = false;
   private waveUntil = 0;
   /** distancia a la que se puede hablar */
@@ -50,6 +51,7 @@ export class CatGuide {
     // saluda la primera vez que el jugador se acerca
     if (!this.greeted && d < 9) { this.greeted = true; this.waveUntil = t + 3.2; }
     this.wave += ((t < this.waveUntil ? 1 : 0) - this.wave) * Math.min(1, dt * 6);
-    this.avatar.update(dt, { speed: 0, swimming: false, t, wave: this.wave });
+    const mo = this.motion; mo.t = t; mo.wave = this.wave;
+    this.avatar.update(dt, mo);
   }
 }

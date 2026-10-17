@@ -31,6 +31,8 @@ function jitter(g: THREE.BufferGeometry, amount: number, seed = 0): THREE.Buffer
   return g;
 }
 
+const FLAME = new THREE.Color('#ffb347');
+
 export interface Landmarks {
   update(t: number, night: number): void;
   obstacles: Obstacle[];
@@ -103,6 +105,7 @@ export function buildLandmarks(scene: THREE.Object3D): Landmarks {
       glassM.emissiveIntensity = on * 3;
       beamM.opacity = on * 0.22;
       light.intensity = on * 14;
+      light.visible = on > 0.01; // una luz apagada fuera de la escena no cuesta nada en los shaders
       pivot.rotation.y = t * 0.9;
     });
   }
@@ -209,9 +212,10 @@ export function buildLandmarks(scene: THREE.Object3D): Landmarks {
     const lamp = new THREE.PointLight('#ffa64a', 0, 14, 2); lamp.position.set(-13.2, 2.2, -2.2); scene.add(lamp);
     ticks.push((t, night) => {
       const on = THREE.MathUtils.smoothstep(night, 0.1, 0.6);
-      flameM.color.set('#ffb347').multiplyScalar(0.6 + on * 3.4);
+      flameM.color.copy(FLAME).multiplyScalar(0.6 + on * 3.4); // el color base está precalculado: color.set(string) analiza el texto en cada llamada
       for (const f of flames) { const k = 1 + Math.sin(t * 10 + f.position.x * 7) * 0.12; f.scale.set(1 / k, k, 1 / k); }
       lamp.intensity = on * 5 * (0.9 + Math.sin(t * 9) * 0.1);
+      lamp.visible = on > 0.01;
     });
   }
 

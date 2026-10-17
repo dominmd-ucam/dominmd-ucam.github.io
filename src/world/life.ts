@@ -123,7 +123,8 @@ export function buildLife(scene: THREE.Scene, gullCount = 60): Life {
       }
 
       // Cardumen: cuando te acercas huyen en abanico (efecto fuente) y vuelven poco a poco a su ronda
-      school.forEach((f, i) => {
+      for (let i = 0; i < school.length; i++) {
+        const f = school[i];
         const a = t * f.sp + f.ph;
         let x = f.cx + Math.cos(a) * f.r, z = f.cz + Math.sin(a) * f.r;
         const dx = x - player.x, dz = z - player.z, d = Math.hypot(dx, dz);
@@ -154,7 +155,7 @@ export function buildLife(scene: THREE.Scene, gullCount = 60): Life {
         dummy.rotation.set(0, f.scare > 0.05 ? Math.atan2(f.fx, f.fz) : -a + (f.sp > 0 ? 0 : Math.PI) + Math.PI, Math.sin(t * (9 + f.scare * 14) + i) * 0.15);
         dummy.updateMatrix();
         fishMesh.setMatrixAt(i, dummy.matrix);
-      });
+      }
       fishMesh.instanceMatrix.needsUpdate = true;
       flashAttr.needsUpdate = true;
     },

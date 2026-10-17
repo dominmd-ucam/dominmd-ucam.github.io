@@ -4,6 +4,7 @@ import { CATEGORIES, LOCKS, SKIN_COLORS, type AvatarConfig, defaultConfig } from
 
 const BASE = `${import.meta.env.BASE_URL}models/avatar/`;
 
+const AXIS_X = new THREE.Vector3(1, 0, 0);
 export interface Motion { speed: number; swimming: boolean; t: number; /** 0–1: saluda con el brazo derecho */ wave?: number }
 
 /**
@@ -125,7 +126,7 @@ export class Avatar {
   private _axis = new THREE.Vector3();
 
   /** Gira un hueso `angle` radianes alrededor de un eje del personaje (por defecto, su derecha). */
-  private swing(name: string, angle: number, local = new THREE.Vector3(1, 0, 0)) {
+  private swing(name: string, angle: number, local = AXIS_X) {
     const bone = this.bones[name];
     if (!bone?.parent) return;
     bone.parent.getWorldQuaternion(this._pw);
