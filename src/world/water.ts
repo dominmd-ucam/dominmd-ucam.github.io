@@ -93,7 +93,7 @@ export interface Water {
 }
 
 export function buildWater(sunDir: THREE.Vector3): Water {
-  const geo = new THREE.PlaneGeometry(900, 900, 300, 300);
+  const geo = new THREE.PlaneGeometry(900, 900, 240, 240);
   geo.rotateX(-Math.PI / 2);
   // vértices desplazados al azar (según su posición): facetas irregulares en vez de una rejilla regular
   const pp = geo.attributes.position as THREE.BufferAttribute;

@@ -4,7 +4,7 @@ import { CATEGORIES, LOCKS, SKIN_COLORS, type AvatarConfig, defaultConfig } from
 
 const BASE = `${import.meta.env.BASE_URL}models/avatar/`;
 
-export interface Motion { speed: number; swimming: boolean; t: number }
+export interface Motion { speed: number; swimming: boolean; t: number; /** 0–1: saluda con el brazo derecho */ wave?: number }
 
 /**
  * Avatar modular: un esqueleto Mixamo compartido y piezas SkinnedMesh intercambiables.
@@ -143,6 +143,10 @@ export class Avatar {
     const k = Math.min(1, m.speed);
     this.phase += dt * (m.swimming ? 5.5 : 3 + 7 * k);
     const s = Math.sin(this.phase);
+    if (m.wave && m.wave > 0.01) {
+      this.swing('mixamorigRightArm', -2.6 * m.wave + Math.sin(m.t * 9) * 0.25 * m.wave);
+      this.swing('mixamorigRightForeArm', -0.5 * m.wave + Math.sin(m.t * 9) * 0.45 * m.wave);
+    }
     if (m.swimming) {
       // braza: brazos por encima de la cabeza alternando, patada corta
       this.swing('mixamorigLeftArm', -2.5 + s * 0.8 * (0.5 + k));

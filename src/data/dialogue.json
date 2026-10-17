@@ -1,0 +1,37 @@
+{
+  "npc": { "id": "misu", "name": "MISU" },
+  "start": "hola",
+  "nodes": {
+    "hola": {
+      "text": "¡Miau! Soy Misu, la guía de esta isla. Bienvenido al portfolio de Domin: aquí cada objeto brillante es uno de sus proyectos.",
+      "choices": [
+        { "label": "¿Qué hay en la isla?", "next": "isla" },
+        { "label": "¿Quién es Domin?", "next": "domin" },
+        { "label": "Enséñame el camino", "next": "camino", "action": "showPaths" },
+        { "label": "Hasta luego", "next": null }
+      ]
+    },
+    "isla": {
+      "text": "El portátil bajo la sombrilla es una web, el cangrejo robot es un bot, el cofre es un plugin y la hoguera es una herramienta de consola. Acércate a cualquiera y pulsa E. También hay un faro, un barco varado y una cueva con tesoro… ¡y un islote al que se llega a nado!",
+      "choices": [
+        { "label": "¿Quién es Domin?", "next": "domin" },
+        { "label": "Enséñame el camino", "next": "camino", "action": "showPaths" },
+        { "label": "Vale, gracias", "next": null }
+      ]
+    },
+    "domin": {
+      "text": "Domin es desarrollador y le gusta montar de todo: webs, bots, plugins y herramientas. Esta isla es su forma de enseñarlo sin un currículum aburrido. (Edita este texto en src/data/dialogue.json.)",
+      "choices": [
+        { "label": "¿Qué hay en la isla?", "next": "isla" },
+        { "label": "Enséñame el camino", "next": "camino", "action": "showPaths" },
+        { "label": "Hasta luego", "next": null }
+      ]
+    },
+    "camino": {
+      "text": "¡Mira las columnas de luz! Cada una marca un proyecto. Sigue los caminos de arena o fíate de los carteles del cruce. ¡Buen viaje!",
+      "choices": [
+        { "label": "¡Gracias, Misu!", "next": null }
+      ]
+    }
+  }
+}

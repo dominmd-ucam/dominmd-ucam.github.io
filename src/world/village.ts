@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { heightAt, pathMask } from './terrain';
 import type { Obstacle } from './props';
+import { batchStatic } from './batch';
 
 const mat = (color: string, o: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...o });
@@ -26,7 +27,7 @@ function label(text: string, bg = '#d9a05b'): THREE.Mesh {
 }
 
 /** Valla de postes y travesaños entre dos puntos; se salta los tramos sobre caminos o fuera de la hierba. */
-function fence(scene: THREE.Scene, a: [number, number], b: [number, number]) {
+function fence(scene: THREE.Object3D, a: [number, number], b: [number, number]) {
   const len = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.round(len / 1.5));
   const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
   const post = new THREE.CylinderGeometry(0.1, 0.12, 1.15, 6);
@@ -45,7 +46,7 @@ function fence(scene: THREE.Scene, a: [number, number], b: [number, number]) {
   }
 }
 
-export function buildVillage(scene: THREE.Scene): { obstacles: Obstacle[] } {
+export function buildVillage(scene: THREE.Object3D): { obstacles: Obstacle[] } {
   const obstacles: Obstacle[] = [];
 
   /* ---------- casita mediterránea ---------- */
@@ -70,6 +71,7 @@ export function buildVillage(scene: THREE.Scene): { obstacles: Obstacle[] } {
     }
     add(g, new THREE.BoxGeometry(2.2, 0.3, 0.4), WOOD, 1.4, 0.95, 2.15);
     for (let i = 0; i < 5; i++) add(g, new THREE.IcosahedronGeometry(0.16, 1), mat(['#ff7a8a', '#ffd23f', '#ff9ac1'][i % 3]), 0.5 + i * 0.4, 1.2, 2.15);
+    batchStatic(g);
     scene.add(g);
     obstacles.push({ x: cx, z: cz, r: 2.7 });
     fence(scene, [cx - 5, cz + 4.5], [cx + 5, cz + 4.5]);

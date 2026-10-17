@@ -1,31 +1,34 @@
 import type { Project } from './interactables';
-import type { Preset } from './world/dayCycle';
+import { ICONS } from './ui/icons';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const TYPE_LABEL: Record<string, string> = { web: 'Web', bot: 'Bot', plugin: 'Plugin', cli: 'Consola' };
 
+/** HUD, aviso de interacción y ficha de proyecto. El menú, los diálogos y los logros viven en src/ui/. */
 export class UI {
   private modal = $('modal');
   private prompt = $<HTMLButtonElement>('prompt');
   private hint = $('hint');
+  private counter = $('projN');
+  private muteBtn = $<HTMLButtonElement>('muteBtn');
   onClose: () => void = () => {};
   onPromptClick: () => void = () => {};
-  onTime: (p: Preset | 'auto') => void = () => {};
   onMute: () => boolean = () => false;
-  private clockEl = $('clock');
-  private timeBtns = [...document.querySelectorAll<HTMLButtonElement>('#timebar button[data-preset]')];
-  private lastClock = '';
-  private lastAuto: boolean | null = null;
+  onPause: () => void = () => {};
+  onAvatar: () => void = () => {};
 
   constructor() {
     $('mClose').addEventListener('click', () => this.closeProject());
-    this.modal.addEventListener('pointerdown', (e) => { if (e.target === this.modal) this.closeProject(); });
+    this.modal.addEventListener('pointerdown', (e) => { if (e.target === this.modal || (e.target as HTMLElement).classList.contains('m-wrap')) this.closeProject(); });
     this.prompt.addEventListener('click', () => this.onPromptClick());
-    for (const b of this.timeBtns) b.addEventListener('click', () => this.onTime(b.dataset.preset as Preset | 'auto'));
-    const mute = $('muteBtn');
-    mute.addEventListener('click', () => { mute.textContent = this.onMute() ? '🔇' : '🔊'; });
     addEventListener('keydown', (e) => { if (e.key === 'Escape' && !this.modal.hidden) this.closeProject(); });
+    $('pauseBtn').innerHTML = ICONS.pause;
+    $('avatarBtn').innerHTML = ICONS.avatar;
+    this.setMuted(false);
+    $('pauseBtn').addEventListener('click', () => this.onPause());
+    $('avatarBtn').addEventListener('click', () => this.onAvatar());
+    this.muteBtn.addEventListener('click', () => this.setMuted(this.onMute()));
   }
 
   ready() {
@@ -33,21 +36,17 @@ export class UI {
     const l = $('loader');
     l.classList.add('done');
     setTimeout(() => l.remove(), 700);
-    setTimeout(() => this.hint.classList.add('gone'), 9000);
+    setTimeout(() => this.hint.classList.add('gone'), 10000);
   }
 
-  setPrompt(p: Project | null) {
-    if (!p) { this.prompt.hidden = true; return; }
+  setMuted(muted: boolean) { this.muteBtn.innerHTML = muted ? ICONS.muted : ICONS.sound; }
+  setCounter(n: number) { this.counter.textContent = String(n); }
+
+  setPrompt(text: string | null) {
+    if (!text) { this.prompt.hidden = true; return; }
     this.prompt.hidden = false;
-    this.prompt.innerHTML = `<kbd>E</kbd> ${p.title}`;
-  }
-
-  setClock(text: string, auto: boolean) {
-    if (text !== this.lastClock) { this.clockEl.textContent = text; this.lastClock = text; }
-    if (auto !== this.lastAuto) {
-      this.lastAuto = auto;
-      for (const b of this.timeBtns) if (b.dataset.preset === 'auto') b.classList.toggle('on', auto);
-    }
+    this.prompt.innerHTML = '<kbd>E</kbd><span></span>';
+    (this.prompt.querySelector('span') as HTMLElement).textContent = text;
   }
 
   get isOpen() { return !this.modal.hidden; }

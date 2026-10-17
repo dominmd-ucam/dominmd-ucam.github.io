@@ -7,6 +7,7 @@ export class Ambience {
   private foam!: GainNode;
   muted = false;
   private night = 0;
+  private volume = 0.75;
   private timers: number[] = [];
 
   /** Debe llamarse dentro de un gesto del usuario (clic, tecla). */
@@ -15,7 +16,7 @@ export class Ambience {
     try {
       const ac = new AudioContext();
       this.ac = ac;
-      this.master = ac.createGain(); this.master.gain.value = this.muted ? 0 : 0.8; this.master.connect(ac.destination);
+      this.master = ac.createGain(); this.master.gain.value = this.muted ? 0 : this.volume; this.master.connect(ac.destination);
       this.birdBus = ac.createGain(); this.birdBus.connect(this.master);
       const len = ac.sampleRate * 3, buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -33,9 +34,19 @@ export class Ambience {
   }
 
   toggleMute(): boolean {
-    this.muted = !this.muted;
-    if (this.ac) this.master.gain.setTargetAtTime(this.muted ? 0 : 0.8, this.ac.currentTime, 0.1);
+    this.setMuted(!this.muted);
     return this.muted;
+  }
+
+  setMuted(m: boolean) {
+    this.muted = m;
+    if (this.ac) this.master.gain.setTargetAtTime(m ? 0 : this.volume, this.ac.currentTime, 0.1);
+  }
+
+  /** 0–8 */
+  setVolume(v: number) {
+    this.volume = Math.max(0, Math.min(8, v)) / 8 * 1.1;
+    if (this.ac && !this.muted) this.master.gain.setTargetAtTime(this.volume, this.ac.currentTime, 0.1);
   }
 
   /** 0 de día → 1 de noche: de noche hay menos pájaros. */

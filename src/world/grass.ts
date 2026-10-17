@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { heightAt, pathMask } from './terrain';
 
 /** Hierba instanciada con viento en el vertex shader: una sola draw call. */
-export function buildGrass(count: number): { mesh: THREE.InstancedMesh; update(t: number): void } {
+export function buildGrass(count: number): { group: THREE.Group; update(t: number): void } {
   // hoja: 3 tramos, afilada hacia la punta
   const segs = 3, pos: number[] = [], col: number[] = [], idx: number[] = [];
   const base = new THREE.Color('#3f9d3f'), tip = new THREE.Color('#c9f06a'), c = new THREE.Color();
@@ -34,10 +34,10 @@ export function buildGrass(count: number): { mesh: THREE.InstancedMesh; update(t
         transformed.z += cos(uTime * 1.3 + ip.x * 0.35) * bend * 0.14;`);
   };
 
-  const mesh = new THREE.InstancedMesh(geo, mat, count);
-  mesh.frustumCulled = false;
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-  const tint = new THREE.Color();
+  // posiciones primero; después se reparten en bloques de 16 m para que el motor pueda descartar los que no se ven
+  const CELL = 16;
+  const chunks = new Map<string, { m: THREE.Matrix4; c: THREE.Color }[]>();
+  const q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   let n = 0, guard = 0;
   while (n < count && guard++ < count * 12) {
     const x = (Math.random() - 0.5) * 60, z = (Math.random() - 0.5) * 60, h = heightAt(x, z);
@@ -46,14 +46,21 @@ export function buildGrass(count: number): { mesh: THREE.InstancedMesh; update(t
     p.set(x, h - 0.02, z);
     q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
     s.set(0.07 + Math.random() * 0.05, hh, 1);
-    m.compose(p, q, s);
-    mesh.setMatrixAt(n, m);
-    tint.setHSL(0.26 + Math.random() * 0.07, 0.65, 0.42 + Math.random() * 0.2);
-    mesh.setColorAt(n, tint);
+    const key = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+    let list = chunks.get(key);
+    if (!list) { list = []; chunks.set(key, list); }
+    list.push({ m: new THREE.Matrix4().compose(p, q, s), c: new THREE.Color().setHSL(0.26 + Math.random() * 0.07, 0.65, 0.42 + Math.random() * 0.2) });
     n++;
   }
-  mesh.count = n;
-  mesh.instanceMatrix.needsUpdate = true;
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  return { mesh, update: (t) => { uTime.value = t; } };
+  const group = new THREE.Group();
+  for (const list of chunks.values()) {
+    const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+    list.forEach((it, i) => { mesh.setMatrixAt(i, it.m); mesh.setColorAt(i, it.c); });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.computeBoundingSphere();
+    mesh.boundingSphere!.radius += 0.6; // margen para el movimiento del viento
+    group.add(mesh);
+  }
+  return { group, update: (t: number) => { uTime.value = t; } };
 }

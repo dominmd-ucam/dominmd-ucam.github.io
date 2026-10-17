@@ -15,6 +15,8 @@ export interface Post {
   render(dt: number): void;
   setSize(w: number, h: number): void;
   setExposure(v: number): void;
+  /** activa o desactiva bloom, viñeta y antialiasing (a nivel bajo siempre está desactivado) */
+  setEnabled(on: boolean): void;
 }
 
 /** Nivel bajo: render directo con el tone mapping nativo. Medio/alto: bloom, viñeta y SMAA. */
@@ -25,6 +27,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
       render: () => renderer.render(scene, camera),
       setSize: () => {},
       setExposure: (v) => { renderer.toneMappingExposure = v; },
+      setEnabled: () => {},
     };
   }
   const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
@@ -34,9 +37,14 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const tone = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC });
   composer.addPass(new EffectPass(camera, exposure, bloom, tone, new HueSaturationEffect({ saturation: 0.34 }), new BrightnessContrastEffect({ contrast: 0.12 }), new VignetteEffect({ offset: 0.35, darkness: 0.28 })));
   composer.addPass(new EffectPass(camera, new SMAAEffect()));
+  let enabled = true, expo = 0.5;
   return {
-    render: (dt) => composer.render(dt),
+    render: (dt) => {
+      if (enabled) { renderer.toneMapping = THREE.NoToneMapping; composer.render(dt); }
+      else { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = expo * 1.1; renderer.render(scene, camera); }
+    },
     setSize: (w, h) => composer.setSize(w, h, false),
-    setExposure: (v) => { exposure.exposure = v; },
+    setExposure: (v) => { expo = v; exposure.exposure = v; },
+    setEnabled: (on) => { enabled = on; },
   };
 }

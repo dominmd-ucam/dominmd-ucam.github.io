@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { DOCK, HILL, ISLET, dockStart, heightAt, islandRadius } from './terrain';
 import type { Obstacle } from './props';
 import { waveHeight } from './water';
+import { batchStatic } from './batch';
 
 const mat = (color: string, o: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, ...o });
@@ -35,7 +36,7 @@ export interface Landmarks {
   obstacles: Obstacle[];
 }
 
-export function buildLandmarks(scene: THREE.Scene): Landmarks {
+export function buildLandmarks(scene: THREE.Object3D): Landmarks {
   const obstacles: Obstacle[] = [];
   const ticks: ((t: number, night: number) => void)[] = [];
 
@@ -62,6 +63,7 @@ export function buildLandmarks(scene: THREE.Scene): Landmarks {
     add(g, box(0.3, 0.2, 4.1), WOOD_D, 0, 4.1, 0);
     // escalones
     for (let i = 0; i < 3; i++) add(g, box(1.0, 0.16, 0.45), WOOD_L, 0, 0.12 + i * 0.2, 2.15 - i * 0.4);
+    batchStatic(g);
     scene.add(g);
     obstacles.push({ x: hx, z: hz, r: 2.3 });
 
@@ -88,10 +90,12 @@ export function buildLandmarks(scene: THREE.Scene): Landmarks {
     const beamM = new THREE.MeshBasicMaterial({ color: '#ffe9a8', transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 3.2, 26, 12, 1, true), beamM);
     beam.geometry.translate(0, -13, 0); beam.geometry.rotateZ(Math.PI / 2); // apunta a +x
-    const pivot = new THREE.Group(); pivot.position.y = top; pivot.add(beam, beam.clone());
+    glassM.userData.unique = true;
+    const pivot = new THREE.Group(); pivot.userData.dynamic = true; pivot.position.y = top; pivot.add(beam, beam.clone());
     pivot.children[1].rotation.y = Math.PI;
     g.add(pivot);
     const light = new THREE.PointLight('#ffd36a', 0, 30, 2); light.position.y = top; g.add(light);
+    batchStatic(g);
     scene.add(g);
     obstacles.push({ x: lx, z: lz, r: 1.5 });
     ticks.push((t, night) => {
@@ -114,10 +118,12 @@ export function buildLandmarks(scene: THREE.Scene): Landmarks {
       if (k % 4 === 0) for (const v of [-1, 1]) add(g, new THREE.CylinderGeometry(0.1, 0.12, 3.2, 7), WOOD_D, u0 + k * 0.62 + 0.3, -0.9, v * (DOCK.width / 2 + 0.05));
     }
     for (const v of [-1, 1]) add(g, box(DOCK.len, 0.08, 0.1), WOOD_D, u0 + DOCK.len / 2, DOCK.y + 0.02, v * (DOCK.width / 2));
+    batchStatic(g);
     scene.add(g);
 
     // balsa con vela, amarrada junto al final del muelle
     const raft = new THREE.Group();
+    raft.userData.dynamic = true;
     for (let i = 0; i < 6; i++) add(raft, new THREE.CylinderGeometry(0.22, 0.22, 3.6, 7), i % 2 ? WOOD : WOOD_L, (i - 2.5) * 0.46, 0, 0).rotation.x = Math.PI / 2;
     for (const z of [-0.9, 0.9]) add(raft, box(2.9, 0.1, 0.18), WOOD_D, 0, 0.22, z);
     add(raft, new THREE.CylinderGeometry(0.06, 0.07, 3.2, 6), WOOD_D, 0, 1.8, 0);
@@ -144,6 +150,7 @@ export function buildLandmarks(scene: THREE.Scene): Landmarks {
     for (const s of [-1, 1]) {
       add(g, jitter(new THREE.IcosahedronGeometry(1.7, 1), 0.3, s), ROCK_D, s * 3.3, 0.2, 0.2).scale.set(1, 1.1, 0.9);
     }
+    batchStatic(g);
     scene.add(g);
 
     const stacks: [number, number, number][] = [[a + 0.13, 11, 4.2], [a - 0.16, 9, 3.2], [-2.2, 9, 3.6], [2.4, 8, 3.0]];
@@ -196,7 +203,7 @@ export function buildLandmarks(scene: THREE.Scene): Landmarks {
       const g = new THREE.Group(); g.position.set(x, h, z);
       add(g, new THREE.CylinderGeometry(0.05, 0.07, 1.7, 6), WOOD_D, 0, 0.85, 0);
       add(g, new THREE.CylinderGeometry(0.16, 0.09, 0.22, 7), mat('#5b3b22'), 0, 1.75, 0);
-      const f = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.38, 6), flameM); f.position.y = 2.0; g.add(f); flames.push(f);
+      const f = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.38, 6), flameM); f.userData.dynamic = true; f.position.y = 2.0; g.add(f); flames.push(f);
       scene.add(g);
     }
     const lamp = new THREE.PointLight('#ffa64a', 0, 14, 2); lamp.position.set(-13.2, 2.2, -2.2); scene.add(lamp);

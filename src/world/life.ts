@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { heightAt } from './terrain';
+import { batchStatic } from './batch';
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -14,13 +16,15 @@ export function buildLife(scene: THREE.Scene): Life {
   for (let i = 0; i < 12; i++) {
     const g = new THREE.Group();
     const n = 4 + Math.floor(Math.random() * 3);
+    const geos: THREE.BufferGeometry[] = [];
     for (let j = 0; j < n; j++) {
       const s = rnd(3.5, 7);
-      const m = new THREE.Mesh(new THREE.SphereGeometry(s, 14, 10), cloudMat);
-      m.position.set((j - n / 2) * 5.2 + rnd(-1, 1), rnd(0, 2) + (j % 2) * 1.2, rnd(-2.5, 2.5));
-      m.scale.y = 0.55;
-      g.add(m);
+      const geo = new THREE.SphereGeometry(s, 14, 10);
+      geo.scale(1, 0.55, 1);
+      geo.translate((j - n / 2) * 5.2 + rnd(-1, 1), rnd(0, 2) + (j % 2) * 1.2, rnd(-2.5, 2.5));
+      geos.push(geo);
     }
+    g.add(new THREE.Mesh(mergeGeometries(geos)!, cloudMat)); // una malla por nube
     const a = Math.random() * Math.PI * 2, d = rnd(80, 230);
     g.position.set(Math.cos(a) * d, rnd(45, 75), Math.sin(a) * d);
     g.rotation.y = Math.random() * 3;
@@ -64,6 +68,7 @@ export function buildLife(scene: THREE.Scene): Life {
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 6), eyeMat); eye.position.set(0.07 * s, 0.24, 0.12); g.add(eye);
     }
     g.position.set(x, h, z); g.rotation.y = Math.random() * 6;
+    batchStatic(g); // cuerpo, pinzas y ojos: 2 mallas por cangrejo en vez de 6
     scene.add(g);
     crabs.push({ g, vx: 0, vz: 0, wait: Math.random() * 3 });
   }

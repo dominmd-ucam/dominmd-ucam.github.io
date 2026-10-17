@@ -95,7 +95,7 @@ const C_ROCK = new THREE.Color('#b98260');
 const C_PATH = new THREE.Color('#dfb98a');
 
 export function buildTerrain(): THREE.Mesh {
-  const seg = 256;
+  const seg = 200;
   const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, seg, seg);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position as THREE.BufferAttribute;

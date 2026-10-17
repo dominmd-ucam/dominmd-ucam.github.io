@@ -4,30 +4,51 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Playa del Desarrollador · Portfolio</title>
-  <meta name="description" content="Portfolio interactivo en 3D: explora la playa y descubre mis proyectos." />
+  <meta name="description" content="Portfolio interactivo en 3D: explora la isla y descubre mis proyectos." />
+  <meta name="theme-color" content="#f4e8cf" />
 </head>
 <body>
   <canvas id="gl"></canvas>
-  <div id="loader"><div class="ld-card"><h1>Playa del Desarrollador</h1><div class="ld-bar"><i></i></div><p>Preparando la isla…</p></div></div>
-  <div id="hud" hidden>
-    <div class="brand"><b>Domin</b><span>Portfolio · Playa del Desarrollador</span></div>
-    <div class="hint" id="hint">WASD / flechas para moverte · arrastra para girar la cámara · rueda para el zoom</div>
-    <button class="prompt" id="prompt" hidden></button>
-    <div class="timebar" id="timebar" role="group" aria-label="Hora del día">
-      <output id="clock">11:00</output>
-      <button data-preset="morning" title="Mañana">🌅</button>
-      <button data-preset="noon" title="Mediodía">☀️</button>
-      <button data-preset="sunset" title="Atardecer">🌇</button>
-      <button data-preset="night" title="Noche">🌙</button>
-      <button data-preset="auto" title="Ciclo automático" class="on">⏱</button>
-      <button id="muteBtn" title="Sonido">🔊</button>
-      <button id="avatarBtn" title="Personalizar avatar" disabled>👤</button>
+
+  <div id="loader">
+    <div class="ld-card">
+      <svg class="ld-logo" viewBox="0 0 64 64" aria-hidden="true">
+        <polygon points="4,52 60,52 50,60 14,60" fill="#f3d9a4"/><polygon points="14,60 50,60 32,56" fill="#e6c689"/>
+        <polygon points="30,52 34,52 36,24 32,22" fill="#9b6b43"/><polygon points="32,22 36,24 35,30" fill="#7a5233"/>
+        <polygon points="33,22 10,20 18,28" fill="#3aa65b"/><polygon points="33,22 18,28 24,34" fill="#2f8f4e"/>
+        <polygon points="34,22 54,18 48,28" fill="#3aa65b"/><polygon points="34,22 48,28 44,34" fill="#2f8f4e"/>
+        <polygon points="33,22 26,6 38,10" fill="#4fbd6d"/><polygon points="33,22 38,10 46,14" fill="#3aa65b"/>
+      </svg>
+      <h1>Playa del <span>Desarrollador</span></h1>
+      <div class="ld-bar"><i></i></div>
+      <p>Preparando la isla…</p>
     </div>
   </div>
-  <div id="joy" hidden><i></i></div>
+
+  <div id="hud" hidden>
+    <div class="brand facet"><b>Domin</b><span>Portfolio · Playa del Desarrollador</span></div>
+    <div class="hud-btns">
+      <button class="hex" id="avatarBtn" aria-label="Personalizar avatar" title="Avatar"></button>
+      <button class="hex" id="muteBtn" aria-label="Sonido" title="Sonido"></button>
+      <button class="hex" id="pauseBtn" aria-label="Menú" title="Menú (Esc)"></button>
+    </div>
+    <div class="counter" id="counter">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="3,7 12,3 21,7 21,17 12,21 3,17" fill="#7fe0d6"/><polygon points="12,3 21,7 12,11 3,7" fill="#b9f2ea"/><polygon points="12,11 21,7 21,17 12,21" fill="#1fb5b0"/></svg>
+      <b id="projN">0</b><span>/ 4 proyectos</span>
+    </div>
+    <div class="hint" id="hint">WASD o flechas para moverte · arrastra para girar la cámara · rueda para el zoom · Esc para el menú</div>
+    <button class="talk" id="prompt" hidden></button>
+  </div>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="dialogue" hidden></div>
+  <div id="pause" hidden></div>
   <aside id="avatarPanel" hidden aria-label="Personalizar avatar"></aside>
+  <div id="joy" hidden><i></i></div>
+  <div id="debug" hidden></div>
+
   <section id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mTitle">
-    <div class="m-card">
+    <div class="m-wrap"><div class="m-card facet">
       <button class="m-close" id="mClose" aria-label="Cerrar">✕</button>
       <span class="m-tag" id="mTag"></span>
       <h2 id="mTitle"></h2>
@@ -35,8 +56,9 @@
       <div class="m-demo" id="mDemo"></div>
       <div class="m-chips" id="mChips"></div>
       <div class="m-actions"><a id="mRepo" target="_blank" rel="noopener">Ver en GitHub</a></div>
-    </div>
+    </div></div>
   </section>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

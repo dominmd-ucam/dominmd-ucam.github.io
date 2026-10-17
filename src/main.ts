@@ -1,6 +1,6 @@
 import './style.css';
 import * as THREE from 'three';
-import { buildTerrain, heightAt } from './world/terrain';
+import { buildTerrain, heightAt, islandRadius, HILL, ISLET, DOCK, dockStart, onDock } from './world/terrain';
 import { buildWater } from './world/water';
 import { buildScenery } from './world/props';
 import { buildGrass } from './world/grass';
@@ -9,14 +9,22 @@ import { buildLife } from './world/life';
 import { buildDiorama } from './world/diorama';
 import { buildTrees } from './world/trees';
 import { buildVillage } from './world/village';
+import { batchStatic } from './world/batch';
+import { Dawn } from './world/dawn';
+import { CatGuide } from './world/npc';
 import { Ambience } from './audio';
-import { DayCycle, type Preset } from './world/dayCycle';
 import { Player } from './player';
 import { Input } from './input';
-import { Interactables } from './interactables';
+import { Interactables, type Project } from './interactables';
 import { UI } from './ui';
+import { Menu, type View } from './ui/menu';
+import { Dialogue } from './ui/dialogue';
+import { Toasts } from './ui/toasts';
+import { Achievements, ACHIEVEMENTS } from './achievements';
+import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL } from './settings';
 import { detectQuality } from './quality';
 import { createPost } from './post';
+import { AdaptiveRes, DebugOverlay } from './perf';
 import { initAssets } from './assets/loader';
 import { Avatar } from './avatar/avatar';
 import { loadConfig } from './avatar/config';
@@ -27,72 +35,178 @@ const canvas = document.getElementById('gl') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: q.tier === 'low', powerPreference: 'high-performance' });
 renderer.setPixelRatio(q.dpr);
 renderer.shadowMap.enabled = q.shadows;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = false; // la sombra se recalcula a 30 Hz (ver el bucle)
+renderer.info.autoReset = false;
 initAssets(renderer);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 6000);
 
-/* cielo, luces, estrellas y entorno: todo lo controla el ciclo día/noche */
-const day = new DayCycle(scene, renderer);
-day.sun.castShadow = q.shadows;
-day.sun.shadow.mapSize.set(q.shadowMap, q.shadowMap);
-const sc = day.sun.shadow.camera;
-sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 1; sc.far = 160;
-day.sun.shadow.bias = -0.0004; day.sun.shadow.normalBias = 0.04;
+/* luz fija de amanecer */
+const dawn = new Dawn(scene, renderer);
+dawn.sun.castShadow = q.shadows;
+dawn.sun.shadow.mapSize.set(q.shadowMap, q.shadowMap);
+const sc = dawn.sun.shadow.camera;
+sc.left = -30; sc.right = 30; sc.top = 30; sc.bottom = -30; sc.near = 1; sc.far = 150;
+dawn.sun.shadow.bias = -0.0004; dawn.sun.shadow.normalBias = 0.04;
+scene.fog = new THREE.FogExp2(dawn.fogColor, 0.0045);
 
-/* mundo */
+/* mundo: lo estático se fusiona al final para reducir llamadas de dibujo */
+const staticWorld = new THREE.Group();
+scene.add(staticWorld);
 const terrain = buildTerrain();
 scene.add(terrain);
 const terrainTime = terrain.userData.uTime as { value: number };
-const water = buildWater(day.sunDir);
+const water = buildWater(dawn.sunDir);
 scene.add(water.mesh);
-const { palms, obstacles } = buildScenery(scene);
-const landmarks = buildLandmarks(scene);
+const { palms, obstacles } = buildScenery(staticWorld);
+const landmarks = buildLandmarks(staticWorld);
 obstacles.push(...landmarks.obstacles);
-const diorama = buildDiorama(scene);
+const diorama = buildDiorama(staticWorld);
 obstacles.push(...diorama.obstacles);
-const village = buildVillage(scene);
+const village = buildVillage(staticWorld);
 obstacles.push(...village.obstacles);
 const trees = buildTrees(scene, obstacles, q.tier === 'low' ? 8 : 15);
+batchStatic(staticWorld);
 const life = buildLife(scene);
-scene.fog = new THREE.FogExp2('#cfe9f5', 0.0042);
+const grass = buildGrass(q.tier === 'high' ? 60000 : q.tier === 'med' ? 30000 : 10000);
+scene.add(grass.group);
+const interactables = new Interactables(scene, obstacles, q.tier);
+const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
+void guide.load().catch((e) => console.warn('Misu no disponible:', e));
+
 const audio = new Ambience();
 addEventListener('pointerdown', () => audio.start());
 addEventListener('keydown', () => audio.start());
-const grass = buildGrass(q.tier === 'high' ? 80000 : q.tier === 'med' ? 40000 : 15000);
-scene.add(grass.mesh);
-const interactables = new Interactables(scene, obstacles, q.tier);
 
+/* interfaz */
 const input = new Input(canvas);
 const ui = new UI();
+const toasts = new Toasts();
+const dialogue = new Dialogue();
+const achievements = new Achievements();
+achievements.onUnlock = (a) => toasts.show(a);
+ui.setCounter(achievements.opened.size);
 const player = new Player(obstacles, [6, 12]);
 scene.add(player.group);
+const post = createPost(renderer, scene, camera, q);
+const debug = new DebugOverlay();
+
 let avatarUI: AvatarUI | null = null;
+const avatarBtn = document.getElementById('avatarBtn') as HTMLButtonElement;
+avatarBtn.disabled = true;
 void Avatar.create().then(async (a) => {
   await a.apply(loadConfig());
   player.attachAvatar(a);
   avatarUI = new AvatarUI(a);
-  avatarUI.onToggle = (open) => { input.enabled = !open && !ui.isOpen; };
-  const btn = document.getElementById('avatarBtn') as HTMLButtonElement;
-  btn.disabled = false;
-  btn.addEventListener('click', () => avatarUI?.toggle());
-  (window as unknown as { __avatar: Avatar }).__avatar = a;
+  avatarBtn.disabled = false;
 }).catch((e) => console.warn('Avatar modular no disponible, uso el de respaldo:', e));
-const post = createPost(renderer, scene, camera, q);
 
-function interact() {
+/* ---------- menú ---------- */
+function achievementsView(): View {
+  return {
+    title: 'Logros', sub: `${achievements.count}/${ACHIEVEMENTS.length} · ${achievements.xp} XP`,
+    hint: 'Esc volver',
+    rows: [
+      ...ACHIEVEMENTS.map((a) => ({ type: 'info' as const, label: `${achievements.has(a.id) ? '✓' : '·'} ${a.title}`, value: achievements.has(a.id) ? `+${a.xp}` : '???' })),
+      { type: 'action', label: 'Atrás', run: () => menu.back() },
+    ],
+  };
+}
+function creditsView(): View {
+  return {
+    title: 'Créditos', sub: 'Gracias', hint: 'Esc volver',
+    rows: [
+      { type: 'info', label: 'Avatar y modelos', value: 'Wawa Sensei' },
+      { type: 'info', label: 'Estilo de referencia', value: 'Petit Island' },
+      { type: 'info', label: 'Motor', value: 'three.js' },
+      { type: 'info', label: 'Interfaz', value: 'Isla Coral' },
+      { type: 'action', label: 'Atrás', run: () => menu.back() },
+    ],
+  };
+}
+function settingsView(): View {
+  const s = settings.value;
+  return {
+    title: 'Ajustes', sub: 'Se guardan solos',
+    rows: [
+      { type: 'toggle', label: 'SONIDO', get: () => settings.value.sound, set: (v) => settings.set('sound', v) },
+      { type: 'bar', label: 'VOLUMEN', max: 8, get: () => settings.value.volume, set: (n) => settings.set('volume', n) },
+      { type: 'toggle', label: 'SOMBRAS', get: () => settings.value.shadows, set: (v) => settings.set('shadows', v) },
+      { type: 'toggle', label: 'EFECTOS', get: () => settings.value.effects, set: (v) => settings.set('effects', v) },
+      { type: 'select', label: 'RESOLUCIÓN', options: RESOLUTIONS.map((r) => RESOLUTION_LABEL[r]), get: () => RESOLUTIONS.indexOf(s.resolution), set: (i) => settings.set('resolution', RESOLUTIONS[i]) },
+      { type: 'select', label: 'CÁMARA', options: ['CERCA', 'MEDIA', 'LEJOS'], get: () => settings.value.camera, set: (i) => settings.set('camera', i) },
+      { type: 'action', label: 'Atrás', run: () => menu.back() },
+    ],
+  };
+}
+function mainView(): View {
+  return {
+    title: 'Pausa', sub: 'Playa del Desarrollador',
+    rows: [
+      { type: 'action', label: 'Continuar', run: () => menu.close() },
+      { type: 'action', label: 'Mi avatar', run: () => { menu.close(); avatarUI?.toggle(true); } },
+      { type: 'action', label: 'Ajustes', run: () => menu.push(settingsView()) },
+      { type: 'action', label: 'Logros', run: () => menu.push(achievementsView()) },
+      { type: 'action', label: 'Créditos', run: () => menu.push(creditsView()) },
+    ],
+  };
+}
+const menu = new Menu(mainView);
+ui.onPause = () => { if (!blocked()) menu.show(); };
+
+/* ---------- ajustes en vivo ---------- */
+let camDistChanged = true;
+const adaptive = new AdaptiveRes(q.dpr, 0.55, (dpr) => { renderer.setPixelRatio(dpr); resize(); });
+function applySettings(key?: string) {
+  const s = settings.value;
+  audio.setMuted(!s.sound);
+  audio.setVolume(s.volume);
+  ui.setMuted(!s.sound);
+  dawn.sun.castShadow = s.shadows && q.shadows;
+  renderer.shadowMap.needsUpdate = true;
+  post.setEnabled(s.effects && q.tier !== 'low');
+  if (key === undefined || key === 'resolution') {
+    if (s.resolution === 'auto') adaptive.setMax(q.dpr);
+    else adaptive.fix(s.resolution === 'high' ? Math.min(devicePixelRatio || 1, 2) : s.resolution === 'medium' ? 1.25 : 0.85);
+  }
+  if (key === undefined || key === 'camera') { input.dist = CAMERA_DIST[s.camera]; camDistChanged = true; }
+  menu.refresh();
+}
+settings.onChange((_, key) => applySettings(key));
+
+/* ---------- interacción ---------- */
+const blocked = () => menu.open || dialogue.open || ui.isOpen || (avatarUI?.open ?? false);
+type Target = { kind: 'station'; project: Project } | { kind: 'npc' } | null;
+function pickTarget(): Target {
   const s = interactables.nearest;
-  if (!s || ui.isOpen) return;
-  input.enabled = false;
+  const dS = s ? Math.hypot(player.group.position.x - s.group.position.x, player.group.position.z - s.group.position.z) : 99;
+  const dN = guide.distanceTo(player.group.position);
+  if (dN < CatGuide.REACH && dN <= dS) return { kind: 'npc' };
+  return s ? { kind: 'station', project: s.project } : null;
+}
+function interact() {
+  if (blocked()) return;
+  const t = pickTarget();
+  if (!t) return;
   ui.setPrompt(null);
-  ui.openProject(s.project);
+  if (t.kind === 'npc') dialogue.start();
+  else {
+    ui.openProject(t.project);
+    achievements.markOpened(t.project.id, interactables.stations.length);
+    ui.setCounter(achievements.opened.size);
+    document.getElementById('counter')?.classList.remove('bump');
+    void document.getElementById('counter')?.offsetWidth;
+    document.getElementById('counter')?.classList.add('bump');
+  }
 }
 input.onInteract = interact;
+input.onEscape = () => { if (!blocked()) menu.show(); };
 ui.onPromptClick = interact;
-ui.onClose = () => { input.enabled = true; };
-ui.onTime = (p: Preset | 'auto') => { if (p === 'auto') day.auto = true; else day.setPreset(p); };
-ui.onMute = () => { audio.start(); return audio.toggleMute(); };
+ui.onAvatar = () => { if (!menu.open && !dialogue.open && !ui.isOpen) avatarUI?.toggle(); };
+dialogue.onStart = () => achievements.unlock('friend');
+dialogue.onAction = (a) => { if (a === 'showPaths') interactables.pulse(4.5, clock.elapsedTime); };
 
 function resize() {
   const w = innerWidth, h = innerHeight;
@@ -103,11 +217,24 @@ function resize() {
 }
 addEventListener('resize', resize);
 resize();
+applySettings();
 
-/* bucle */
+/* ---------- zonas para los logros ---------- */
+const zone = (a: number, f: number) => { const r = islandRadius(a) * f; return [Math.cos(a) * r, Math.sin(a) * r] as const; };
+const WRECK = zone(1.38, 0.93), CAVE = zone(2.15, 0.86);
+const DOCK_END = [Math.cos(DOCK.a) * (dockStart() + DOCK.len - 1.2), Math.sin(DOCK.a) * (dockStart() + DOCK.len - 1.2)] as const;
+function checkZones(p: THREE.Vector3) {
+  const near = (c: readonly [number, number], r: number) => Math.hypot(p.x - c[0], p.z - c[1]) < r;
+  if (near(WRECK, 5)) achievements.unlock('wreck');
+  if (near(CAVE, 5.5)) achievements.unlock('cave');
+  if (near(HILL, 3.2) && p.y > 5) achievements.unlock('lighthouse');
+  if (near(ISLET, 5)) achievements.unlock('islet');
+  if (onDock(p.x, p.z) && near(DOCK_END, 1.8)) achievements.unlock('sailor');
+}
+
+/* ---------- bucle ---------- */
 const clock = new THREE.Clock();
-const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
-const camHead = new THREE.Vector3();
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), camHead = new THREE.Vector3();
 function camBlocked(p: THREE.Vector3): boolean {
   if (trees.blocks(p)) return true;
   if (p.y > 9) return false;
@@ -115,64 +242,70 @@ function camBlocked(p: THREE.Vector3): boolean {
   return false;
 }
 let shownPrompt: string | null = null;
-let first = true;
+let first = true, frameNo = 0, traveled = 0, swimT = 0, zoneT = 0;
+const last = player.group.position.clone();
 
 function frame() {
-  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  const raw = clock.getDelta(), dt = Math.min(raw, 0.05), t = clock.elapsedTime;
+  adaptive.tick(raw * 1000, settings.value.resolution === 'auto');
+  input.enabled = !blocked();
   input.update();
   player.update(dt, input, t);
   interactables.update(t, player.group.position);
+  guide.update(dt, t, player.group.position);
   grass.update(t);
   trees.update(t);
-
   for (const p of palms) {
     p.crown.rotation.z = Math.sin(t * 0.9 + p.phase) * 0.025;
     p.crown.rotation.x = Math.cos(t * 0.7 + p.phase) * 0.02;
   }
 
-  // cámara en tercera persona con suavizado y sin atravesar el suelo
+  // logros por movimiento y por zonas
   const pp = player.group.position;
-  if (avatarUI?.open) {
-    // vista frontal del personaje mientras se edita
-    input.yaw = player.group.rotation.y;
-    input.pitch = 0.12;
-    input.dist = 4.2;
-  }
+  traveled += Math.hypot(pp.x - last.x, pp.z - last.z);
+  last.copy(pp);
+  if (traveled > 14) achievements.unlock('steps');
+  swimT = player.swimming ? swimT + dt : 0;
+  if (swimT > 2.5) achievements.unlock('swimmer');
+  if ((zoneT += dt) > 0.3) { zoneT = 0; checkZones(pp); }
+
+  // cámara en tercera persona con suavizado y sin atravesar el suelo
+  if (avatarUI?.open) { input.yaw = player.group.rotation.y; input.pitch = 0.12; input.dist = 4.2; camDistChanged = true; }
+  else if (camDistChanged && !avatarUI?.open) { input.dist = CAMERA_DIST[settings.value.camera]; camDistChanged = false; }
   const cp = Math.cos(input.pitch);
-  camPos.set(
-    pp.x + Math.sin(input.yaw) * cp * input.dist,
-    pp.y + 1.5 + Math.sin(input.pitch) * input.dist,
-    pp.z + Math.cos(input.yaw) * cp * input.dist,
-  );
+  camPos.set(pp.x + Math.sin(input.yaw) * cp * input.dist, pp.y + 1.5 + Math.sin(input.pitch) * input.dist, pp.z + Math.cos(input.yaw) * cp * input.dist);
   camPos.y = Math.max(camPos.y, heightAt(camPos.x, camPos.z) + 0.8, 0.6);
-  // la cámara se acerca al jugador si hay una roca, el barco o la cabaña de por medio
   for (let k = 0; k < 14 && camBlocked(camPos); k++) camPos.lerp(camHead.set(pp.x, pp.y + 1.5, pp.z), 0.12);
   camLook.set(pp.x, pp.y + 1.3, pp.z);
   if (first) camera.position.copy(camPos);
   else camera.position.lerp(camPos, 1 - Math.exp(-14 * dt));
   camera.lookAt(camLook);
 
-  day.update(dt, pp, camera);
+  dawn.update(pp);
   terrainTime.value = t;
-  landmarks.update(t, day.night);
+  landmarks.update(t, 0.35);
   diorama.update(t);
-  life.update(t, dt, pp, day.night, day.waterEnv.horizon);
-  audio.setNight(day.night);
-  (scene.fog as THREE.FogExp2).color.copy(day.fogColor);
-  water.update(t, camera.position, day.waterEnv);
-  post.setExposure(day.exposure);
-  ui.setClock(day.clock, day.auto);
+  life.update(t, dt, pp, 0, dawn.waterEnv.horizon);
+  water.update(t, camera.position, dawn.waterEnv);
+  post.setExposure(dawn.exposure);
 
-  const id = interactables.nearest?.project.id ?? null;
-  if (id !== shownPrompt && !ui.isOpen) {
-    shownPrompt = id;
-    ui.setPrompt(interactables.nearest?.project ?? null);
+  // aviso de interacción
+  const tg = blocked() ? null : pickTarget();
+  const label = tg ? (tg.kind === 'npc' ? 'Hablar con Misu' : tg.project.title) : null;
+  if (label !== shownPrompt) { shownPrompt = label; ui.setPrompt(label); }
+
+  // con el menú o una ficha abiertas basta con 30 fps; la sombra se recalcula en fotogramas alternos
+  frameNo++;
+  const idle = menu.open || ui.isOpen;
+  if (!idle || (frameNo & 1) === 0) {
+    renderer.shadowMap.needsUpdate = (frameNo & 1) === 0;
+    renderer.info.reset();
+    post.render(dt);
+    debug.update(raw * 1000, renderer, adaptive.dpr);
   }
-
-  post.render(dt);
   if (first) { first = false; ui.ready(); }
 }
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { player, input, interactables, renderer, q, day, scene, camera };
+(window as unknown as { __dbg: unknown }).__dbg = { player, input, interactables, renderer, q, dawn, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };

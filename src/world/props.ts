@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { heightAt, islandRadius } from './terrain';
+import { heightAt, islandRadius, pathMask } from './terrain';
+import { batchStatic } from './batch';
 
 export interface Obstacle { x: number; z: number; r: number }
 
@@ -51,6 +52,8 @@ export function makePalm(x: number, z: number, scale: number, rnd: () => number)
   }
   const curve = new THREE.CatmullRomCurve3(pts);
   // tronco escalonado: anillos de cono apilados siguiendo la curva
+  const trunk = new THREE.Group();
+  group.add(trunk);
   const rings = 11, up = new THREE.Vector3(0, 1, 0);
   for (let i = 0; i < rings; i++) {
     const a = curve.getPoint(i / rings), b = curve.getPoint((i + 1) / rings), v = b.clone().sub(a);
@@ -60,7 +63,7 @@ export function makePalm(x: number, z: number, scale: number, rnd: () => number)
     seg.quaternion.setFromUnitVectors(up, v.normalize());
     seg.rotateY(i * 0.7);
     seg.castShadow = true;
-    group.add(seg);
+    trunk.add(seg);
   }
   const crown = new THREE.Group();
   crown.position.copy(pts[pts.length - 1]);
@@ -81,10 +84,14 @@ export function makePalm(x: number, z: number, scale: number, rnd: () => number)
     c.castShadow = true;
     crown.add(c);
   }
+  // fusionamos tronco y copa por separado: 3 llamadas de dibujo por palmera en vez de ~25 (la copa se mece como grupo)
+  batchStatic(trunk);
+  batchStatic(crown);
+  group.userData.dynamic = true;
   return { group, crown, phase: rnd() * 6 };
 }
 
-export function buildScenery(scene: THREE.Scene) {
+export function buildScenery(scene: THREE.Object3D) {
   const rnd = rand(7);
   const palms: Palm[] = [];
   const obstacles: Obstacle[] = [];
@@ -137,17 +144,23 @@ export function buildScenery(scene: THREE.Scene) {
     scene.add(m);
     obstacles.push({ x, z, r: s * 0.8 });
   }
-  const petal = [std('#ff7a59'), std('#ffc857'), std('#ff9ac1'), std('#ffffff')];
-  const stem = std('#3a9a4a');
-  for (let i = 0; i < 70; i++) {
+  // flores: 2 mallas instanciadas (tallos y flores) en vez de ~140 mallas sueltas
+  const petalColors = ['#ff7a59', '#ffc857', '#ff9ac1', '#ffffff'].map((c) => new THREE.Color(c));
+  const spots2: { x: number; z: number; h: number; i: number }[] = [];
+  for (let i = 0; i < 90; i++) {
     const a = rnd() * Math.PI * 2, r = islandRadius(a) * (0.2 + rnd() * 0.6);
     const x = Math.cos(a) * r, z = Math.sin(a) * r, h = heightAt(x, z);
-    if (h < 1.0) continue;
-    const g = new THREE.Group(); g.position.set(x, h, z);
-    const s = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 4), stem); s.position.y = 0.15; g.add(s);
-    const f = new THREE.Mesh(new THREE.IcosahedronGeometry(0.08, 1), petal[i % 4]); f.position.y = 0.32; g.add(f);
-    scene.add(g);
+    if (h < 1.0 || pathMask(x, z) > 0.2) continue;
+    spots2.push({ x, z, h, i });
   }
+  const stems = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 4).translate(0, 0.15, 0), std('#3a9a4a'), spots2.length);
+  const blooms = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.08, 1).translate(0, 0.32, 0), std('#ffffff'), spots2.length);
+  const fm = new THREE.Matrix4();
+  spots2.forEach((f, k) => {
+    fm.makeTranslation(f.x, f.h, f.z);
+    stems.setMatrixAt(k, fm); blooms.setMatrixAt(k, fm); blooms.setColorAt(k, petalColors[f.i % 4]);
+  });
+  scene.add(stems, blooms);
   return { palms, obstacles };
 }
 

@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { heightAt, islandRadius } from './terrain';
 import type { Obstacle } from './props';
 import { waveHeight } from './water';
+import { batchStatic } from './batch';
 
 const mat = (color: string, o: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, ...o });
@@ -54,7 +55,7 @@ export interface Diorama {
   obstacles: Obstacle[];
 }
 
-export function buildDiorama(scene: THREE.Scene): Diorama {
+export function buildDiorama(scene: THREE.Object3D): Diorama {
   const obstacles: Obstacle[] = [];
   const ticks: ((t: number) => void)[] = [];
   const WOOD = mat('#d08c5a'), WOOD_D = mat('#7d3d26'), WOOD_L = mat('#e0a572');
@@ -106,6 +107,7 @@ export function buildDiorama(scene: THREE.Scene): Diorama {
     sail.rotation.y = 0.5; sail.rotation.z = -0.3;
     // escalones a cubierta
     for (let i = 0; i < 4; i++) add(ship, new THREE.BoxGeometry(0.5, 0.1, 1.1), WOOD_L, -2.2 + i * 0.5, 0.25 + i * 0.28, 0.9);
+    batchStatic(ship);
     scene.add(ship);
     for (const lx of [-2.5, -0.8, 0.9, 2.6, 4]) { const w = world(ship, lx, 0); obstacles.push({ x: w.x, z: w.z, r: 1.5 }); }
   }
@@ -131,6 +133,7 @@ export function buildDiorama(scene: THREE.Scene): Diorama {
     // nido con huevos en lo alto
     add(g, new THREE.TorusGeometry(0.42, 0.12, 5, 9), mat('#8a5a35'), 1.2, 7.1, -2.4).rotation.x = Math.PI / 2;
     for (let i = 0; i < 3; i++) add(g, new THREE.SphereGeometry(0.17, 8, 6), mat('#f4ecd4'), 1.2 + (i - 1) * 0.2, 7.12, -2.4 + (i % 2) * 0.12);
+    batchStatic(g);
     scene.add(g);
     for (const [px, , pz, pr] of pillars) { const w = world(g, px, pz); obstacles.push({ x: w.x, z: w.z, r: pr * 0.85 }); }
 
@@ -168,7 +171,7 @@ export function buildDiorama(scene: THREE.Scene): Diorama {
     const sa = a - 0.2, sr = islandRadius(sa) * 0.82, sx = Math.cos(sa) * sr, sz = Math.sin(sa) * sr;
     const s = new THREE.Group(); s.position.set(sx, heightAt(sx, sz), sz);
     add(s, rock(0.7, 4, 0.7), GREY_D, 0, 0.3, 0);
-    const steel = new THREE.MeshStandardMaterial({ color: '#cfe3f5', metalness: 0.8, roughness: 0.25, emissive: '#5aa9ff', emissiveIntensity: 0.35 });
+    const steel = new THREE.MeshStandardMaterial({ userData: { unique: true }, color: '#cfe3f5', metalness: 0.8, roughness: 0.25, emissive: '#5aa9ff', emissiveIntensity: 0.35 });
     add(s, new THREE.BoxGeometry(0.1, 1.3, 0.03), steel, 0, 1.15, 0);
     add(s, new THREE.BoxGeometry(0.5, 0.07, 0.08), mat('#c8a24a', { metalness: 0.6 }), 0, 1.85, 0);
     add(s, new THREE.CylinderGeometry(0.035, 0.035, 0.32, 6), mat('#4a2c1a'), 0, 2.06, 0);
@@ -237,6 +240,7 @@ export function buildDiorama(scene: THREE.Scene): Diorama {
       const x = Math.cos(aa) * rr, z = Math.sin(aa) * rr;
       if (heightAt(x, z) > -0.35) continue;
       const m = add(scene, plank, floaters.length % 2 ? WOOD : WOOD_D, x, 0, z);
+      m.userData.dynamic = true;
       m.rotation.y = Math.random() * 3;
       floaters.push({ m, x, z, ph: Math.random() * 6 });
     }
