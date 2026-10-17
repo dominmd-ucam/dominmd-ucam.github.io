@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { heightAt } from './terrain';
 import { batchStatic } from './batch';
+import { buildFlock } from './flock';
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -9,7 +10,7 @@ export interface Life {
   update(t: number, dt: number, player: THREE.Vector3, night: number, skyTint: THREE.Color): void;
 }
 
-export function buildLife(scene: THREE.Scene): Life {
+export function buildLife(scene: THREE.Scene, gullCount = 60): Life {
   /* ---------- nubes ---------- */
   const cloudMat = new THREE.MeshStandardMaterial({ color: '#ffffff', emissive: '#ffffff', emissiveIntensity: 0.35, roughness: 1, fog: false });
   const clouds: { g: THREE.Group; speed: number }[] = [];
@@ -32,26 +33,8 @@ export function buildLife(scene: THREE.Scene): Life {
     clouds.push({ g, speed: rnd(0.8, 1.8) });
   }
 
-  /* ---------- gaviotas ---------- */
-  const gullBody = new THREE.MeshStandardMaterial({ color: '#fbfbf6', roughness: 0.7, flatShading: true });
-  const gullTip = new THREE.MeshStandardMaterial({ color: '#7d8a93', roughness: 0.7, flatShading: true, side: THREE.DoubleSide });
-  const wingGeo = (side: number) => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -0.2, 0, 0, 0.26, side * 1.25, 0.04, -0.05], 3));
-    g.computeVertexNormals();
-    return g;
-  };
-  const gulls = Array.from({ length: 6 }, (_, i) => {
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.7, 5), gullBody); body.rotation.x = Math.PI / 2; g.add(body);
-    const wl = new THREE.Group(), wr = new THREE.Group();
-    wl.add(new THREE.Mesh(wingGeo(-1), i % 2 ? gullBody : gullTip));
-    wr.add(new THREE.Mesh(wingGeo(1), i % 2 ? gullBody : gullTip));
-    g.add(wl, wr);
-    g.scale.setScalar(rnd(1.2, 1.7));
-    scene.add(g);
-    return { g, wl, wr, r: rnd(14, 38), h: rnd(14, 28), sp: rnd(0.12, 0.22) * (i % 2 ? 1 : -1), a: Math.random() * 6, cx: rnd(-8, 8), cz: rnd(-8, 8), ph: Math.random() * 6 };
-  });
+  /* ---------- gaviotas: bandada con boids (ver flock.ts) ---------- */
+  const flock = buildFlock(scene, gullCount);
 
   /* ---------- cangrejos ---------- */
   const crabMat = new THREE.MeshStandardMaterial({ color: '#ee5a3c', roughness: 0.6, flatShading: true });
@@ -103,17 +86,7 @@ export function buildLife(scene: THREE.Scene): Life {
       cloudMat.emissiveIntensity = 0.45 - night * 0.3;
       for (const c of clouds) { c.g.position.x += c.speed * dt; if (c.g.position.x > 260) c.g.position.x = -260; }
 
-      for (const b of gulls) {
-        b.a += b.sp * dt;
-        const x = b.cx + Math.cos(b.a) * b.r, z = b.cz + Math.sin(b.a) * b.r;
-        const y = b.h + Math.sin(t * 0.5 + b.ph) * 1.4;
-        b.g.position.set(x, y, z);
-        b.g.rotation.y = -b.a + (b.sp > 0 ? 0 : Math.PI);
-        b.g.rotation.z = (b.sp > 0 ? -1 : 1) * 0.35;
-        const f = Math.sin(t * 5 + b.ph) * 0.5 * (0.4 + 0.6 * Math.sin(t * 0.7 + b.ph) ** 2);
-        b.wl.rotation.z = -f; b.wr.rotation.z = f;
-        b.g.visible = night < 0.85;
-      }
+      flock.update(t, dt);
 
       for (const c of crabs) {
         const p = c.g.position;

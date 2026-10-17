@@ -77,7 +77,7 @@ obstacles.push(...village.obstacles);
 const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
 const trees = buildTrees(scene, obstacles, q.tier === 'low' ? 8 : 15);
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
-const life = buildLife(scene);
+const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
 const grass = buildGrass(q.tier === 'high' ? 60000 : q.tier === 'med' ? 30000 : 10000);
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
