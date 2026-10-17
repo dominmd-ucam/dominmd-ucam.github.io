@@ -79,25 +79,25 @@ export function buildLife(scene: THREE.Scene): Life {
   const fishMesh = new THREE.InstancedMesh(fishGeo, new THREE.MeshBasicMaterial({ color: '#ffffff' }), FISH);
   fishMesh.frustumCulled = false;
   const palette = ['#ffb347', '#ff7a59', '#ffe27a', '#7ad7ff'].map((c) => new THREE.Color(c));
-  const school: { cx: number; cz: number; r: number; sp: number; ph: number; dy: number }[] = [];
+  const school: { cx: number; cz: number; r: number; sp: number; ph: number; dy: number; fx: number; fz: number; scare: number }[] = [];
   guard = 0;
   while (school.length < FISH && guard++ < 3000) {
     const cx = rnd(-34, 34), cz = rnd(-34, 34), h = heightAt(cx, cz);
     if (h > -0.9 || h < -2.4) continue;
     const k = school.length;
-    school.push({ cx, cz, r: rnd(0.8, 2.6), sp: rnd(0.4, 0.9) * (k % 2 ? 1 : -1), ph: Math.random() * 6, dy: rnd(0.35, 0.8) });
+    school.push({ cx, cz, r: rnd(0.8, 2.6), sp: rnd(0.4, 0.9) * (k % 2 ? 1 : -1), ph: Math.random() * 6, dy: rnd(0.35, 0.8), fx: 0, fz: 0, scare: 0 });
     fishMesh.setColorAt(k, palette[k % palette.length]);
   }
   fishMesh.count = school.length;
   scene.add(fishMesh);
   const dummy = new THREE.Object3D();
 
-  const cloudNight = new THREE.Color('#5a6a99'), tmp = new THREE.Color();
+  const cloudNight = new THREE.Color('#5a6a99'), tmp = new THREE.Color(), WHITE = new THREE.Color('#ffffff');
 
   return {
     update(t, dt, player, night, skyTint) {
       // nubes: se tiñen con el cielo y se oscurecen de noche
-      tmp.copy(skyTint).lerp(new THREE.Color('#ffffff'), 0.6).lerp(cloudNight, night);
+      tmp.copy(skyTint).lerp(WHITE, 0.6).lerp(cloudNight, night);
       cloudMat.color.copy(tmp);
       cloudMat.emissive.copy(tmp);
       cloudMat.emissiveIntensity = 0.45 - night * 0.3;
@@ -129,12 +129,18 @@ export function buildLife(scene: THREE.Scene): Life {
         if (Math.hypot(c.vx, c.vz) > 0.05) c.g.rotation.y = Math.atan2(c.vx, c.vz) + Math.PI / 2; // anda de lado
       }
 
+      // Cardumen: cuando te acercas huyen en abanico (efecto fuente) y vuelven poco a poco a su ronda
       school.forEach((f, i) => {
         const a = t * f.sp + f.ph;
-        const x = f.cx + Math.cos(a) * f.r, z = f.cz + Math.sin(a) * f.r;
+        let x = f.cx + Math.cos(a) * f.r, z = f.cz + Math.sin(a) * f.r;
+        const dx = x - player.x, dz = z - player.z, d = Math.hypot(dx, dz);
+        if (d < 4.5) { f.scare = Math.min(1, f.scare + dt * 5); f.fx = dx / (d || 1); f.fz = dz / (d || 1); }
+        else f.scare = Math.max(0, f.scare - dt * 0.35);
+        const push = f.scare * 3.2;
+        x += f.fx * push; z += f.fz * push;
         const floor = heightAt(x, z);
-        dummy.position.set(x, Math.max(floor + f.dy, -1.4) , z);
-        dummy.rotation.set(0, -a + (f.sp > 0 ? 0 : Math.PI) + Math.PI, Math.sin(t * 9 + i) * 0.15);
+        dummy.position.set(x, Math.max(floor + f.dy + f.scare * 0.25, -1.4), z);
+        dummy.rotation.set(0, f.scare > 0.05 ? Math.atan2(f.fx, f.fz) : -a + (f.sp > 0 ? 0 : Math.PI) + Math.PI, Math.sin(t * (9 + f.scare * 14) + i) * 0.15);
         dummy.updateMatrix();
         fishMesh.setMatrixAt(i, dummy.matrix);
       });

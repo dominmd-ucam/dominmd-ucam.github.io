@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { heightAt, pathMask } from './terrain';
 
 /** Hierba instanciada con viento en el vertex shader: una sola draw call. */
-export function buildGrass(count: number): { group: THREE.Group; update(t: number): void } {
+export function buildGrass(count: number): { group: THREE.Group; update(t: number, cam?: THREE.Vector3): void } {
   // hoja: 3 tramos, afilada hacia la punta
   const segs = 3, pos: number[] = [], col: number[] = [], idx: number[] = [];
   const base = new THREE.Color('#3f9d3f'), tip = new THREE.Color('#c9f06a'), c = new THREE.Color();
@@ -53,6 +53,7 @@ export function buildGrass(count: number): { group: THREE.Group; update(t: numbe
     n++;
   }
   const group = new THREE.Group();
+  const lod: { mesh: THREE.InstancedMesh; full: number }[] = [];
   for (const list of chunks.values()) {
     const mesh = new THREE.InstancedMesh(geo, mat, list.length);
     list.forEach((it, i) => { mesh.setMatrixAt(i, it.m); mesh.setColorAt(i, it.c); });
@@ -61,6 +62,21 @@ export function buildGrass(count: number): { group: THREE.Group; update(t: numbe
     mesh.computeBoundingSphere();
     mesh.boundingSphere!.radius += 0.6; // margen para el movimiento del viento
     group.add(mesh);
+    lod.push({ mesh, full: list.length });
   }
-  return { group, update: (t: number) => { uTime.value = t; } };
+  // LOD: las instancias están en orden aleatorio, así que dibujar solo las N primeras adelgaza el césped de forma uniforme.
+  // Cerca se ve todo; a media distancia la mitad; lejos una cuarta parte; más allá de 90 m, nada.
+  return {
+    group,
+    update: (t: number, cam?: THREE.Vector3) => {
+      uTime.value = t;
+      if (!cam) return;
+      for (const { mesh, full } of lod) {
+        const d = Math.hypot(mesh.boundingSphere!.center.x - cam.x, mesh.boundingSphere!.center.z - cam.z);
+        const f = d < 26 ? 1 : d < 46 ? 0.5 : d < 90 ? 0.22 : 0;
+        mesh.count = Math.round(full * f);
+        mesh.visible = f > 0;
+      }
+    },
+  };
 }

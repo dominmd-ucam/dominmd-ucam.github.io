@@ -75,7 +75,7 @@ const village = buildVillage(staticWorld);
 obstacles.push(...village.obstacles);
 const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
 const trees = buildTrees(scene, obstacles, q.tier === 'low' ? 8 : 15);
-batchStatic(staticWorld);
+batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const life = buildLife(scene);
 const grass = buildGrass(q.tier === 'high' ? 60000 : q.tier === 'med' ? 30000 : 10000);
 scene.add(grass.group);
@@ -274,7 +274,7 @@ function camBlocked(p: THREE.Vector3): boolean {
   return false;
 }
 let shownPrompt: string | null = null;
-let first = true, frameNo = 0, traveled = 0, swimT = 0, zoneT = 0;
+let first = true, frameNo = 0, traveled = 0, swimT = 0, zoneT = 0, rippleT = 0, wasWet = false;
 const last = player.group.position.clone();
 
 function frame() {
@@ -288,7 +288,7 @@ function frame() {
   infoPoint?.update(t, player.group.position);
   presence?.send(player.group.position.x, player.group.position.z, player.group.rotation.y, Math.min(1, player.vel.length() / 6.5), player.swimming, performance.now());
   ghosts.update(dt, t, performance.now());
-  grass.update(t);
+  grass.update(t, camera.position);
   trees.update(t);
   for (const p of palms) {
     p.crown.rotation.z = Math.sin(t * 0.9 + p.phase) * 0.025;
@@ -303,6 +303,13 @@ function frame() {
   swimT = player.swimming ? swimT + dt : 0;
   if (swimT > 2.5) achievements.unlock('swimmer');
   if ((zoneT += dt) > 0.3) { zoneT = 0; checkZones(pp); }
+
+  // olas capilares: un golpe al entrar en el agua y anillos suaves mientras te mueves por ella
+  const wet = heightAt(pp.x, pp.z) < 0.12 && !onDock(pp.x, pp.z);
+  rippleT += dt;
+  if (wet && !wasWet) { water.ripple(pp.x, pp.z, t, 1); rippleT = 0; }
+  else if (wet && player.vel.length() > 0.8 && rippleT > 0.42) { water.ripple(pp.x, pp.z, t, player.swimming ? 0.9 : 0.55); rippleT = 0; }
+  wasWet = wet;
 
   // cámara en tercera persona con suavizado y sin atravesar el suelo
   if (avatarUI?.open) { input.yaw = player.group.rotation.y; input.pitch = 0.12; input.dist = 4.2; camDistChanged = true; }

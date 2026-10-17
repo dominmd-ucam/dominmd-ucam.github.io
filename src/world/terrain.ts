@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Delaunay } from 'd3-delaunay';
 import projects from '../data/projects.json';
 
 export const WORLD_SIZE = 128;
@@ -92,13 +93,102 @@ const C_GRASS2 = new THREE.Color('#58b448');
 const C_ROCK = new THREE.Color('#b98260');
 const C_PATH = new THREE.Color('#dfb98a');
 
+/**
+ * Cuánto detalle necesita cada punto del mapa (0 = llano y sin interés, 1 = máximo).
+ * Los triángulos deben ir donde hacen falta: costa y orilla, pendientes, la transición arena→hierba y los caminos
+ * (el color de los caminos se pinta por vértice). El fondo marino llano y lejano casi no necesita ninguno.
+ */
+function importance(x: number, z: number): number {
+  const h = heightAt(x, z), e = 0.8;
+  const slope = Math.hypot(heightAt(x + e, z) - heightAt(x - e, z), heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e);
+  const shore = 1 - THREE.MathUtils.smoothstep(Math.abs(h), 0.15, 1.3);          // orilla: espuma, arena mojada
+  const grassLine = 1 - THREE.MathUtils.smoothstep(Math.abs(h - 1.05), 0.15, 0.5); // paso de arena a hierba
+  const path = THREE.MathUtils.smoothstep(pathMask(x, z), 0.02, 0.3);
+  const land = h > 0.5 ? 0.18 : 0; // el interior de la isla tiene algo de detalle para el relieve suave
+  return Math.min(1, Math.max(shore, grassLine, path, Math.min(1, slope * 3), land));
+}
+const R_MIN = 0.7, R_MAX = 8.5;
+
+/** Reparto de puntos "como una multitud": cada uno guarda su distancia según la importancia del lugar (disco de Poisson variable). */
+function samplePoints(): [number, number][] {
+  const half = WORLD_SIZE / 2;
+  let seed = 90210;
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const cand: { x: number; z: number; r: number }[] = [];
+  const step = 0.6;
+  for (let gz = -half + step; gz < half - step; gz += step) {
+    for (let gx = -half + step; gx < half - step; gx += step) {
+      const x = gx + (rnd() - 0.5) * step, z = gz + (rnd() - 0.5) * step;
+      cand.push({ x, z, r: THREE.MathUtils.lerp(R_MAX, R_MIN, importance(x, z)) });
+    }
+  }
+  cand.sort((a, b) => a.r - b.r); // primero las zonas de más detalle
+  const cell = R_MIN, cols = Math.ceil(WORLD_SIZE / cell) + 1;
+  const grid = new Map<number, { x: number; z: number; r: number }[]>();
+  const key = (cx: number, cz: number) => cz * cols + cx;
+  const pts: [number, number][] = [];
+  for (const c of cand) {
+    const cx = Math.floor((c.x + half) / cell), cz = Math.floor((c.z + half) / cell), reach = Math.ceil(c.r / cell);
+    let ok = true;
+    for (let dz = -reach; dz <= reach && ok; dz++) {
+      for (let dx = -reach; dx <= reach && ok; dx++) {
+        const list = grid.get(key(cx + dx, cz + dz));
+        if (!list) continue;
+        for (const o of list) if (Math.hypot(o.x - c.x, o.z - c.z) < (c.r + o.r) / 2) { ok = false; break; } // transición gradual entre zonas densas y dispersas
+      }
+    }
+    if (!ok) continue;
+    const k = key(cx, cz);
+    (grid.get(k) ?? grid.set(k, []).get(k)!).push(c);
+    pts.push([c.x, c.z]);
+  }
+  return pts;
+}
+
+/** Malla del terreno: Delaunay (los triángulos más "gordos" posibles) sobre puntos de densidad variable, con relajación de Lloyd. */
+function terrainGeometry(): THREE.BufferGeometry {
+  const half = WORLD_SIZE / 2;
+  const fixed: [number, number][] = [];
+  for (let t = -half; t <= half; t += 6.4) { fixed.push([t, -half], [t, half], [-half, t], [half, t]); }
+  const interior = samplePoints();
+  const pts = [...fixed, ...interior];
+  const nFixed = fixed.length;
+  // relajación de Lloyd suave: separa cada punto de sus vecinos sin borrar el gradiente de densidad
+  for (let it = 0; it < 2; it++) {
+    const vor = Delaunay.from(pts).voronoi([-half, -half, half, half]);
+    for (let i = nFixed; i < pts.length; i++) {
+      const poly = vor.cellPolygon(i);
+      if (!poly) continue;
+      let cx = 0, cz = 0, a = 0;
+      for (let k = 0; k < poly.length - 1; k++) {
+        const [x0, z0] = poly[k], [x1, z1] = poly[k + 1], cr = x0 * z1 - x1 * z0;
+        a += cr; cx += (x0 + x1) * cr; cz += (z0 + z1) * cr;
+      }
+      if (Math.abs(a) < 1e-6) continue;
+      const mx = cx / (3 * a), mz = cz / (3 * a);
+      pts[i] = [pts[i][0] + (mx - pts[i][0]) * 0.45, pts[i][1] + (mz - pts[i][1]) * 0.45];
+    }
+  }
+  const tri = Delaunay.from(pts).triangles;
+  const position = new Float32Array(pts.length * 3);
+  pts.forEach(([x, z], i) => { position[i * 3] = x; position[i * 3 + 1] = heightAt(x, z); position[i * 3 + 2] = z; });
+  const index = new Uint32Array(tri.length);
+  for (let i = 0; i < tri.length; i += 3) {
+    const a = tri[i], b = tri[i + 1], c = tri[i + 2];
+    // orientación hacia arriba (+Y): si el triángulo sale al revés, se invierte
+    const cross = (pts[b][0] - pts[a][0]) * (pts[c][1] - pts[a][1]) - (pts[b][1] - pts[a][1]) * (pts[c][0] - pts[a][0]);
+    if (cross > 0) { index[i] = a; index[i + 1] = c; index[i + 2] = b; } else { index[i] = a; index[i + 1] = b; index[i + 2] = c; }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(position, 3));
+  g.setIndex(new THREE.BufferAttribute(index, 1));
+  return g;
+}
+
 export function buildTerrain(): THREE.Mesh {
-  const seg = 200;
-  const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, seg, seg);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i++) pos.setY(i, heightAt(pos.getX(i), pos.getZ(i)));
+  const geo = terrainGeometry();
   geo.computeVertexNormals();
+  const pos = geo.attributes.position as THREE.BufferAttribute;
   const nor = geo.attributes.normal as THREE.BufferAttribute;
   const col = new Float32Array(pos.count * 3);
   const c = new THREE.Color();
@@ -123,11 +213,30 @@ export function buildTerrain(): THREE.Mesh {
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nuniform float uTime;')
+      .replace('#include <common>', `#include <common>
+varying vec3 vWPos;
+uniform float uTime;
+// Ruido de Worley: distancia al punto más cercano (F1) y al segundo (F2). Donde F2 - F1 ≈ 0 estás en un borde de Voronoi.
+vec2 hash2(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
+vec2 worley(vec2 p) {
+  vec2 i = floor(p), f = fract(p); float d1 = 8.0, d2 = 8.0;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    vec2 g = vec2(float(x), float(y));
+    vec2 o = 0.5 + 0.5 * sin(uTime * 0.55 + 6.2831 * hash2(i + g)); // los puntos bailan: la red se deforma
+    float d = length(g + o - f);
+    if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+  }
+  return vec2(d1, d2);
+}
+float causticNet(vec2 p) { vec2 w = worley(p); return 1.0 - smoothstep(0.0, 0.17, w.y - w.x); } // líneas finas brillantes alrededor de parches oscuros`)
       .replace('#include <color_fragment>', `#include <color_fragment>
-        float under = smoothstep(0.15, -0.3, vWPos.y) * (1.0 - smoothstep(-0.7, -2.6, vWPos.y));
-        float ca = sin(vWPos.x * 1.9 + uTime * 1.1) + sin(vWPos.z * 2.1 - uTime * 0.9) + sin((vWPos.x + vWPos.z) * 1.3 + uTime * 0.7);
-        diffuseColor.rgb += vec3(0.45, 0.8, 0.75) * pow(1.0 - abs(ca) / 3.0, 6.0) * under * 0.3;`);
+        // Cáusticas = la luz del sol enfocada por las ondas. No se simula la luz: se dibujan los bordes de Voronoi.
+        // Dos redes que se deslizan una sobre otra no se repiten; se desvanecen con la profundidad y junto a la orilla.
+        float depthFade = smoothstep(-0.12, -0.55, vWPos.y) * (1.0 - smoothstep(-1.4, -3.4, vWPos.y));
+        float net1 = causticNet(vWPos.xz * 0.42 + vec2(uTime * 0.05, 0.0));
+        float net2 = causticNet(vWPos.xz * 0.63 + vec2(7.3, -uTime * 0.045));
+        float caus = (net1 + net2) * 0.5 * (0.55 + 0.9 * net1 * net2);
+        diffuseColor.rgb += vec3(0.50, 0.85, 0.80) * caus * depthFade * 0.55;`);
   };
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;

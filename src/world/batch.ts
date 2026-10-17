@@ -14,9 +14,11 @@ function signature(m: THREE.Material): string {
 /**
  * Fusiona las mallas estáticas de `root` en una sola malla por material (y atributos).
  * Reduce llamadas de dibujo (y de la pasada de sombras) sin cambiar el aspecto.
+ * Con `cellSize` > 0 se agrupan además por zonas (celdas cuadradas): cada malla fusionada queda localizada y el motor
+ * puede descartarla si no está en cámara (una sola malla gigante nunca se descarta y siempre pagas todos sus triángulos).
  * Se saltan las instancias, mallas con esqueleto, materiales múltiples y todo lo marcado con `userData.dynamic`.
  */
-export function batchStatic(root: THREE.Object3D): number {
+export function batchStatic(root: THREE.Object3D, cellSize = 0): number {
   root.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
   const rel = new THREE.Matrix4();
@@ -40,7 +42,9 @@ export function batchStatic(root: THREE.Object3D): number {
     const attrs = Object.keys(g.attributes).sort().join(',');
     rel.multiplyMatrices(inv, m.matrixWorld);
     g.applyMatrix4(rel);
-    const key = `${signature(m.material)}#${attrs}`;
+    let cell = '';
+    if (cellSize > 0) { g.computeBoundingBox(); const c = g.boundingBox!.getCenter(new THREE.Vector3()); cell = `@${Math.floor(c.x / cellSize)},${Math.floor(c.z / cellSize)}`; }
+    const key = `${signature(m.material)}#${attrs}${cell}`;
     let b = buckets.get(key);
     if (!b) { b = { material: m.material, geos: [], cast: false, meshes: [] }; buckets.set(key, b); }
     b.geos.push(g);

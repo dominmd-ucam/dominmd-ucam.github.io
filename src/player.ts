@@ -49,6 +49,7 @@ export class Player {
   }
 
   swimming = false;
+  private tgt = new THREE.Vector2();
   avatar: Avatar | null = null;
   private holder = new THREE.Group();
   /** altura objetivo del avatar y giro para que mire a +Z del jugador (se ajusta según el modelo) */
@@ -70,7 +71,7 @@ export class Player {
     // dirección relativa a la cámara
     const wx = input.move.x * cy - input.move.y * sy;
     const wz = -input.move.x * sy - input.move.y * cy;
-    const target = new THREE.Vector2(wx, wz).multiplyScalar(this.swimming ? SPEED * 0.6 : SPEED);
+    const target = this.tgt.set(wx, wz).multiplyScalar(this.swimming ? SPEED * 0.6 : SPEED);
     this.vel.lerp(target, 1 - Math.exp(-12 * dt));
 
     const p = this.group.position;
