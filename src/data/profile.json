@@ -1,0 +1,25 @@
+{
+  "name": "Domin",
+  "role": "Desarrollador de software",
+  "headline": "Webs, bots, plugins y herramientas, hechos con cariño por el detalle.",
+  "description": "Portfolio de Domin, desarrollador de software: webs, bots, plugins y herramientas. Recórrelo como un videojuego en 3D o en versión clásica.",
+  "siteUrl": "https://dominmd-ucam.github.io/",
+  "about": [
+    "Soy Domin, desarrollador. Me gusta construir cosas que funcionan bien y se ven mejor: aplicaciones web, bots, plugins y pequeñas herramientas de línea de comandos.",
+    "Este portfolio es una isla que se puede recorrer como un videojuego, pero también tiene esta versión clásica, rápida y accesible. Elige la que prefieras."
+  ],
+  "highlights": [
+    { "title": "Webs", "text": "Interfaces claras y rápidas, con atención al detalle." },
+    { "title": "Bots y plugins", "text": "Automatización y extensiones que se integran con las aplicaciones que ya usas." },
+    { "title": "Herramientas", "text": "Utilidades de consola y servicios desplegados con Docker en Linux." }
+  ],
+  "skills": [
+    { "group": "Lenguajes", "items": ["TypeScript", "JavaScript", "HTML y CSS"] },
+    { "group": "Entorno", "items": ["Node.js", "Linux (Ubuntu)", "Docker", "Git"] },
+    { "group": "Gráficos", "items": ["three.js", "WebGL"] }
+  ],
+  "links": [
+    { "label": "GitHub", "url": "https://github.com/dominmd-ucam" }
+  ],
+  "email": ""
+}

@@ -2,37 +2,118 @@
   {
     "id": "web-demo",
     "type": "web",
-    "title": "Proyecto web (ejemplo)",
-    "description": "Aquí irá un demo simulado de una de mis webs: navegable, con datos de ejemplo.",
-    "tech": ["TypeScript", "React", "API REST"],
-    "repo": "https://github.com/",
-    "position": [10, 8]
+    "title": "Tienda Costa (ejemplo)",
+    "description": "Ejemplo de proyecto web: una tienda con catálogo, carrito y un panel de ventas. Sustituye este texto por tu proyecto real.",
+    "tech": ["TypeScript", "API REST", "Docker"],
+    "repo": "https://github.com/dominmd-ucam",
+    "position": [10, 8],
+    "demo": {
+      "type": "web",
+      "url": "tienda-costa.dev",
+      "cartLabel": "Carrito",
+      "pages": [
+        {
+          "title": "Inicio", "slug": "",
+          "sections": [
+            { "kind": "hero", "title": "Todo para tu verano", "text": "Toallas, gafas y sombrillas con envío en 24 h.", "cta": "Ver catálogo" },
+            { "kind": "cards", "items": [
+              { "title": "Sombrilla coral", "text": "Protección UV 50+", "price": "24,90 €" },
+              { "title": "Gafas de sol", "text": "Polarizadas", "price": "18,00 €" },
+              { "title": "Toalla de playa", "text": "100 % algodón", "price": "12,50 €" }
+            ] }
+          ]
+        },
+        {
+          "title": "Panel", "slug": "panel",
+          "sections": [
+            { "kind": "stats", "items": [
+              { "label": "Pedidos hoy", "value": "128" },
+              { "label": "Ingresos", "value": "3.240 €" },
+              { "label": "Conversión", "value": "4,2 %" }
+            ] },
+            { "kind": "chart", "title": "Ventas de la semana", "values": [42, 58, 51, 74, 66, 90, 82], "labels": ["L", "M", "X", "J", "V", "S", "D"] },
+            { "kind": "list", "title": "Últimos pedidos", "items": [
+              { "label": "#1042 · Marta R.", "value": "48,90 €" },
+              { "label": "#1041 · Luis G.", "value": "18,00 €" },
+              { "label": "#1040 · Ana P.", "value": "72,40 €" }
+            ] }
+          ]
+        }
+      ]
+    }
   },
   {
     "id": "bot-demo",
     "type": "bot",
-    "title": "Bot (ejemplo)",
-    "description": "Conversación guionizada con uno de mis bots, como si estuviera en Discord o Telegram.",
+    "title": "Capitán Bot (ejemplo)",
+    "description": "Ejemplo de bot de comunidad con comandos de ayuda, clima y sorteos. Conversa con él en el demo.",
     "tech": ["Node.js", "Discord API"],
-    "repo": "https://github.com/",
-    "position": [-12, 6]
+    "repo": "https://github.com/dominmd-ucam",
+    "position": [-12, 6],
+    "demo": {
+      "type": "bot",
+      "name": "Capitán Bot",
+      "channel": "general",
+      "intro": ["¡Ahoy! Soy el Capitán Bot. Prueba un comando de la lista de abajo."],
+      "fallback": "No conozco ese comando. Prueba con /ayuda.",
+      "commands": [
+        { "cmd": "/ayuda", "replies": [{ "title": "Comandos disponibles", "fields": [{ "name": "/clima", "value": "Tiempo en la isla" }, { "name": "/sorteo", "value": "Elige un ganador" }, { "name": "/ping", "value": "Latencia del bot" }] }] },
+        { "cmd": "/ping", "replies": [{ "text": "🏓 ¡Pong! 42 ms" }] },
+        { "cmd": "/clima", "replies": [{ "title": "Clima en la isla", "fields": [{ "name": "Ahora", "value": "☀️ 27 °C, despejado" }, { "name": "Mañana", "value": "⛅ 25 °C, viento suave" }] }] },
+        { "cmd": "/sorteo", "replies": [{ "text": "🎲 Sorteando entre 38 participantes…" }, { "text": "🎉 ¡El ganador es **@marinero_42**!" }] }
+      ]
+    }
   },
   {
     "id": "plugin-demo",
     "type": "plugin",
-    "title": "Plugin (ejemplo)",
-    "description": "Panel simulado del plugin dentro de su aplicación anfitriona.",
-    "tech": ["Java", "Paper API"],
-    "repo": "https://github.com/",
-    "position": [4, -14]
+    "title": "IslandTools (ejemplo)",
+    "description": "Ejemplo de plugin para un servidor de juegos: panel de ajustes, comandos y registro en vivo.",
+    "tech": ["Java", "API del servidor"],
+    "repo": "https://github.com/dominmd-ucam",
+    "position": [4, -14],
+    "demo": {
+      "type": "plugin",
+      "host": "Panel del servidor",
+      "plugin": "IslandTools v1.4",
+      "sections": [
+        { "name": "General", "settings": [
+          { "id": "pvp", "label": "PvP activado", "kind": "toggle", "value": false, "log": "PvP {value}" },
+          { "id": "mode", "label": "Modo de juego", "kind": "select", "options": ["Supervivencia", "Creativo", "Aventura"], "value": "Supervivencia", "log": "Modo cambiado a {value}" },
+          { "id": "radius", "label": "Radio de la isla (bloques)", "kind": "number", "min": 50, "max": 500, "step": 50, "value": 200, "log": "Radio fijado en {value}" }
+        ] },
+        { "name": "Economía", "settings": [
+          { "id": "shop", "label": "Tiendas de jugadores", "kind": "toggle", "value": true, "log": "Tiendas {value}" },
+          { "id": "tax", "label": "Impuesto (%)", "kind": "number", "min": 0, "max": 20, "step": 1, "value": 5, "log": "Impuesto al {value} %" }
+        ] }
+      ],
+      "commands": [
+        { "cmd": "/islandtools reload", "output": ["Configuración recargada (12 ajustes)."] },
+        { "cmd": "/islandtools info", "output": ["IslandTools v1.4", "Jugadores en isla: 7", "Tiendas activas: 23"] }
+      ],
+      "boot": ["[IslandTools] Habilitando v1.4…", "[IslandTools] 12 ajustes cargados.", "[IslandTools] Listo."]
+    }
   },
   {
     "id": "cli-demo",
     "type": "cli",
-    "title": "Herramienta de consola (ejemplo)",
-    "description": "Sesión de terminal grabada y reproducida junto a la hoguera.",
-    "tech": ["Python", "Docker"],
-    "repo": "https://github.com/",
-    "position": [16, -4]
+    "title": "isla-cli (ejemplo)",
+    "description": "Ejemplo de herramienta de consola para desplegar y vigilar servicios. Escribe comandos o reproduce una sesión.",
+    "tech": ["Node.js", "Docker"],
+    "repo": "https://github.com/dominmd-ucam",
+    "position": [16, -4],
+    "demo": {
+      "type": "cli",
+      "prompt": "dev@isla:~$",
+      "banner": ["isla-cli 2.1.0 — escribe 'help' para ver los comandos."],
+      "commands": {
+        "help": ["Comandos:", "  status    estado de los servicios", "  deploy    despliega la última versión", "  logs      últimas líneas del registro", "  version   versión de la herramienta"],
+        "status": ["SERVICIO     ESTADO    CPU   MEM", "web          running   3%    120MB", "api          running   7%    210MB", "bot          running   1%    64MB"],
+        "deploy": ["→ Construyendo imagen…", "→ Subiendo a registro…", "→ Reiniciando servicios…", "✔ Desplegado en 14 s"],
+        "logs": ["[12:01:04] api    GET /health 200 3ms", "[12:01:09] bot    comando /ping", "[12:01:15] web    GET / 200 18ms"],
+        "version": ["isla-cli 2.1.0"]
+      },
+      "autoplay": ["status", "deploy", "logs"]
+    }
   }
 ]

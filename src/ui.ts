@@ -1,28 +1,23 @@
 import type { Project } from './interactables';
+import { ProjectModal } from './ui/projectModal';
 import { ICONS } from './ui/icons';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-const TYPE_LABEL: Record<string, string> = { web: 'Web', bot: 'Bot', plugin: 'Plugin', cli: 'Consola' };
-
-/** HUD, aviso de interacción y ficha de proyecto. El menú, los diálogos y los logros viven en src/ui/. */
+/** HUD y aviso de interacción del juego. La ficha de proyecto y su demo se comparten con la versión clásica. */
 export class UI {
-  private modal = $('modal');
+  private modal = ProjectModal.get();
   private prompt = $<HTMLButtonElement>('prompt');
   private hint = $('hint');
   private counter = $('projN');
   private muteBtn = $<HTMLButtonElement>('muteBtn');
-  onClose: () => void = () => {};
   onPromptClick: () => void = () => {};
   onMute: () => boolean = () => false;
   onPause: () => void = () => {};
   onAvatar: () => void = () => {};
 
   constructor() {
-    $('mClose').addEventListener('click', () => this.closeProject());
-    this.modal.addEventListener('pointerdown', (e) => { if (e.target === this.modal || (e.target as HTMLElement).classList.contains('m-wrap')) this.closeProject(); });
     this.prompt.addEventListener('click', () => this.onPromptClick());
-    addEventListener('keydown', (e) => { if (e.key === 'Escape' && !this.modal.hidden) this.closeProject(); });
     $('pauseBtn').innerHTML = ICONS.pause;
     $('avatarBtn').innerHTML = ICONS.avatar;
     this.setMuted(false);
@@ -30,6 +25,8 @@ export class UI {
     $('avatarBtn').addEventListener('click', () => this.onAvatar());
     this.muteBtn.addEventListener('click', () => this.setMuted(this.onMute()));
   }
+
+  set onClose(fn: () => void) { this.modal.onClose = fn; }
 
   ready() {
     $('hud').hidden = false;
@@ -49,24 +46,7 @@ export class UI {
     (this.prompt.querySelector('span') as HTMLElement).textContent = text;
   }
 
-  get isOpen() { return !this.modal.hidden; }
-
-  openProject(p: Project) {
-    $('mTag').textContent = TYPE_LABEL[p.type] ?? p.type;
-    $('mTag').dataset.type = p.type;
-    $('mTitle').textContent = p.title;
-    $('mDesc').textContent = p.description;
-    $('mDemo').innerHTML = '<span>Demo simulado próximamente</span>';
-    const chips = $('mChips'); chips.replaceChildren();
-    for (const t of p.tech) { const s = document.createElement('span'); s.textContent = t; chips.append(s); }
-    const repo = $<HTMLAnchorElement>('mRepo'); repo.href = p.repo;
-    this.modal.hidden = false;
-    $('mClose').focus();
-  }
-
-  closeProject() {
-    if (this.modal.hidden) return;
-    this.modal.hidden = true;
-    this.onClose();
-  }
+  get isOpen() { return this.modal.isOpen; }
+  openProject(p: Project) { this.modal.open(p); }
+  closeProject() { this.modal.close(); }
 }

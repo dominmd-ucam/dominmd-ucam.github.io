@@ -4,6 +4,7 @@ import { heightAt } from './world/terrain';
 import { makeStation, type Obstacle, type ProjectType } from './world/props';
 import { loadModel } from './assets/loader';
 import type { Tier } from './quality';
+import type { DemoSpec } from './demos/types';
 
 export interface Project {
   id: string;
@@ -13,6 +14,7 @@ export interface Project {
   tech: string[];
   repo: string;
   position: [number, number];
+  demo?: DemoSpec;
 }
 
 interface Station { project: Project; group: THREE.Group; marker: THREE.Mesh; beam: THREE.Mesh; tick?: (t: number) => void; baseY: number }
@@ -29,7 +31,7 @@ export class Interactables {
   pulse(seconds: number, now: number) { this.pulseUntil = now + seconds; }
 
   constructor(scene: THREE.Scene, obstacles: Obstacle[], tier: Tier) {
-    for (const project of data as Project[]) {
+    for (const project of data as unknown as Project[]) {
       const [x, z] = project.position;
       const { group, accent, tick } = makeStation(project.type);
       const y = heightAt(x, z);

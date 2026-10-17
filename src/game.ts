@@ -16,6 +16,7 @@ import { Ambience } from './audio';
 import { Player } from './player';
 import { Input } from './input';
 import { Interactables, type Project } from './interactables';
+import { goClassic } from './mode';
 import { UI } from './ui';
 import { Menu, type View } from './ui/menu';
 import { Dialogue } from './ui/dialogue';
@@ -150,6 +151,7 @@ function mainView(): View {
       { type: 'action', label: 'Ajustes', run: () => menu.push(settingsView()) },
       { type: 'action', label: 'Logros', run: () => menu.push(achievementsView()) },
       { type: 'action', label: 'Créditos', run: () => menu.push(creditsView()) },
+      { type: 'action', label: 'Versión clásica', run: () => goClassic() },
     ],
   };
 }
@@ -309,3 +311,6 @@ renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
 (window as unknown as { __dbg: unknown }).__dbg = { player, input, interactables, renderer, q, dawn, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
+
+/** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
+export function start() { /* sin acciones adicionales */ }

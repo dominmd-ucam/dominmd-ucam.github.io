@@ -1,28 +1,7 @@
-@import '@fontsource/fredoka/latin-500.css';
-@import '@fontsource/fredoka/latin-600.css';
-@import '@fontsource/fredoka/latin-700.css';
-@import '@fontsource/nunito/latin-600.css';
-@import '@fontsource/nunito/latin-700.css';
-@import '@fontsource/nunito/latin-800.css';
-
-/* Kit de interfaz "Isla Coral": facetas planas, hexágonos, curvas con rebote. */
-:root {
-  --ink: #0f3440; --deep: #0e5e7a; --sea: #1fb5b0; --sea-hi: #7fe0d6; --sand: #f3d9a4; --bg: #f4e8cf;
-  --foam: #fbf7ee; --paper: #fffaf0; --paper-2: #f2e7cf; --coral: #ff7a59; --coral-d: #e05a3c; --leaf: #3aa65b; --sun: #ffc857; --muted: #5b7c83;
-  --disp: "Fredoka", "Nunito", ui-rounded, system-ui, sans-serif;
-  --body: "Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --pop: cubic-bezier(.34, 1.56, .64, 1); --out: cubic-bezier(.22, 1, .36, 1);
-  --shadow: rgba(15, 52, 64, .26);
-  color-scheme: light;
-}
-* { box-sizing: border-box; }
+/* Estilos del juego (HUD, menú, diálogos, logros, editor de avatar). La paleta y las fichas de proyecto viven en shared.css. */
 html, body { margin: 0; height: 100%; overflow: hidden; background: #f6c9a0; color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.4; }
-[hidden] { display: none !important; }
 #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 #gl:active { cursor: grabbing; }
-button { font-family: inherit; color: inherit; }
-:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; }
-.facet { background: linear-gradient(152deg, var(--paper) 0 54%, var(--paper-2) 54% 100%); color: var(--ink); }
 
 /* ---------- carga ---------- */
 #loader { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: linear-gradient(180deg, #ffd6a8, #f6a97f 60%, #1fb5b0 61%, #0e5e7a); transition: opacity .6s ease; }
@@ -63,7 +42,6 @@ button { font-family: inherit; color: inherit; }
 /* ---------- menú de pausa ---------- */
 #pause { position: fixed; inset: 0; z-index: 30; }
 .veil { position: absolute; inset: 0; background: linear-gradient(100deg, rgba(14, 94, 122, .62) 0 45%, rgba(14, 94, 122, .18) 70%); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: fade .4s ease both; }
-@keyframes fade { from { opacity: 0; } }
 @keyframes fadeOut { to { opacity: 0; } }
 .menu-wrap { position: absolute; left: clamp(12px, 5vw, 64px); top: 50%; width: min(420px, calc(100vw - 24px)); transform: translateY(-50%); filter: drop-shadow(8px 10px 0 rgba(15, 52, 64, .3)); animation: menuIn .6s var(--out) both; font-size: 20px; }
 @keyframes menuIn { from { transform: translate(-130%, -50%) rotate(-8deg); } 60% { transform: translate(3%, -50%) rotate(1.2deg); } to { transform: translate(0, -50%) rotate(0); } }
@@ -146,25 +124,6 @@ button { font-family: inherit; color: inherit; }
 .xp { position: absolute; right: 1.6em; top: 50%; transform: translateY(-50%); font-size: .72em; font-weight: 800; background: var(--sea); color: var(--foam); padding: .05em .7em; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); white-space: nowrap; }
 .cf { position: absolute; left: 2.3em; top: 50%; width: .55em; height: .55em; clip-path: polygon(50% 0, 100% 100%, 0 100%); animation: burst 1s .35s cubic-bezier(.2, .8, .3, 1) both; }
 @keyframes burst { from { opacity: 1; transform: translate(0, 0) scale(0); } 25% { opacity: 1; } to { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--r)) scale(1); } }
-
-/* ---------- ficha de proyecto ---------- */
-#modal { position: fixed; inset: 0; z-index: 20; background: rgba(14, 94, 122, .4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: fade .25s ease both; }
-.m-wrap { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; filter: drop-shadow(6px 8px 0 rgba(15, 52, 64, .3)); }
-.m-card { position: relative; width: min(640px, 100%); max-height: calc(100dvh - 32px); overflow: auto; padding: 1.6em 1.8em; clip-path: polygon(0 4%, 3% 0, 97% 0, 100% 4%, 100% 96%, 97% 100%, 3% 100%, 0 96%); animation: rise .45s var(--pop) both; }
-@keyframes rise { from { opacity: 0; transform: translateY(18px) scale(.94); } }
-.m-card h2 { margin: .5em 0 .3em; font: 700 clamp(26px, 4vw, 34px)/1.1 var(--disp); color: var(--deep); }
-.m-card p { margin: 0 0 1em; color: #35525a; line-height: 1.5; font-weight: 600; }
-.m-close { position: absolute; top: 14px; right: 18px; width: 36px; height: 36px; border: 0; background: var(--paper-2); font-weight: 800; cursor: pointer; clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); transition: transform .25s var(--pop); }
-.m-close:hover { transform: scale(1.12) rotate(8deg); }
-.m-tag { display: inline-block; padding: .1em 1em; font: 700 .8em var(--disp); letter-spacing: .1em; text-transform: uppercase; color: var(--foam); background: var(--sea); clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%); }
-.m-tag[data-type="bot"] { background: var(--coral); }
-.m-tag[data-type="plugin"] { background: #e0a21f; }
-.m-tag[data-type="cli"] { background: #8a63d2; }
-.m-demo { display: grid; place-items: center; min-height: 200px; margin-bottom: 1em; background: rgba(15, 52, 64, .08); border: 2px dashed rgba(15, 52, 64, .2); color: var(--muted); font-weight: 700; font-size: .9em; }
-.m-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.2em; }
-.m-chips span { padding: .15em .9em; font-size: .8em; font-weight: 800; background: var(--paper-2); clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%); }
-.m-actions a { display: inline-block; padding: .5em 1.6em; font-weight: 800; text-decoration: none; color: var(--foam); background: var(--coral); clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%); transition: transform .25s var(--pop), background .2s; }
-.m-actions a:hover { background: var(--coral-d); transform: translateY(-2px); }
 
 /* ---------- editor de avatar ---------- */
 #avatarPanel { position: fixed; z-index: 15; left: 16px; top: 78px; bottom: 16px; width: min(340px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 12px; padding: 16px; overflow: auto; background: linear-gradient(152deg, var(--paper) 0 54%, var(--paper-2) 54% 100%); clip-path: polygon(0 3%, 4% 0, 96% 0, 100% 3%, 100% 97%, 96% 100%, 4% 100%, 0 97%); animation: rise .35s var(--pop) both; }
