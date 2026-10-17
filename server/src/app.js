@@ -7,6 +7,7 @@ import { loadConfig } from './config.js';
 import { openDb } from './db.js';
 import { registerRoutes } from './routes.js';
 import { registerPresence } from './presence.js';
+import { clientIp, ipHash } from './util.js';
 
 const adminHtml = readFileSync(new URL('./admin.html', import.meta.url), 'utf8');
 
@@ -23,6 +24,13 @@ export async function buildApp(cfg = loadConfig()) {
   });
   await app.register(rateLimit, { global: false });
   await app.register(websocket, { options: { maxPayload: 512 } });
+
+  if (cfg.diag) {
+    app.addHook('onRequest', async (req) => {
+      const h = req.headers;
+      req.log.info({ diag: { ipHeader: cfg.ipHeader || '(ninguna)', hasXff: !!h['x-forwarded-for'], xffCount: String(h['x-forwarded-for'] ?? '').split(',').filter(Boolean).length, hasCf: !!h['cf-connecting-ip'], funnel: !!h['tailscale-funnel-request'], usedHash: ipHash(clientIp(req, cfg.ipHeader)), socketHash: ipHash(req.socket.remoteAddress ?? ''), headerNames: Object.keys(h).filter((n) => !['authorization', 'cookie'].includes(n)) } }, 'diag');
+    });
+  }
 
   app.addHook('onSend', async (_req, reply) => {
     reply.header('x-content-type-options', 'nosniff');

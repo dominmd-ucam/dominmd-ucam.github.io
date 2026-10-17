@@ -21,6 +21,8 @@ export function loadConfig(env = process.env) {
       maxPlayers: Number(env.PRESENCE_MAX ?? 60),
       maxPerIp: Number(env.PRESENCE_MAX_PER_IP ?? 4),
     },
+    /** Diagnóstico temporal: registra qué cabeceras de IP llegan (sin guardar IP). Apágalo después. */
+    diag: env.DIAG === 'on',
     logLevel: env.LOG_LEVEL ?? 'info',
   };
 }

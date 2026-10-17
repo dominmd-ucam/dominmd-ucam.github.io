@@ -28,12 +28,16 @@ export function safeEqual(a, b) {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-/** IP del visitante según la cabecera de confianza configurada. */
+/**
+ * IP del visitante según la cabecera de confianza configurada.
+ * Con x-forwarded-for se usa la ÚLTIMA entrada: la añade el proxy de confianza, mientras que las anteriores
+ * pueden venir falsificadas por el cliente. Las demás cabeceras (p. ej. cf-connecting-ip) llevan un único valor.
+ */
 export function clientIp(req, ipHeader) {
   if (ipHeader) {
     const v = req.headers[ipHeader];
-    const first = (Array.isArray(v) ? v[0] : v)?.split(',')[0]?.trim();
-    if (first) return first;
+    const parts = (Array.isArray(v) ? v.join(',') : v)?.split(',').map((x) => x.trim()).filter(Boolean);
+    if (parts?.length) return ipHeader === 'x-forwarded-for' ? parts[parts.length - 1] : parts[0];
   }
   return req.socket?.remoteAddress ?? 'unknown';
 }

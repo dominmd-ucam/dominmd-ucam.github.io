@@ -130,3 +130,12 @@ test('presencia: los visitantes se ven entre sí y se rechaza otro origen', asyn
   assert.ok(closed === 1008 || closed === 'error', 'otro origen rechazado');
   a.ws.close(); b.ws.close();
 });
+
+test('IP del visitante: con x-forwarded-for cuenta la última entrada (la del proxy), no la que envía el cliente', async () => {
+  const { clientIp } = await import('../src/util.js');
+  const req = (xff) => ({ headers: { 'x-forwarded-for': xff }, socket: { remoteAddress: '172.21.0.3' } });
+  assert.equal(clientIp(req('1.1.1.1, 2.2.2.2, 203.0.113.9'), 'x-forwarded-for'), '203.0.113.9', 'falsificar el inicio de la cabecera no sirve');
+  assert.equal(clientIp(req('203.0.113.9'), 'x-forwarded-for'), '203.0.113.9');
+  assert.equal(clientIp({ headers: {}, socket: { remoteAddress: '172.21.0.3' } }, 'x-forwarded-for'), '172.21.0.3', 'sin cabecera: IP del socket');
+  assert.equal(clientIp({ headers: { 'cf-connecting-ip': '198.51.100.7' }, socket: {} }, 'cf-connecting-ip'), '198.51.100.7');
+});

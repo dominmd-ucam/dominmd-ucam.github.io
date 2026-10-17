@@ -11,7 +11,7 @@ services:
     environment:
       DB_FILE: /data/portfolio.db
     volumes:
-      - ./data:/data
+      - api-data:/data
     # solo accesible desde el propio servidor: el túnel o el proxy llegan por la red interna o por localhost
     ports:
       - "127.0.0.1:8787:8787"
@@ -53,3 +53,7 @@ services:
       - ./tailscale:/config:ro
     depends_on:
       - api
+
+volumes:
+  # volumen gestionado por Docker: hereda el dueño del directorio /data de la imagen, así que no hay que tocar permisos
+  api-data:

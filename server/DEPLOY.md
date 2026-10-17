@@ -93,10 +93,10 @@ Abre `https://api.tudominio.com/admin`, pega el token y aprueba, rechaza o borra
 |---|---|
 | Actualizar | `git pull && docker compose up -d --build` |
 | Ver registros | `docker compose logs -f api` |
-| Copia de seguridad | `docker compose exec api node scripts/backup.mjs /data/backup.db` (queda en `server/data/`) |
+| Copia de seguridad | `docker compose exec api node scripts/backup.mjs /data/backup.db && docker compose cp api:/data/backup.db ./backup.db` |
 | Apagar los fantasmas | `PRESENCE=off` en `.env` y `docker compose up -d` |
 
-Programa la copia con `cron` si te importa conservar el libro de visitas. Los datos viven en `server/data/`.
+Programa la copia con `cron` si te importa conservar el libro de visitas. Los datos viven en el volumen de Docker `api-data`.
 
 ## Privacidad y seguridad
 
