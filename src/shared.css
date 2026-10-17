@@ -4,6 +4,7 @@
 @import '@fontsource/nunito/latin-600.css';
 @import '@fontsource/nunito/latin-700.css';
 @import '@fontsource/nunito/latin-800.css';
+@import './demos-extra.css';
 
 /* Variables y piezas comunes a la versión clásica y al juego: paleta, fichas de proyecto y demos. */
 :root {
@@ -35,6 +36,9 @@ button { font-family: inherit; color: inherit; }
 .m-tag[data-type="bot"], .tag[data-type="bot"] { background: var(--coral); }
 .m-tag[data-type="plugin"], .tag[data-type="plugin"] { background: #e0a21f; }
 .m-tag[data-type="cli"], .tag[data-type="cli"] { background: #8a63d2; }
+.m-tag[data-type="mobile"], .tag[data-type="mobile"] { background: #e0488f; }
+.m-tag[data-type="device"], .tag[data-type="device"] { background: #e07a30; }
+.m-note { margin: -.4em 0 1em; font-size: .82em; font-weight: 700; color: var(--muted); }
 .m-demo { margin-bottom: 1em; }
 .m-demo.empty { display: grid; place-items: center; min-height: 160px; background: rgba(15, 52, 64, .08); border: 2px dashed rgba(15, 52, 64, .2); color: var(--muted); font-weight: 700; font-size: .9em; }
 .m-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.2em; }

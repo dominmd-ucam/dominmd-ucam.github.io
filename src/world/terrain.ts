@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import projects from '../data/projects.json';
 
 export const WORLD_SIZE = 128;
 const ISLAND_R = 26;
@@ -40,12 +41,9 @@ export const ISLET: [number, number] = [-33, 20];
 
 /** Caminos de arena: polilíneas entre el punto de inicio, las estaciones y el faro. */
 const PATHS: [number, number][][] = [
-  [[6, 13], [8, 9], [4, 4], [0, 0]],
-  [[0, 0], [10, 8]],
-  [[0, 0], [16, -4]],
-  [[0, 0], [4, -14]],
-  [[0, 0], [-12, 6]],
-  [[0, 0], [-7, -6]],
+  [[6, 13], [8, 9], [4, 4], [0, 0]],   // desde el punto de inicio
+  [[0, 0], [-7, -6]],                  // hacia el faro
+  ...(projects as unknown as { position: [number, number] }[]).map((p) => [[0, 0], p.position] as [number, number][]), // un camino por proyecto
 ];
 function segDist(px: number, pz: number, ax: number, az: number, bx: number, bz: number) {
   const dx = bx - ax, dz = bz - az;

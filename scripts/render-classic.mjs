@@ -2,8 +2,8 @@
 // así el contenido está en el HTML estático: indexable, accesible y visible antes de que cargue ningún JavaScript.
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-const TYPE_LABEL = { web: 'Web', bot: 'Bot', plugin: 'Plugin', cli: 'Consola' };
-const TYPE_BLURB = { web: 'Probar la web', bot: 'Hablar con el bot', plugin: 'Abrir el panel', cli: 'Abrir la terminal' };
+const TYPE_LABEL = { web: 'Web', bot: 'Bot', plugin: 'Plugin', cli: 'Consola', mobile: 'App móvil', device: 'Dispositivo' };
+const TYPE_BLURB = { web: 'Probar el demo', bot: 'Hablar con el bot', plugin: 'Abrir el panel', cli: 'Abrir la terminal', mobile: 'Probar la app', device: 'Ver el dispositivo' };
 
 export function renderHead(profile) {
   const title = `${profile.name} · ${profile.role}`;
@@ -88,7 +88,11 @@ export function renderClassic(profile, projects) {
 
     <section id="proyectos" aria-labelledby="h-projects">
       <h2 id="h-projects">Proyectos</h2>
-      <p class="section-lede">Cada proyecto tiene un demo simulado que puedes probar aquí mismo, sin salir de la página.</p>
+      <p class="section-lede">Cada proyecto tiene un demo simulado que puedes probar aquí mismo, sin salir de la página. Los proyectos privados se muestran con datos ficticios.</p>
+      <div class="filters" role="group" aria-label="Filtrar por tipo">
+        <button type="button" class="chip on" data-filter="all">Todos</button>
+        ${[...new Set(projects.map((p) => p.type))].map((t) => `<button type="button" class="chip" data-filter="${esc(t)}">${esc(TYPE_LABEL[t] ?? t)}</button>`).join('')}
+      </div>
       <div class="cards">
         ${projects.map((p) => `
         <article class="card" data-type="${esc(p.type)}">
@@ -98,8 +102,9 @@ export function renderClassic(profile, projects) {
           <ul class="chips" aria-label="Tecnologías">${(p.tech ?? []).map(chip).join('')}</ul>
           <div class="card-actions">
             <button class="btn" type="button" data-project="${esc(p.id)}">${esc(TYPE_BLURB[p.type] ?? 'Ver demo')}</button>
-            <a class="btn ghost" href="${esc(p.repo)}" target="_blank" rel="noopener">Código</a>
+            ${p.repo ? `<a class="btn ghost" href="${esc(p.repo)}" target="_blank" rel="noopener">Código</a>` : '<span class="private">🔒 Repositorio privado</span>'}
           </div>
+          ${p.credit ? `<p class="card-note">${esc(p.credit)}</p>` : ''}
         </article>`).join('')}
       </div>
     </section>

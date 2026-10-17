@@ -6,12 +6,14 @@ export interface ProjectLike {
   title: string;
   description: string;
   tech: string[];
-  repo: string;
+  repo: string | null;
+  credit?: string;
+  note?: string;
   demo?: DemoSpec;
 }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const TYPE_LABEL: Record<string, string> = { web: 'Web', bot: 'Bot', plugin: 'Plugin', cli: 'Consola' };
+const TYPE_LABEL: Record<string, string> = { web: 'Web', bot: 'Bot', plugin: 'Plugin', cli: 'Consola', mobile: 'Móvil', device: 'Dispositivo' };
 
 /** Ficha de proyecto con su demo simulado. La usan la versión clásica y el juego. */
 export class ProjectModal {
@@ -43,7 +45,11 @@ export class ProjectModal {
     $('mDesc').textContent = p.description;
     const chips = $('mChips');
     chips.replaceChildren(...p.tech.map((t) => { const s = document.createElement('span'); s.textContent = t; return s; }));
-    ($('mRepo') as HTMLAnchorElement).href = p.repo;
+    const repo = $('mRepo') as HTMLAnchorElement;
+    if (p.repo) { repo.href = p.repo; repo.textContent = 'Ver código en GitHub'; repo.hidden = false; } else repo.hidden = true;
+    const notes = [p.credit, p.note].filter(Boolean).join(' ');
+    $('mNote').textContent = notes || (p.repo ? '' : 'Repositorio privado.');
+    $('mNote').hidden = !$('mNote').textContent;
     this.demo?.dispose();
     const host = $('mDemo');
     host.replaceChildren();

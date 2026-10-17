@@ -4,7 +4,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'steps', title: 'Primeros pasos', desc: 'Recorre la isla a pie', xp: 10, icon: 'compass' },
   { id: 'friend', title: 'Amigo felino', desc: 'Habla con Misu', xp: 20, icon: 'cat' },
   { id: 'curious', title: 'Curioso', desc: 'Abre tu primer proyecto', xp: 30, icon: 'key' },
-  { id: 'explorer', title: 'Explorador', desc: 'Abre los cuatro proyectos', xp: 100, icon: 'star' },
+  { id: 'explorer', title: 'Explorador', desc: 'Abre todos los proyectos', xp: 100, icon: 'star' },
   { id: 'swimmer', title: 'Nadador', desc: 'Date un baño en el mar', xp: 20, icon: 'wave' },
   { id: 'sailor', title: 'Lobo de mar', desc: 'Llega al final del muelle', xp: 25, icon: 'anchor' },
   { id: 'wreck', title: 'Cazatesoros', desc: 'Visita el barco varado', xp: 25, icon: 'anchor' },

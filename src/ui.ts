@@ -10,6 +10,7 @@ export class UI {
   private prompt = $<HTMLButtonElement>('prompt');
   private hint = $('hint');
   private counter = $('projN');
+  private total = $('projT');
   private muteBtn = $<HTMLButtonElement>('muteBtn');
   onPromptClick: () => void = () => {};
   onMute: () => boolean = () => false;
@@ -38,6 +39,7 @@ export class UI {
 
   setMuted(muted: boolean) { this.muteBtn.innerHTML = muted ? ICONS.muted : ICONS.sound; }
   setCounter(n: number) { this.counter.textContent = String(n); }
+  setTotal(n: number) { this.total.textContent = String(n); }
 
   setPrompt(text: string | null) {
     if (!text) { this.prompt.hidden = true; return; }

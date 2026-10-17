@@ -10,16 +10,35 @@ export interface Project {
   id: string;
   type: ProjectType;
   title: string;
+  short: string;
+  credit?: string;
+  note?: string;
   description: string;
   tech: string[];
-  repo: string;
+  repo: string | null;
   position: [number, number];
   demo?: DemoSpec;
 }
 
-interface Station { project: Project; group: THREE.Group; marker: THREE.Mesh; beam: THREE.Mesh; tick?: (t: number) => void; baseY: number }
+interface Station { project: Project; group: THREE.Group; label: THREE.Sprite; marker: THREE.Mesh; beam: THREE.Mesh; tick?: (t: number) => void; baseY: number }
 
 const REACH = 3.2;
+
+/** Nombre del proyecto flotando sobre la estación: así se reconoce desde lejos. */
+function makeLabel(text: string): THREE.Sprite {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+  const g = c.getContext('2d')!;
+  g.fillStyle = 'rgba(255,250,240,.94)';
+  g.beginPath(); g.roundRect(8, 16, 496, 96, 36); g.fill();
+  g.fillStyle = '#0f3440'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  let size = 54;
+  do { g.font = `700 ${size}px system-ui, sans-serif`; size -= 2; } while (g.measureText(text).width > 440 && size > 20);
+  g.fillText(text, 256, 66);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, fog: false, depthWrite: false }));
+  sp.scale.set(4, 1, 1);
+  return sp;
+}
 
 export class Interactables {
   stations: Station[] = [];
@@ -56,7 +75,10 @@ export class Interactables {
       );
       beam.position.set(x, y + 3, z);
       scene.add(beam);
-      this.stations.push({ project, group, marker, beam, tick, baseY: y + 3.7 });
+      const label = makeLabel(project.short);
+      label.position.set(x, y + 4.7, z);
+      scene.add(label);
+      this.stations.push({ project, group, label, marker, beam, tick, baseY: y + 3.7 });
     }
   }
 

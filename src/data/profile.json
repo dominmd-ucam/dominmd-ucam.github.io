@@ -1,25 +1,78 @@
 {
   "name": "Domin",
   "role": "Desarrollador de software",
-  "headline": "Webs, bots, plugins y herramientas, hechos con cariño por el detalle.",
-  "description": "Portfolio de Domin, desarrollador de software: webs, bots, plugins y herramientas. Recórrelo como un videojuego en 3D o en versión clásica.",
+  "headline": "Webs, apps, bots, plugins y herramientas, hechos con cariño por el detalle.",
+  "description": "Portfolio de Domin, desarrollador de software: webs y apps en PHP, TypeScript y Flutter, bots, plugins y herramientas. Recórrelo como un videojuego en 3D o en versión clásica.",
   "siteUrl": "https://dominmd-ucam.github.io/",
   "about": [
-    "Soy Domin, desarrollador. Me gusta construir cosas que funcionan bien y se ven mejor: aplicaciones web, bots, plugins y pequeñas herramientas de línea de comandos.",
-    "Este portfolio es una isla que se puede recorrer como un videojuego, pero también tiene esta versión clásica, rápida y accesible. Elige la que prefieras."
+    "Soy Domin, desarrollador. Me gusta construir cosas que funcionan bien y se ven mejor: aplicaciones web y móviles, bots, plugins para herramientas que uso a diario y utilidades de consola.",
+    "Este portfolio es una isla que se puede recorrer como un videojuego, pero también tiene esta versión clásica, rápida y accesible. Cada proyecto tiene un demo simulado que puedes probar."
   ],
   "highlights": [
-    { "title": "Webs", "text": "Interfaces claras y rápidas, con atención al detalle." },
-    { "title": "Bots y plugins", "text": "Automatización y extensiones que se integran con las aplicaciones que ya usas." },
-    { "title": "Herramientas", "text": "Utilidades de consola y servicios desplegados con Docker en Linux." }
+    {
+      "title": "Aplicaciones web y móviles",
+      "text": "Gestión de gimnasios, explotaciones, mantenimientos y hostelería, con PHP, React y Flutter."
+    },
+    {
+      "title": "Bots, plugins y agentes",
+      "text": "Plugins para Dispatcharr y para depuradores, bots de Discord y búsqueda semántica sobre notas."
+    },
+    {
+      "title": "Hardware y herramientas",
+      "text": "Firmware para una pantalla ESP32 y utilidades de consola, desplegadas con Docker en Linux."
+    }
   ],
   "skills": [
-    { "group": "Lenguajes", "items": ["TypeScript", "JavaScript", "HTML y CSS"] },
-    { "group": "Entorno", "items": ["Node.js", "Linux (Ubuntu)", "Docker", "Git"] },
-    { "group": "Gráficos", "items": ["three.js", "WebGL"] }
+    {
+      "group": "Lenguajes",
+      "items": [
+        "TypeScript",
+        "JavaScript",
+        "PHP",
+        "Python",
+        "C# (.NET)",
+        "Dart (Flutter)",
+        "C",
+        "PowerShell",
+        "Java"
+      ]
+    },
+    {
+      "group": "Datos y servicios",
+      "items": [
+        "MariaDB / MySQL",
+        "PostgreSQL",
+        "Supabase",
+        "ChromaDB",
+        "APIs REST"
+      ]
+    },
+    {
+      "group": "Entorno",
+      "items": [
+        "Linux (Ubuntu)",
+        "Docker",
+        "Git",
+        "Node.js",
+        "Cypress"
+      ]
+    },
+    {
+      "group": "Gráficos y web",
+      "items": [
+        "three.js",
+        "WebGL",
+        "React",
+        "Tailwind CSS",
+        "HTML y CSS"
+      ]
+    }
   ],
   "links": [
-    { "label": "GitHub", "url": "https://github.com/dominmd-ucam" }
+    {
+      "label": "GitHub",
+      "url": "https://github.com/dominmd-ucam"
+    }
   ],
   "email": ""
 }

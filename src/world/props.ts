@@ -165,7 +165,7 @@ export function buildScenery(scene: THREE.Object3D) {
 }
 
 /* ---------- objetos interactivos (placeholders) ---------- */
-export type ProjectType = 'web' | 'bot' | 'plugin' | 'cli';
+export type ProjectType = 'web' | 'bot' | 'plugin' | 'cli' | 'mobile' | 'device';
 
 export function makeStation(type: ProjectType): { group: THREE.Group; accent: THREE.Color; tick?: (t: number) => void } {
   const g = new THREE.Group();
@@ -216,6 +216,23 @@ export function makeStation(type: ProjectType): { group: THREE.Group; accent: TH
     const gem = add(new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), new THREE.MeshStandardMaterial({ color: '#ffd24a', emissive: '#ffb703', emissiveIntensity: 1.2 })));
     gem.position.y = 1.65;
     tick = (t) => { gem.rotation.y = t * 1.5; gem.position.y = 1.65 + Math.sin(t * 2) * 0.08; };
+  } else if (type === 'mobile') {
+    accent = new THREE.Color('#ff9ac1');
+    const base = add(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 0.35, 10), wood)); base.position.y = 0.18;
+    const post = add(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.9, 8), dark)); post.position.y = 0.8;
+    const phone = add(new THREE.Mesh(new THREE.BoxGeometry(0.62, 1.1, 0.07), std('#1b2430'))); phone.position.y = 1.7; phone.rotation.x = -0.18;
+    const scrM = new THREE.MeshStandardMaterial({ color: '#102030', emissive: '#ff9ac1', emissiveIntensity: 0.9 });
+    const scr = add(new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.95, 0.02), scrM)); scr.position.set(0, 1.7, 0.045); scr.rotation.x = -0.18;
+    const heart = add(new THREE.Mesh(new THREE.OctahedronGeometry(0.14, 0), new THREE.MeshStandardMaterial({ color: '#ff7a8a', emissive: '#ff5a7a', emissiveIntensity: 1.2 }))); heart.position.set(0, 2.55, 0);
+    tick = (t) => { heart.rotation.y = t * 1.6; heart.position.y = 2.55 + Math.sin(t * 2.4) * 0.08; scrM.emissiveIntensity = 0.7 + Math.sin(t * 3) * 0.2; };
+  } else if (type === 'device') {
+    accent = new THREE.Color('#ff9a6a');
+    const desk = add(new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 0.9, 10), wood)); desk.position.y = 0.45;
+    const body = add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.62, 0.12), std('#0a0d12'))); body.position.set(0, 1.25, 0); body.rotation.x = -0.12;
+    const scrM = new THREE.MeshStandardMaterial({ color: '#000', emissive: '#ff7a59', emissiveIntensity: 1.1 });
+    const scr = add(new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.5, 0.02), scrM)); scr.position.set(0, 1.25, 0.07); scr.rotation.x = -0.12;
+    const bar = add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.01), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffc857').multiplyScalar(2) }))); bar.position.set(-0.1, 1.28, 0.085); bar.rotation.x = -0.12;
+    tick = (t) => { scrM.emissiveIntensity = 0.9 + Math.sin(t * 2.2) * 0.25; bar.scale.x = 0.7 + Math.sin(t * 1.4) * 0.25; };
   } else {
     accent = new THREE.Color('#b388ff');
     const stone = std('#9a9fa8');

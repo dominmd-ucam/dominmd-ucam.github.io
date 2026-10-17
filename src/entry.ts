@@ -18,6 +18,15 @@ document.addEventListener('click', (e) => {
   if (p) modal.open(p);
 });
 
+// filtros de la lista de proyectos
+document.addEventListener('click', (e) => {
+  const f = (e.target as HTMLElement).closest<HTMLElement>('[data-filter]');
+  if (!f) return;
+  const type = f.dataset.filter ?? 'all';
+  document.querySelectorAll<HTMLElement>('[data-filter]').forEach((b) => b.classList.toggle('on', b === f));
+  document.querySelectorAll<HTMLElement>('.card[data-type]').forEach((c) => { c.hidden = type !== 'all' && c.dataset.type !== type; });
+});
+
 const support = gameSupport();
 const buttons = [...document.querySelectorAll<HTMLButtonElement>('[data-enter3d]')];
 const note = document.querySelector<HTMLElement>('[data-gate-note]');

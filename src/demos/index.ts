@@ -3,6 +3,8 @@ import { mountWeb } from './web';
 import { mountBot } from './bot';
 import { mountPlugin } from './plugin';
 import { mountCli } from './cli';
+import { mountMobile } from './mobile';
+import { mountDevice } from './device';
 
 export type { DemoSpec, DemoHandle };
 
@@ -13,5 +15,7 @@ export function mountDemo(host: HTMLElement, spec: DemoSpec): DemoHandle {
     case 'bot': return mountBot(host, spec);
     case 'plugin': return mountPlugin(host, spec);
     case 'cli': return mountCli(host, spec);
+    case 'mobile': return mountMobile(host, spec);
+    case 'device': return mountDevice(host, spec);
   }
 }

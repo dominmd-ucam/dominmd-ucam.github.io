@@ -12,7 +12,7 @@
       ]
     },
     "isla": {
-      "text": "El portátil bajo la sombrilla es una web, el cangrejo robot es un bot, el cofre es un plugin y la hoguera es una herramienta de consola. Acércate a cualquiera y pulsa E. También hay un faro, un barco varado y una cueva con tesoro… ¡y un islote al que se llega a nado!",
+      "text": "Hay 14 estaciones repartidas por la isla: webs, bots, plugins, herramientas de consola, una app móvil y hasta un dispositivo con pantalla. El nombre de cada proyecto flota sobre su estación: acércate y pulsa E para probar su demo. También hay un faro, un barco varado, una cueva con espada… ¡y un islote al que se llega a nado!",
       "choices": [
         { "label": "¿Quién es Domin?", "next": "domin" },
         { "label": "Enséñame el camino", "next": "camino", "action": "showPaths" },
@@ -28,7 +28,7 @@
       ]
     },
     "camino": {
-      "text": "¡Mira las columnas de luz! Cada una marca un proyecto. Sigue los caminos de arena o fíate de los carteles del cruce. ¡Buen viaje!",
+      "text": "¡Mira las columnas de luz! Cada una marca un proyecto. Del cruce central salen caminos hasta todos ellos, y los carteles te dicen cuál es cuál. ¡Buen viaje!",
       "choices": [
         { "label": "¡Gracias, Misu!", "next": null }
       ]

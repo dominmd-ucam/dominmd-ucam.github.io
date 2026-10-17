@@ -68,12 +68,12 @@ const diorama = buildDiorama(staticWorld);
 obstacles.push(...diorama.obstacles);
 const village = buildVillage(staticWorld);
 obstacles.push(...village.obstacles);
+const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
 const trees = buildTrees(scene, obstacles, q.tier === 'low' ? 8 : 15);
 batchStatic(staticWorld);
 const life = buildLife(scene);
 const grass = buildGrass(q.tier === 'high' ? 60000 : q.tier === 'med' ? 30000 : 10000);
 scene.add(grass.group);
-const interactables = new Interactables(scene, obstacles, q.tier);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
 
@@ -89,6 +89,7 @@ const dialogue = new Dialogue();
 const achievements = new Achievements();
 achievements.onUnlock = (a) => toasts.show(a);
 ui.setCounter(achievements.opened.size);
+ui.setTotal(interactables.stations.length);
 const player = new Player(obstacles, [6, 12]);
 scene.add(player.group);
 const post = createPost(renderer, scene, camera, q);

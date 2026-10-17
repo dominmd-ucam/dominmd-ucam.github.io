@@ -1,5 +1,6 @@
 import type { DemoHandle, WebDemo, WebSection } from './types';
 import { el, Timers } from './dom';
+import { extraSection } from './web-sections';
 
 /** Navegador simulado con páginas navegables, carrito, estadísticas y gráficos animados. */
 export function mountWeb(host: HTMLElement, spec: WebDemo): DemoHandle {
@@ -22,6 +23,8 @@ export function mountWeb(host: HTMLElement, spec: WebDemo): DemoHandle {
   let current = 0;
 
   const section = (s: WebSection): HTMLElement => {
+    const extra = extraSection(s, timers);
+    if (extra) return extra;
     const box = el('section', `wb wb-${s.kind}`);
     if (s.kind === 'hero') {
       box.append(el('h4', '', s.title), el('p', '', s.text));
@@ -67,7 +70,7 @@ export function mountWeb(host: HTMLElement, spec: WebDemo): DemoHandle {
         bars.append(col);
       });
       box.append(bars);
-    } else {
+    } else if (s.kind === 'list') {
       box.append(el('h5', '', s.title));
       for (const it of s.items) {
         const r = el('div', 'wb-row');
