@@ -46,7 +46,7 @@ renderer.shadowMap.enabled = q.shadows;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.shadowMap.autoUpdate = false; // la sombra se recalcula a 30 Hz (ver el bucle)
 renderer.info.autoReset = false;
-initAssets(renderer);
+initAssets();
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 6000);
