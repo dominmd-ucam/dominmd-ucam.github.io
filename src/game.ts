@@ -293,7 +293,7 @@ function frame() {
   presence?.send(player.group.position.x, player.group.position.z, player.group.rotation.y, Math.min(1, player.vel.length() / 6.5), player.swimming, performance.now());
   ghosts.update(dt, t, performance.now());
   grass.update(t, camera.position);
-  trees.update(t);
+  trees.update(t, camera.position);
   for (const p of palms) {
     p.crown.rotation.z = Math.sin(t * 0.9 + p.phase) * 0.025;
     p.crown.rotation.x = Math.cos(t * 0.7 + p.phase) * 0.02;

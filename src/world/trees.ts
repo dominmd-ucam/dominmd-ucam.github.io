@@ -1,15 +1,15 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { heightAt, islandRadius, pathMask } from './terrain';
 import type { Obstacle } from './props';
 
 /** Árboles de copa redonda y blanda, al estilo de los juegos tipo Petit Island: tronco grueso y copa de esferas con degradado. */
-function canopyGeometry(): THREE.BufferGeometry {
+function canopyGeometry(detail: number): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   const blobs: [number, number, number, number][] = [[0, 0, 0, 1.9], [1.3, -0.3, 0.4, 1.35], [-1.2, -0.2, -0.5, 1.4], [0.3, 1.1, -0.3, 1.25], [-0.2, -0.4, 1.3, 1.2]];
   const low = new THREE.Color('#3da34a'), high = new THREE.Color('#b4e460'), c = new THREE.Color();
   for (const [x, y, z, r] of blobs) {
-    const g = new THREE.IcosahedronGeometry(r, 3);
+    let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(r, detail);
     const p = g.attributes.position as THREE.BufferAttribute;
     const col = new Float32Array(p.count * 3);
     for (let i = 0; i < p.count; i++) {
@@ -20,6 +20,8 @@ function canopyGeometry(): THREE.BufferGeometry {
       c.toArray(col, i * 3);
     }
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    // baja resolución: vértices compartidos → sombreado suave, que a distancia imita al detalle alto
+    if (detail < 3) { g.deleteAttribute('normal'); g.deleteAttribute('uv'); g = mergeVertices(g); }
     parts.push(g);
   }
   const m = mergeGeometries(parts)!;
@@ -27,7 +29,7 @@ function canopyGeometry(): THREE.BufferGeometry {
   return m;
 }
 
-export function buildTrees(scene: THREE.Scene, obstacles: Obstacle[], count: number): { update(t: number): void; blocks(p: THREE.Vector3): boolean } {
+export function buildTrees(scene: THREE.Scene, obstacles: Obstacle[], count: number): { update(t: number, cam?: THREE.Vector3): void; blocks(p: THREE.Vector3): boolean } {
   const spots: { x: number; z: number; s: number; a: number }[] = [];
   let seed = 20241017;
   const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296); // posiciones reproducibles
@@ -54,7 +56,12 @@ export function buildTrees(scene: THREE.Scene, obstacles: Obstacle[], count: num
         transformed.x += sway * 0.07 * (position.y + 1.6);
         transformed.z += cos(uTime * 0.7 + ip.z) * 0.05 * (position.y + 1.6);`);
   };
-  const canopy = new THREE.InstancedMesh(canopyGeometry(), canopyMat, spots.length);
+  // LOD de las copas (lo que más triángulos cuesta): la misma copa con menos subdivisiones según la distancia a la cámara
+  const LODS = [{ detail: 3, max: 26 }, { detail: 1, max: 65 }, { detail: 0, max: Infinity }];
+  const HYST = 3; // margen en metros para que un árbol no salte de nivel una y otra vez en el límite
+  const canopies = LODS.map((l) => new THREE.InstancedMesh(canopyGeometry(l.detail), canopyMat, spots.length));
+  const baseMat = new Float32Array(spots.length * 16), baseCol = new Float32Array(spots.length * 3);
+  const lodOf = new Int8Array(spots.length).fill(-1), counts = new Int32Array(LODS.length);
   const trunkGeo = new THREE.CylinderGeometry(0.28, 0.45, 2.6, 8); trunkGeo.translate(0, 1.3, 0);
   const trunk = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: '#a86b40', roughness: 0.9 }), spots.length);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), tint = new THREE.Color();
@@ -64,14 +71,37 @@ export function buildTrees(scene: THREE.Scene, obstacles: Obstacle[], count: num
     m.compose(new THREE.Vector3(p.x, y, p.z), q, new THREE.Vector3(p.s, p.s, p.s));
     trunk.setMatrixAt(i, m);
     m.compose(new THREE.Vector3(p.x, y + 3.9 * p.s, p.z), q, new THREE.Vector3(p.s, p.s, p.s));
-    canopy.setMatrixAt(i, m);
+    m.toArray(baseMat, i * 16);
     tint.setHSL(0.27 + Math.random() * 0.05, 0.9, 0.9 + Math.random() * 0.2);
-    canopy.setColorAt(i, tint);
+    tint.toArray(baseCol, i * 3);
     obstacles.push({ x: p.x, z: p.z, r: 0.7 * p.s });
   });
-  for (const o of [canopy, trunk]) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; scene.add(o); }
+  for (const c of canopies) c.setColorAt(0, tint); // reserva el buffer de color; luego se rellena por nivel
+  for (const o of [...canopies, trunk]) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; scene.add(o); }
+
+  /** Reparte los árboles entre los niveles según la distancia horizontal a la cámara; solo reescribe buffers si alguno cambia de nivel. */
+  function assignLods(cam: THREE.Vector3) {
+    let changed = false;
+    for (let i = 0; i < spots.length; i++) {
+      const d = Math.hypot(cam.x - spots[i].x, cam.z - spots[i].z);
+      let l = Math.max(lodOf[i], 0);
+      while (l < LODS.length - 1 && d > LODS[l].max + HYST) l++;
+      while (l > 0 && d < LODS[l - 1].max - HYST) l--;
+      if (l !== lodOf[i]) { lodOf[i] = l; changed = true; }
+    }
+    if (!changed) return;
+    counts.fill(0);
+    for (let i = 0; i < spots.length; i++) {
+      const k = lodOf[i], c = canopies[k];
+      (c.instanceMatrix.array as Float32Array).set(baseMat.subarray(i * 16, i * 16 + 16), counts[k] * 16);
+      (c.instanceColor!.array as Float32Array).set(baseCol.subarray(i * 3, i * 3 + 3), counts[k] * 3);
+      counts[k]++;
+    }
+    canopies.forEach((c, k) => { c.count = counts[k]; c.visible = counts[k] > 0; c.instanceMatrix.needsUpdate = true; c.instanceColor!.needsUpdate = true; });
+  }
+
   return {
-    update: (t) => { uTime.value = t; },
+    update: (t, cam) => { uTime.value = t; if (cam) assignLods(cam); },
     /** ¿está el punto (la cámara) dentro de alguna copa? */
     blocks: (p) => spots.some((s) => {
       const y0 = heightAt(s.x, s.z) + 2.0 * s.s;
