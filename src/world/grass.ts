@@ -1,16 +1,17 @@
 import * as THREE from 'three';
 import { heightAt, pathMask } from './terrain';
 
-/** Hierba instanciada con viento en el vertex shader: una sola draw call. */
-export function buildGrass(count: number): { group: THREE.Group; update(t: number, cam?: THREE.Vector3): void } {
-  // hoja: 3 tramos, afilada hacia la punta
-  const segs = 3, pos: number[] = [], col: number[] = [], idx: number[] = [];
-  const base = new THREE.Color('#3f9d3f'), tip = new THREE.Color('#c9f06a'), c = new THREE.Color();
+const BASE = new THREE.Color('#3f9d3f'), TIP = new THREE.Color('#c9f06a');
+const NEAR_FULL = 18; // metros hasta los que se dibuja la hoja completa
+
+/** Hoja completa: 3 tramos, afilada hacia la punta (6 triángulos, 8 vértices). */
+function bladeFull(): THREE.BufferGeometry {
+  const segs = 3, pos: number[] = [], col: number[] = [], idx: number[] = [], c = new THREE.Color();
   for (let i = 0; i <= segs; i++) {
     const u = i / segs, w = 0.5 * (1 - u * u * 0.92);
     for (const s of [-1, 1]) {
       pos.push(s * w, u, 0);
-      c.copy(base).lerp(tip, u);
+      c.copy(BASE).lerp(TIP, u);
       col.push(c.r, c.g, c.b);
     }
   }
@@ -20,6 +21,24 @@ export function buildGrass(count: number): { group: THREE.Group; update(t: numbe
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.setIndex(idx);
   geo.computeVertexNormals();
+  return geo;
+}
+
+/** Hoja ligera: un solo triángulo (3 vértices). A distancia no se distingue de la completa y cuesta 6 veces menos triángulos y casi 3 veces menos vértices. */
+function bladeLite(): THREE.BufferGeometry {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute([-0.42, 0, 0, 0.42, 0, 0, 0, 1, 0], 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute([BASE.r, BASE.g, BASE.b, BASE.r, BASE.g, BASE.b, TIP.r, TIP.g, TIP.b], 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * Hierba instanciada con viento en el vertex shader. Cada bloque de 16 m tiene dos mallas que comparten los mismos datos de instancias:
+ * la hoja completa (cerca) y la ligera (lejos). En calidad baja solo existe la ligera.
+ */
+export function buildGrass(count: number, liteOnly = false): { group: THREE.Group; update(t: number, cam?: THREE.Vector3): void } {
+  const geoFull = liteOnly ? null : bladeFull(), geoLite = bladeLite();
 
   const uTime = { value: 0 };
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.8 });
@@ -53,29 +72,38 @@ export function buildGrass(count: number): { group: THREE.Group; update(t: numbe
     n++;
   }
   const group = new THREE.Group();
-  const lod: { mesh: THREE.InstancedMesh; full: number }[] = [];
+  const lod: { near: THREE.InstancedMesh | null; far: THREE.InstancedMesh; center: THREE.Vector3; full: number }[] = [];
   for (const list of chunks.values()) {
-    const mesh = new THREE.InstancedMesh(geo, mat, list.length);
-    list.forEach((it, i) => { mesh.setMatrixAt(i, it.m); mesh.setColorAt(i, it.c); });
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    mesh.computeBoundingSphere();
-    mesh.boundingSphere!.radius += 0.6; // margen para el movimiento del viento
-    group.add(mesh);
-    lod.push({ mesh, full: list.length });
+    const far = new THREE.InstancedMesh(geoLite, mat, list.length);
+    list.forEach((it, i) => { far.setMatrixAt(i, it.m); far.setColorAt(i, it.c); });
+    far.instanceMatrix.needsUpdate = true;
+    if (far.instanceColor) far.instanceColor.needsUpdate = true;
+    far.computeBoundingSphere();
+    far.boundingSphere!.radius += 0.6; // margen para el movimiento del viento
+    group.add(far);
+    let near: THREE.InstancedMesh | null = null;
+    if (geoFull) {
+      near = new THREE.InstancedMesh(geoFull, mat, list.length);
+      near.instanceMatrix = far.instanceMatrix; near.instanceColor = far.instanceColor; // mismos datos, otra geometría
+      near.boundingSphere = far.boundingSphere!.clone();
+      group.add(near);
+    }
+    lod.push({ near, far, center: far.boundingSphere!.center.clone(), full: list.length });
   }
   // LOD: las instancias están en orden aleatorio, así que dibujar solo las N primeras adelgaza el césped de forma uniforme.
-  // Cerca se ve todo; a media distancia la mitad; lejos una cuarta parte; más allá de 90 m, nada.
+  // Cerca se ve todo; a media distancia la mitad; lejos una cuarta parte; más allá de 90 m, nada. Hasta 18 m (centro del bloque) se usa la hoja completa y desde ahí la ligera: a esa distancia una hoja mide 1–5 píxeles de ancho y no se distinguen.
   return {
     group,
     update: (t: number, cam?: THREE.Vector3) => {
       uTime.value = t;
       if (!cam) return;
-      for (const { mesh, full } of lod) {
-        const d = Math.hypot(mesh.boundingSphere!.center.x - cam.x, mesh.boundingSphere!.center.z - cam.z);
+      for (const { near, far, center, full } of lod) {
+        const d = Math.hypot(center.x - cam.x, center.z - cam.z);
         const f = d < 26 ? 1 : d < 46 ? 0.5 : d < 90 ? 0.22 : 0;
-        mesh.count = Math.round(full * f);
-        mesh.visible = f > 0;
+        const useNear = near !== null && d < NEAR_FULL;
+        const k = Math.round(full * f);
+        if (near) { near.count = k; near.visible = f > 0 && useNear; }
+        far.count = k; far.visible = f > 0 && !useNear;
       }
     },
   };

@@ -80,7 +80,7 @@ const trees = buildTrees(scene, obstacles, q.tier === 'low' ? 8 : 15);
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
-const grass = buildGrass(q.tier === 'high' ? 60000 : q.tier === 'med' ? 30000 : 10000);
+const grass = buildGrass(q.tier === 'high' ? 60000 : q.tier === 'med' ? 30000 : 10000, q.tier === 'low'); // en calidad baja, solo la hoja ligera
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
