@@ -14,6 +14,9 @@ Parámetros útiles: `?q=low|med|high` (fuerza la calidad) y `?debug` (o F3) par
 - **Clásica** (por defecto): HTML estático generado en la compilación desde `src/data/profile.json` y `src/data/projects.json` (`scripts/render-classic.mjs`). Indexable, accesible y ligera (~25 KB de JS/CSS).
 - **Isla 3D**: se descarga solo al pulsar «Explorar la isla en 3D» (`?modo=3d` o `#isla` entran directamente; `?modo=clasico` fuerza la clásica). Se recuerda la última elección.
 
+## Backend opcional (tu servidor)
+`server/` es una API pequeña (Node + SQLite, en Docker) con **libro de visitas moderado**, **formulario de contacto** y **visitantes fantasma** en tiempo real. La web funciona igual sin ella: si `API_URL` no está definida al compilar, esas funciones no aparecen. Guía paso a paso en [server/DEPLOY.md](server/DEPLOY.md). Pruebas: `cd server && npm test`.
+
 ## Cómo añadir o cambiar un proyecto
 Edita `src/data/projects.json`: `type` (`web | bot | plugin | cli | mobile | device`), `short` (nombre que flota sobre la estación), `repo` (`null` si es privado), `credit` y `note` opcionales, `position` `[x, z]` en la isla (los caminos y los carteles se generan solos) y `demo` con el guion simulado. Los esquemas de cada demo están en `src/demos/types.ts`. El mismo demo se ve en la versión clásica y dentro del juego.
 

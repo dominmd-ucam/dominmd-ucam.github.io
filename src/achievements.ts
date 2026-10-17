@@ -10,6 +10,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'wreck', title: 'Cazatesoros', desc: 'Visita el barco varado', xp: 25, icon: 'anchor' },
   { id: 'cave', title: 'Espeleólogo', desc: 'Encuentra la cueva y la espada', xp: 25, icon: 'compass' },
   { id: 'lighthouse', title: 'Guardafaro', desc: 'Sube al faro', xp: 25, icon: 'star' },
+  { id: 'company', title: 'Compañía', desc: 'Coincide con otro visitante en la isla', xp: 30, icon: 'cat' },
   { id: 'islet', title: 'Robinson', desc: 'Llega nadando al islote', xp: 40, icon: 'wave' },
 ];
 

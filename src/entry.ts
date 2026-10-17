@@ -3,6 +3,8 @@ import './classic.css';
 import projects from './data/projects.json';
 import { ProjectModal, type ProjectLike } from './ui/projectModal';
 import { gameSupport, rememberMode, storedMode } from './mode';
+import { apiConfigured } from './net/api';
+import { mountContact, mountGuestbook } from './net/forms';
 
 /**
  * Punto de entrada: la versión clásica ya viene en el HTML (indexable y rápida).
@@ -17,6 +19,15 @@ document.addEventListener('click', (e) => {
   const p = byId.get(t.dataset.project ?? '');
   if (p) modal.open(p);
 });
+
+// libro de visitas y contacto: solo si el backend está configurado
+if (apiConfigured) {
+  document.querySelectorAll<HTMLElement>('[data-needs-api]').forEach((e) => { e.hidden = false; });
+  const gb = document.querySelector<HTMLElement>('[data-guestbook]');
+  const ct = document.querySelector<HTMLElement>('[data-contact]');
+  if (gb) mountGuestbook(gb);
+  if (ct) { const h = document.createElement('h3'); h.textContent = 'O escríbeme directamente'; ct.before(h); mountContact(ct); }
+}
 
 // filtros de la lista de proyectos
 document.addEventListener('click', (e) => {

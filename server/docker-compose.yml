@@ -1,0 +1,34 @@
+# API del portfolio. Uso:
+#   cp .env.example .env   # y rellénalo
+#   docker compose --profile cloudflare up -d --build     (con Cloudflare Tunnel)
+#   docker compose up -d --build                          (sin túnel: Tailscale Funnel o tu proxy inverso)
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_FILE: /data/portfolio.db
+    volumes:
+      - ./data:/data
+    # solo accesible desde el propio servidor: el túnel o el proxy llegan por la red interna o por localhost
+    ports:
+      - "127.0.0.1:8787:8787"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+
+  cloudflared:
+    profiles: ["cloudflare"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?define TUNNEL_TOKEN en .env}
+    depends_on:
+      - api

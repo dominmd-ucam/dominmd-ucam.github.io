@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Moderación · Portfolio</title>
+<style>
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f4e8cf; color: #0f3440; }
+  main { max-width: 860px; margin: 0 auto; padding: 20px; }
+  h1 { margin: 0 0 12px; } h2 { margin: 24px 0 8px; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  input, button { font: inherit; padding: 7px 12px; border-radius: 8px; border: 1px solid #b9a77f; }
+  input { flex: 1; min-width: 220px; }
+  button { background: #1fb5b0; color: #fff; border: 0; cursor: pointer; font-weight: 700; }
+  button.warn { background: #e0533d; } button.ghost { background: #fffaf0; color: #0f3440; border: 1px solid #b9a77f; }
+  .card { background: #fffaf0; border-radius: 10px; padding: 10px 14px; margin: 8px 0; box-shadow: 0 2px 0 rgba(15,52,64,.15); }
+  .card small { color: #5b7c83; } .card p { margin: 4px 0 8px; white-space: pre-wrap; word-break: break-word; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  #msg { color: #e0533d; font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Moderación</h1>
+  <div class="bar">
+    <input id="token" type="password" placeholder="Token de administración" autocomplete="off">
+    <button id="login">Entrar</button>
+  </div>
+  <p id="msg"></p>
+  <div id="app" hidden>
+    <p id="summary"></p>
+    <h2>Libro de visitas</h2>
+    <div class="bar">
+      <button class="ghost" data-status="pending">Pendientes</button>
+      <button class="ghost" data-status="approved">Aprobados</button>
+      <button class="ghost" data-status="rejected">Rechazados</button>
+    </div>
+    <div id="guest"></div>
+    <h2>Mensajes de contacto</h2>
+    <div id="contact"></div>
+  </div>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let token = sessionStorage.getItem('adm') || '';
+  let status = 'pending';
+  const api = async (path, method = 'GET') => {
+    const r = await fetch('/admin/api' + path, { method, headers: { authorization: 'Bearer ' + token } });
+    if (!r.ok) throw new Error(r.status === 401 ? 'Token incorrecto' : 'Error ' + r.status);
+    return r.json();
+  };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
+  const btn = (label, cls, fn) => { const b = el('button', cls, label); b.addEventListener('click', async () => { await fn(); load(); }); return b; };
+  const when = (t) => new Date(t).toLocaleString('es-ES');
+  async function load() {
+    $('msg').textContent = '';
+    try {
+      const s = await api('/summary');
+      $('summary').textContent = `${s.pending} pendientes · ${s.approved} aprobados · ${s.unread} mensajes sin leer`;
+      const g = await api('/guestbook?status=' + status);
+      $('guest').replaceChildren(...g.entries.map((e) => {
+        const c = el('div', 'card'); c.append(el('b', '', e.name), el('small', '', ' · ' + when(e.createdAt)), el('p', '', e.message));
+        const row = el('div', 'row');
+        if (e.status !== 'approved') row.append(btn('Aprobar', '', () => api('/guestbook/' + e.id + '/approve', 'POST')));
+        if (e.status !== 'rejected') row.append(btn('Rechazar', 'ghost', () => api('/guestbook/' + e.id + '/reject', 'POST')));
+        row.append(btn('Borrar', 'warn', () => api('/guestbook/' + e.id, 'DELETE')));
+        c.append(row); return c;
+      }));
+      if (!g.entries.length) $('guest').append(el('p', '', 'Nada por aquí.'));
+      const m = await api('/contact');
+      $('contact').replaceChildren(...m.messages.map((e) => {
+        const c = el('div', 'card'); c.append(el('b', '', e.name), el('small', '', ' · ' + when(e.createdAt) + (e.email ? ' · ' + e.email : '') + (e.handled ? ' · atendido' : '')), el('p', '', e.message));
+        const row = el('div', 'row');
+        if (!e.handled) row.append(btn('Marcar atendido', '', () => api('/contact/' + e.id + '/handled', 'POST')));
+        row.append(btn('Borrar', 'warn', () => api('/contact/' + e.id, 'DELETE')));
+        c.append(row); return c;
+      }));
+      if (!m.messages.length) $('contact').append(el('p', '', 'Sin mensajes.'));
+      $('app').hidden = false;
+    } catch (e) { $('msg').textContent = e.message; $('app').hidden = true; }
+  }
+  $('login').addEventListener('click', () => { token = $('token').value.trim(); sessionStorage.setItem('adm', token); load(); });
+  document.querySelectorAll('[data-status]').forEach((b) => b.addEventListener('click', () => { status = b.dataset.status; load(); }));
+  if (token) load();
+</script>
+</body>
+</html>

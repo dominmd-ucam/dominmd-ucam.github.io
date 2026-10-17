@@ -45,6 +45,7 @@ export function renderClassic(profile, projects) {
         <li><a href="#sobre-mi">Sobre mí</a></li>
         <li><a href="#proyectos">Proyectos</a></li>
         <li><a href="#habilidades">Habilidades</a></li>
+        <li><a href="#libro" data-needs-api hidden>Libro de visitas</a></li>
         <li><a href="#contacto">Contacto</a></li>
       </ul>
     </nav>
@@ -116,10 +117,17 @@ export function renderClassic(profile, projects) {
       </div>
     </section>
 
+    <section id="libro" aria-labelledby="h-book" data-needs-api hidden>
+      <h2 id="h-book">Libro de visitas</h2>
+      <p class="section-lede">Deja unas palabras si te ha gustado la isla. Los mensajes aparecen cuando los apruebo.</p>
+      <div data-guestbook></div>
+    </section>
+
     <section id="contacto" aria-labelledby="h-contact">
       <h2 id="h-contact">Contacto</h2>
       <p class="section-lede">Puedes ver mi código y escribirme por aquí.</p>
       <div class="cta">${mail}${links}</div>
+      <div class="contact-form" data-contact data-needs-api hidden></div>
     </section>
   </main>
 

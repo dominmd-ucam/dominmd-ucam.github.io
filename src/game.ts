@@ -17,6 +17,11 @@ import { Player } from './player';
 import { Input } from './input';
 import { Interactables, type Project } from './interactables';
 import { goClassic } from './mode';
+import { apiConfigured } from './net/api';
+import { Presence } from './net/presence';
+import { Ghosts } from './world/ghosts';
+import { InfoPoint } from './world/infopoint';
+import { GuestbookPanel } from './ui/guestbookPanel';
 import { UI } from './ui';
 import { Menu, type View } from './ui/menu';
 import { Dialogue } from './ui/dialogue';
@@ -76,6 +81,12 @@ const grass = buildGrass(q.tier === 'high' ? 60000 : q.tier === 'med' ? 30000 : 
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
+
+/* backend opcional: libro de visitas, contacto y visitantes fantasma (solo si hay API configurada) */
+const infoPoint = apiConfigured ? new InfoPoint(scene, obstacles, 3.2, 12.2) : null;
+const guestbook = apiConfigured ? new GuestbookPanel() : null;
+const presence = apiConfigured ? new Presence() : null;
+const ghosts = new Ghosts(scene);
 
 const audio = new Ambience();
 addEventListener('pointerdown', () => audio.start());
@@ -137,6 +148,7 @@ function settingsView(): View {
       { type: 'bar', label: 'VOLUMEN', max: 8, get: () => settings.value.volume, set: (n) => settings.set('volume', n) },
       { type: 'toggle', label: 'SOMBRAS', get: () => settings.value.shadows, set: (v) => settings.set('shadows', v) },
       { type: 'toggle', label: 'EFECTOS', get: () => settings.value.effects, set: (v) => settings.set('effects', v) },
+      ...(apiConfigured ? [{ type: 'toggle' as const, label: 'VISITANTES', get: () => settings.value.ghosts, set: (v: boolean) => settings.set('ghosts', v) }] : []),
       { type: 'select', label: 'RESOLUCIÓN', options: RESOLUTIONS.map((r) => RESOLUTION_LABEL[r]), get: () => RESOLUTIONS.indexOf(s.resolution), set: (i) => settings.set('resolution', RESOLUTIONS[i]) },
       { type: 'select', label: 'CÁMARA', options: ['CERCA', 'MEDIA', 'LEJOS'], get: () => settings.value.camera, set: (i) => settings.set('camera', i) },
       { type: 'action', label: 'Atrás', run: () => menu.back() },
@@ -162,6 +174,19 @@ ui.onPause = () => { if (!blocked()) menu.show(); };
 /* ---------- ajustes en vivo ---------- */
 let camDistChanged = true;
 const adaptive = new AdaptiveRes(q.dpr, 0.55, (dpr) => { renderer.setPixelRatio(dpr); resize(); });
+const onlineEl = document.getElementById('online') as HTMLElement;
+function setPresence(on: boolean) {
+  if (!presence) return;
+  if (on && !presence.connected) presence.start();
+  else if (!on) { presence.stop(); ghosts.clear(); }
+  ghosts.enabled = on;
+}
+if (presence) {
+  presence.onPeers = (rows) => ghosts.apply(rows, performance.now());
+  presence.onBye = (id) => ghosts.remove(id);
+  presence.onCount = (n) => { onlineEl.hidden = n < 1; onlineEl.textContent = n === 1 ? '👻 Estás solo en la isla' : `👻 ${n} visitantes en la isla`; };
+  ghosts.onFirst = () => achievements.unlock('company');
+}
 function applySettings(key?: string) {
   const s = settings.value;
   audio.setMuted(!s.sound);
@@ -170,6 +195,7 @@ function applySettings(key?: string) {
   dawn.sun.castShadow = s.shadows && q.shadows;
   renderer.shadowMap.needsUpdate = true;
   post.setEnabled(s.effects && q.tier !== 'low');
+  setPresence(s.ghosts);
   if (key === undefined || key === 'resolution') {
     if (s.resolution === 'auto') adaptive.setMax(q.dpr);
     else adaptive.fix(s.resolution === 'high' ? Math.min(devicePixelRatio || 1, 2) : s.resolution === 'medium' ? 1.25 : 0.85);
@@ -180,12 +206,14 @@ function applySettings(key?: string) {
 settings.onChange((_, key) => applySettings(key));
 
 /* ---------- interacción ---------- */
-const blocked = () => menu.open || dialogue.open || ui.isOpen || (avatarUI?.open ?? false);
-type Target = { kind: 'station'; project: Project } | { kind: 'npc' } | null;
+const blocked = () => menu.open || dialogue.open || ui.isOpen || (guestbook?.open ?? false) || (avatarUI?.open ?? false);
+type Target = { kind: 'station'; project: Project } | { kind: 'npc' } | { kind: 'guestbook' } | null;
 function pickTarget(): Target {
   const s = interactables.nearest;
   const dS = s ? Math.hypot(player.group.position.x - s.group.position.x, player.group.position.z - s.group.position.z) : 99;
   const dN = guide.distanceTo(player.group.position);
+  const dG = infoPoint ? infoPoint.distanceTo(player.group.position) : 99;
+  if (dG < InfoPoint.REACH && dG <= dN && dG <= dS) return { kind: 'guestbook' };
   if (dN < CatGuide.REACH && dN <= dS) return { kind: 'npc' };
   return s ? { kind: 'station', project: s.project } : null;
 }
@@ -195,6 +223,7 @@ function interact() {
   if (!t) return;
   ui.setPrompt(null);
   if (t.kind === 'npc') dialogue.start();
+  else if (t.kind === 'guestbook') guestbook?.openPanel();
   else {
     ui.openProject(t.project);
     achievements.markOpened(t.project.id, interactables.stations.length);
@@ -256,6 +285,9 @@ function frame() {
   player.update(dt, input, t);
   interactables.update(t, player.group.position);
   guide.update(dt, t, player.group.position);
+  infoPoint?.update(t, player.group.position);
+  presence?.send(player.group.position.x, player.group.position.z, player.group.rotation.y, Math.min(1, player.vel.length() / 6.5), player.swimming, performance.now());
+  ghosts.update(dt, t, performance.now());
   grass.update(t);
   trees.update(t);
   for (const p of palms) {
@@ -294,7 +326,7 @@ function frame() {
 
   // aviso de interacción
   const tg = blocked() ? null : pickTarget();
-  const label = tg ? (tg.kind === 'npc' ? 'Hablar con Misu' : tg.project.title) : null;
+  const label = tg ? (tg.kind === 'npc' ? 'Hablar con Misu' : tg.kind === 'guestbook' ? 'Libro de visitas y contacto' : tg.project.title) : null;
   if (label !== shownPrompt) { shownPrompt = label; ui.setPrompt(label); }
 
   // con el menú o una ficha abiertas basta con 30 fps; la sombra se recalcula en fotogramas alternos
@@ -311,7 +343,7 @@ function frame() {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { player, input, interactables, renderer, q, dawn, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
+(window as unknown as { __dbg: unknown }).__dbg = { presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }

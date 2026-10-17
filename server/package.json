@@ -1,0 +1,24 @@
+{
+  "name": "portfolio-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "API del portfolio: libro de visitas moderado, formulario de contacto y presencia en tiempo real.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test --test-concurrency=1",
+    "backup": "node scripts/backup.mjs"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.1",
+    "@fastify/rate-limit": "^11.2.1",
+    "@fastify/websocket": "^11.3.4",
+    "fastify": "^5.12.7"
+  },
+  "devDependencies": {
+    "ws": "^8.22.0"
+  }
+}

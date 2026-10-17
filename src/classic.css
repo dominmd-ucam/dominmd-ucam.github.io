@@ -59,6 +59,8 @@ h3 { font: 600 20px var(--disp); margin: 0 0 6px; }
 .chip.on { background: var(--sea); color: var(--foam); }
 .card[hidden] { display: none; }
 
+.contact-form { margin-top: 20px; }
+#contacto h3 { margin: 26px 0 10px; }
 .skills { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 22px; }
 .site-footer { text-align: center; padding: 30px 16px 40px; color: var(--muted); font-weight: 600; font-size: 14px; }
 .site-footer a { color: var(--coral-d); }

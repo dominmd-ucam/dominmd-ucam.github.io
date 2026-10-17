@@ -25,7 +25,7 @@ interface Station { project: Project; group: THREE.Group; label: THREE.Sprite; m
 const REACH = 3.2;
 
 /** Nombre del proyecto flotando sobre la estación: así se reconoce desde lejos. */
-function makeLabel(text: string): THREE.Sprite {
+export function makeLabel(text: string): THREE.Sprite {
   const c = document.createElement('canvas'); c.width = 512; c.height = 128;
   const g = c.getContext('2d')!;
   g.fillStyle = 'rgba(255,250,240,.94)';
@@ -36,7 +36,7 @@ function makeLabel(text: string): THREE.Sprite {
   g.fillText(text, 256, 66);
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, fog: false, depthWrite: false }));
-  sp.scale.set(4, 1, 1);
+  sp.scale.set(3.4, 0.85, 1);
   return sp;
 }
 
@@ -91,6 +91,7 @@ export class Interactables {
       s.tick?.(t);
       const d = Math.hypot(player.x - s.group.position.x, player.z - s.group.position.z);
       if (d < bd) { bd = d; best = s; }
+      (s.label.material as THREE.SpriteMaterial).opacity = Math.min(1, Math.max(0, (d - 4) / 6)); // el nombre se desvanece al acercarte
       (s.beam.material as THREE.MeshBasicMaterial).opacity = 0.1 + (d < REACH ? 0.12 : 0) + this.boost * 0.28;
       s.beam.scale.set(1 + this.boost * 0.5, 1 + this.boost * 2.2, 1 + this.boost * 0.5);
       s.beam.position.y = s.baseY - 0.7 + 3 * s.beam.scale.y - 3;

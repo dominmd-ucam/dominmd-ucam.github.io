@@ -5,6 +5,7 @@
 @import '@fontsource/nunito/latin-700.css';
 @import '@fontsource/nunito/latin-800.css';
 @import './demos-extra.css';
+@import './net.css';
 
 /* Variables y piezas comunes a la versión clásica y al juego: paleta, fichas de proyecto y demos. */
 :root {
