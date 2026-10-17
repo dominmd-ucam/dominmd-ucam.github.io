@@ -125,12 +125,30 @@ export class Avatar {
   private _q = new THREE.Quaternion();
   private _axis = new THREE.Vector3();
 
-  /** Gira un hueso `angle` radianes alrededor de un eje del personaje (por defecto, su derecha). */
+  /** Rotación en el mundo del esqueleto (armature) y del avatar: no cambian mientras se aplican los giros de un fotograma. */
+  private _armQ = new THREE.Quaternion();
+
+  /** Rotación en el mundo de `o`: producto de las rotaciones locales (la escala es uniforme y no la afecta). */
+  private worldQuat(o: THREE.Object3D, out: THREE.Quaternion): THREE.Quaternion {
+    if (!o.parent) return out.copy(o.quaternion);
+    return this.worldQuat(o.parent, out).multiply(o.quaternion);
+  }
+
+  /** Igual, pero sin subir por encima del armature: su rotación ya está calculada en `_armQ`. */
+  private boneWorldQuat(o: THREE.Object3D, out: THREE.Quaternion): THREE.Quaternion {
+    if (o === this.armature || !o.parent) return out.copy(this._armQ);
+    return this.boneWorldQuat(o.parent, out).multiply(o.quaternion);
+  }
+
+  /**
+   * Gira un hueso `angle` radianes alrededor de un eje del personaje (por defecto, su derecha), en ejes del mundo.
+   * Antes se leían las matrices del mundo con getWorldQuaternion (que recorre y recompone la jerarquía entera en cada llamada, ~10 por avatar y fotograma);
+   * ahora basta multiplicar las rotaciones locales de la cadena de huesos, que son 5–6 productos.
+   */
   private swing(name: string, angle: number, local = AXIS_X) {
     const bone = this.bones[name];
     if (!bone?.parent) return;
-    bone.parent.getWorldQuaternion(this._pw);
-    this.root.getWorldQuaternion(this._gq);
+    this.boneWorldQuat(bone.parent, this._pw);
     this._axis.copy(local).applyQuaternion(this._gq);
     this._q.setFromAxisAngle(this._axis, angle);
     bone.quaternion.premultiply(this._pw).premultiply(this._q);
@@ -140,7 +158,9 @@ export class Avatar {
 
   update(dt: number, m: Motion) {
     this.mixer.update(dt);
-    this.root.updateMatrixWorld(true);
+    // los giros leen las rotaciones locales (ya actualizadas por el mezclador), así que no hace falta recalcular las matrices del mundo aquí: el render lo hace una vez
+    this.worldQuat(this.armature, this._armQ);
+    this.worldQuat(this.root, this._gq);
     const k = Math.min(1, m.speed);
     this.phase += dt * (m.swimming ? 5.5 : 3 + 7 * k);
     const s = Math.sin(this.phase);
