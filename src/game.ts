@@ -6,6 +6,7 @@ import { buildScenery } from './world/props';
 import { buildGrass } from './world/grass';
 import { buildLandmarks } from './world/landmarks';
 import { buildLife } from './world/life';
+import { buildSplash } from './world/splash';
 import { buildDiorama } from './world/diorama';
 import { buildTrees } from './world/trees';
 import { buildVillage } from './world/village';
@@ -77,6 +78,7 @@ obstacles.push(...village.obstacles);
 const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
 const trees = buildTrees(scene, obstacles, q.tier === 'low' ? 8 : 15);
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
+const splash = buildSplash(scene);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
 const grass = buildGrass(q.tier === 'high' ? 60000 : q.tier === 'med' ? 30000 : 10000);
 scene.add(grass.group);
@@ -311,7 +313,7 @@ function frame() {
   // olas capilares: un golpe al entrar en el agua y anillos suaves mientras te mueves por ella
   const wet = heightAt(pp.x, pp.z) < 0.12 && !onDock(pp.x, pp.z);
   rippleT += dt;
-  if (wet && !wasWet) { water.ripple(pp.x, pp.z, t, 1); rippleT = 0; }
+  if (wet && !wasWet) { water.ripple(pp.x, pp.z, t, 1); splash.crown(pp.x, pp.z, t, Math.min(1, 0.45 + player.vel.length() / 8)); rippleT = 0; }
   else if (wet && player.vel.length() > 0.8 && rippleT > 0.42) { water.ripple(pp.x, pp.z, t, player.swimming ? 0.9 : 0.55); rippleT = 0; }
   wasWet = wet;
 
@@ -332,6 +334,7 @@ function frame() {
   landmarks.update(t, 0.35);
   diorama.update(t);
   life.update(t, dt, pp, 0, dawn.waterEnv.horizon);
+  splash.update(t, dt);
   water.update(t, camera.position, dawn.waterEnv);
   post.setExposure(dawn.exposure);
 
@@ -354,7 +357,7 @@ function frame() {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
+(window as unknown as { __dbg: unknown }).__dbg = { presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }
