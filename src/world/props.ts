@@ -13,8 +13,9 @@ function rand(seed: number) {
 }
 
 /* ---------- palmeras ---------- */
-const leafGeo = (() => {
-  const g = new THREE.PlaneGeometry(1, 1, 4, 10);
+/** Hoja arqueada; `sx` y `sy` son las subdivisiones (el nivel lejano usa muchas menos). */
+function makeLeafGeo(sx: number, sy: number): THREE.BufferGeometry {
+  const g = new THREE.PlaneGeometry(1, 1, sx, sy);
   const p = g.attributes.position as THREE.BufferAttribute;
   const col = new Float32Array(p.count * 3);
   const dark = new THREE.Color('#2fae4a'), light = new THREE.Color('#8fe86a'), c = new THREE.Color();
@@ -33,12 +34,14 @@ const leafGeo = (() => {
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   g.computeVertexNormals();
   return g;
-})();
+}
+const leafGeoHi = makeLeafGeo(4, 10), leafGeoLo = makeLeafGeo(2, 4);
 const leafMat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.7, flatShading: true });
 const trunkMat = std('#b97a4a', { flatShading: true });
 const cocoMat = std('#5b3b22');
 
-export interface Palm { group: THREE.Group; crown: THREE.Group; phase: number }
+/** Palmera con dos niveles de detalle (cerca ≈1.600 triángulos, lejos ≈330): `setFar` alterna cuál se dibuja. */
+export interface Palm { group: THREE.Group; crown: THREE.Group; phase: number; far: boolean; setFar(far: boolean): void }
 
 export function makePalm(x: number, z: number, scale: number, rnd: () => number): Palm {
   const group = new THREE.Group();
@@ -51,44 +54,64 @@ export function makePalm(x: number, z: number, scale: number, rnd: () => number)
     pts.push(new THREE.Vector3(Math.cos(dir) * lean * u * u, u * H, Math.sin(dir) * lean * u * u));
   }
   const curve = new THREE.CatmullRomCurve3(pts);
-  // tronco escalonado: anillos de cono apilados siguiendo la curva
-  const trunk = new THREE.Group();
-  group.add(trunk);
-  const rings = 11, up = new THREE.Vector3(0, 1, 0);
-  for (let i = 0; i < rings; i++) {
-    const a = curve.getPoint(i / rings), b = curve.getPoint((i + 1) / rings), v = b.clone().sub(a);
-    const rb = 0.36 - i * 0.016, rt = rb - 0.03;
-    const seg = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, v.length() * 1.18, 7), trunkMat);
-    seg.position.copy(a).add(b).multiplyScalar(0.5);
-    seg.quaternion.setFromUnitVectors(up, v.normalize());
-    seg.rotateY(i * 0.7);
-    seg.castShadow = true;
-    trunk.add(seg);
-  }
+  const up = new THREE.Vector3(0, 1, 0);
+  // tronco escalonado: anillos de cono apilados siguiendo la curva (el nivel lejano usa menos anillos y menos lados)
+  const buildTrunk = (rings: number, radial: number) => {
+    const trunk = new THREE.Group();
+    group.add(trunk);
+    for (let i = 0; i < rings; i++) {
+      const a = curve.getPoint(i / rings), b = curve.getPoint((i + 1) / rings), v = b.clone().sub(a);
+      const rb = 0.36 - (i / rings) * 0.176, rt = rb - 0.03;
+      const seg = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, v.length() * 1.18, radial), trunkMat);
+      seg.position.copy(a).add(b).multiplyScalar(0.5);
+      seg.quaternion.setFromUnitVectors(up, v.normalize());
+      seg.rotateY(i * 0.7);
+      seg.castShadow = true;
+      trunk.add(seg);
+    }
+    return trunk;
+  };
   const crown = new THREE.Group();
   crown.position.copy(pts[pts.length - 1]);
   group.add(crown);
+  // los parámetros de cada hoja se sortean una vez: los dos niveles son la misma palmera
   const n = 10;
-  for (let i = 0; i < n; i++) {
-    const leaf = new THREE.Mesh(leafGeo, leafMat);
-    leaf.rotation.y = (i / n) * Math.PI * 2 + rnd() * 0.3;
-    leaf.rotation.x = -0.15 + rnd() * 0.3;
-    leaf.scale.setScalar(0.85 + rnd() * 0.3);
-    leaf.castShadow = true;
-    crown.add(leaf);
-  }
-  for (let i = 0; i < 3; i++) {
-    const c = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), cocoMat);
-    const a = (i / 3) * Math.PI * 2;
-    c.position.set(Math.cos(a) * 0.25, -0.25, Math.sin(a) * 0.25);
-    c.castShadow = true;
-    crown.add(c);
-  }
-  // fusionamos tronco y copa por separado: 3 llamadas de dibujo por palmera en vez de ~25 (la copa se mece como grupo)
-  batchStatic(trunk);
-  batchStatic(crown);
+  const leaves = Array.from({ length: n }, (_, i) => ({ ry: (i / n) * Math.PI * 2 + rnd() * 0.3, rx: -0.15 + rnd() * 0.3, s: 0.85 + rnd() * 0.3 }));
+  const buildCrown = (geo: THREE.BufferGeometry, coconuts: boolean) => {
+    const g = new THREE.Group();
+    crown.add(g);
+    for (const l of leaves) {
+      const leaf = new THREE.Mesh(geo, leafMat);
+      leaf.rotation.y = l.ry; leaf.rotation.x = l.rx; leaf.scale.setScalar(l.s);
+      leaf.castShadow = true;
+      g.add(leaf);
+    }
+    if (coconuts) {
+      for (let i = 0; i < 3; i++) {
+        const c = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), cocoMat);
+        const a = (i / 3) * Math.PI * 2;
+        c.position.set(Math.cos(a) * 0.25, -0.25, Math.sin(a) * 0.25);
+        c.castShadow = true;
+        g.add(c);
+      }
+    }
+    return g;
+  };
+  const trunkHi = buildTrunk(11, 7), trunkLo = buildTrunk(5, 5);
+  const crownHi = buildCrown(leafGeoHi, true), crownLo = buildCrown(leafGeoLo, false);
+  // fusionamos cada parte por separado: pocas llamadas de dibujo por palmera (la copa se mece como grupo)
+  for (const g of [trunkHi, trunkLo, crownHi, crownLo]) batchStatic(g);
   group.userData.dynamic = true;
-  return { group, crown, phase: rnd() * 6 };
+  const palm: Palm = {
+    group, crown, phase: rnd() * 6, far: false,
+    setFar(far) {
+      palm.far = far;
+      trunkHi.visible = crownHi.visible = !far;
+      trunkLo.visible = crownLo.visible = far;
+    },
+  };
+  palm.setFar(false);
+  return palm;
 }
 
 export function buildScenery(scene: THREE.Object3D) {

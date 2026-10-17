@@ -297,6 +297,9 @@ function frame() {
   grass.update(t, camera.position);
   trees.update(t, camera.position);
   for (const p of palms) {
+    // LOD: a más de 48 m se dibuja la versión ligera (con 4 m de histéresis para que no parpadee en el límite)
+    const dp = Math.hypot(camera.position.x - p.group.position.x, camera.position.z - p.group.position.z);
+    if (p.far ? dp < 44 : dp > 48) p.setFar(!p.far);
     p.crown.rotation.z = Math.sin(t * 0.9 + p.phase) * 0.025;
     p.crown.rotation.x = Math.cos(t * 0.7 + p.phase) * 0.02;
   }
