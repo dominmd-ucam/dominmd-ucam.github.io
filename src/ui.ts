@@ -29,6 +29,14 @@ export class UI {
 
   set onClose(fn: () => void) { this.modal.onClose = fn; }
 
+  /** Avance real de la carga (0–1) y el texto que se ve debajo de la barra. */
+  setLoad(frac: number, text?: string) {
+    const bar = document.getElementById('ldBar'), label = document.getElementById('ldText');
+    bar?.style.setProperty('--p', String(Math.max(0.05, Math.min(1, frac))));
+    bar?.parentElement?.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
+    if (text && label) label.textContent = text;
+  }
+
   ready() {
     $('hud').hidden = false;
     const l = $('loader');

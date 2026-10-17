@@ -117,13 +117,25 @@ if (new URLSearchParams(location.search).has('tune')) {
 let avatarUI: AvatarUI | null = null;
 const avatarBtn = document.getElementById('avatarBtn') as HTMLButtonElement;
 avatarBtn.disabled = true;
+/* pantalla de carga: se mantiene hasta que el avatar esté puesto (o falle) y pasen al menos 2 s, para que no se vea al personaje de respaldo cambiar de golpe */
+const loadStart = performance.now();
+const MIN_LOAD_MS = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 2000, MAX_LOAD_MS = 10000;
+let avatarSettled = false, revealed = false;
+function checkReveal() {
+  if (revealed || first) return; // hace falta al menos un fotograma dibujado
+  const elapsed = performance.now() - loadStart;
+  if (!avatarSettled && elapsed < MAX_LOAD_MS) return;
+  revealed = true;
+  ui.setLoad(1, 'Todo listo');
+  setTimeout(() => ui.ready(), Math.max(350, MIN_LOAD_MS - elapsed)); // 350 ms: se ve la barra llena antes del fundido
+}
 void Avatar.create().then(async (a) => {
   await a.apply(loadConfig());
   player.attachAvatar(a);
   avatarUI = new AvatarUI(a);
   studio.prewarm(renderer, scene, camera); // compila ya los shaders con luz de estudio: abrir el editor no da tirones
   avatarBtn.disabled = false;
-}).catch((e) => console.warn('Avatar modular no disponible, uso el de respaldo:', e));
+}).catch((e) => console.warn('Avatar modular no disponible, uso el de respaldo:', e)).finally(() => { avatarSettled = true; ui.setLoad(0.95, 'Todo listo'); });
 
 /* ---------- menú ---------- */
 function achievementsView(): View {
@@ -359,7 +371,8 @@ function frame() {
     post.render(dt);
     debug.update(raw * 1000, renderer, adaptive.dpr);
   }
-  if (first) { first = false; ui.ready(); }
+  if (first) { first = false; ui.setLoad(avatarSettled ? 0.95 : 0.6, avatarSettled ? 'Todo listo' : 'Vistiendo al personaje…'); }
+  checkReveal();
 }
 renderer.setAnimationLoop(frame);
 
