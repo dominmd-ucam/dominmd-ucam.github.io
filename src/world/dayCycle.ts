@@ -17,7 +17,7 @@ export class DayCycle {
 
   readonly sunDir = new THREE.Vector3();
   readonly sky = new Sky();
-  readonly hemi = new THREE.HemisphereLight('#bfe6ff', '#e7d3a2', 0.6);
+  readonly hemi = new THREE.HemisphereLight('#cdeaff', '#f3dca0', 0.6);
   readonly sun = new THREE.DirectionalLight('#fff0d2', 3.2);
   readonly moon = new THREE.DirectionalLight('#8fb0ff', 0);
   readonly stars: THREE.Points;
@@ -92,12 +92,12 @@ export class DayCycle {
     su.mieDirectionalG.value = 0.85;
     su.sunPosition.value.copy(this.sunDir);
 
-    this.sun.color.copy(C('#fff0d2')).lerp(C('#ff9a55'), gold * 0.85);
+    this.sun.color.copy(C('#fff0c4')).lerp(C('#ff9a55'), gold * 0.85);
     this.sun.intensity = 3.4 * S(e, -0.04, 0.22);
     this.moon.intensity = 1.5 * (1 - S(e, -0.3, 0.05));
 
-    this.hemi.color.copy(C('#3a55a8')).lerp(C('#bfe6ff'), day).lerp(C('#ffc9a0'), gold * 0.4);
-    this.hemi.groundColor.copy(C('#161c2c')).lerp(C('#e7d3a2'), day);
+    this.hemi.color.copy(C('#3a55a8')).lerp(C('#cdeaff'), day).lerp(C('#ffc9a0'), gold * 0.4);
+    this.hemi.groundColor.copy(C('#161c2c')).lerp(C('#f3dca0'), day);
     this.hemi.intensity = 0.55 - 0.25 * day;
     this.scene.environmentIntensity = 0.22 + 0.1 * day;
     this.exposure = 0.42 + 0.2 * this.night;

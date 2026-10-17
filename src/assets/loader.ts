@@ -17,7 +17,8 @@ export function initAssets(renderer: THREE.WebGLRenderer) {
   loader = new GLTFLoader().setDRACOLoader(draco).setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder);
 }
 
-function load(url: string): Promise<GLTF> {
+/** Carga cruda de un glTF (sin sustituir sombras ni nada): lo usa el avatar. */
+export function loadGLTF(url: string): Promise<GLTF> {
   if (!loader) return Promise.reject(new Error('initAssets() no se ha llamado'));
   return loader.loadAsync(url);
 }
@@ -32,7 +33,7 @@ export async function loadModel(name: string, tier: Tier): Promise<THREE.Group |
   candidates.push(`${BASE}models/${name}.glb`);
   for (const url of candidates) {
     try {
-      const gltf = await load(url);
+      const gltf = await loadGLTF(url);
       gltf.scene.traverse((o) => {
         if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; }
       });

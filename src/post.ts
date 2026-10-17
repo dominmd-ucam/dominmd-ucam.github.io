@@ -32,7 +32,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const exposure = new ExposureEffect();
   const bloom = new BloomEffect({ intensity: 0.4, luminanceThreshold: 1.15, luminanceSmoothing: 0.25, mipmapBlur: true, radius: 0.7 });
   const tone = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC });
-  composer.addPass(new EffectPass(camera, exposure, bloom, tone, new HueSaturationEffect({ saturation: 0.28 }), new BrightnessContrastEffect({ contrast: 0.12 }), new VignetteEffect({ offset: 0.3, darkness: 0.4 })));
+  composer.addPass(new EffectPass(camera, exposure, bloom, tone, new HueSaturationEffect({ saturation: 0.34 }), new BrightnessContrastEffect({ contrast: 0.12 }), new VignetteEffect({ offset: 0.35, darkness: 0.28 })));
   composer.addPass(new EffectPass(camera, new SMAAEffect()));
   return {
     render: (dt) => composer.render(dt),

@@ -7,6 +7,8 @@ import { buildGrass } from './world/grass';
 import { buildLandmarks } from './world/landmarks';
 import { buildLife } from './world/life';
 import { buildDiorama } from './world/diorama';
+import { buildTrees } from './world/trees';
+import { buildVillage } from './world/village';
 import { Ambience } from './audio';
 import { DayCycle, type Preset } from './world/dayCycle';
 import { Player } from './player';
@@ -16,6 +18,9 @@ import { UI } from './ui';
 import { detectQuality } from './quality';
 import { createPost } from './post';
 import { initAssets } from './assets/loader';
+import { Avatar } from './avatar/avatar';
+import { loadConfig } from './avatar/config';
+import { AvatarUI } from './avatar/ui';
 
 const q = detectQuality();
 const canvas = document.getElementById('gl') as HTMLCanvasElement;
@@ -47,6 +52,9 @@ const landmarks = buildLandmarks(scene);
 obstacles.push(...landmarks.obstacles);
 const diorama = buildDiorama(scene);
 obstacles.push(...diorama.obstacles);
+const village = buildVillage(scene);
+obstacles.push(...village.obstacles);
+const trees = buildTrees(scene, obstacles, q.tier === 'low' ? 8 : 15);
 const life = buildLife(scene);
 scene.fog = new THREE.FogExp2('#cfe9f5', 0.0042);
 const audio = new Ambience();
@@ -60,6 +68,17 @@ const input = new Input(canvas);
 const ui = new UI();
 const player = new Player(obstacles, [6, 12]);
 scene.add(player.group);
+let avatarUI: AvatarUI | null = null;
+void Avatar.create().then(async (a) => {
+  await a.apply(loadConfig());
+  player.attachAvatar(a);
+  avatarUI = new AvatarUI(a);
+  avatarUI.onToggle = (open) => { input.enabled = !open && !ui.isOpen; };
+  const btn = document.getElementById('avatarBtn') as HTMLButtonElement;
+  btn.disabled = false;
+  btn.addEventListener('click', () => avatarUI?.toggle());
+  (window as unknown as { __avatar: Avatar }).__avatar = a;
+}).catch((e) => console.warn('Avatar modular no disponible, uso el de respaldo:', e));
 const post = createPost(renderer, scene, camera, q);
 
 function interact() {
@@ -90,6 +109,7 @@ const clock = new THREE.Clock();
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
 const camHead = new THREE.Vector3();
 function camBlocked(p: THREE.Vector3): boolean {
+  if (trees.blocks(p)) return true;
   if (p.y > 9) return false;
   for (const o of obstacles) if (o.r >= 1.4 && Math.hypot(p.x - o.x, p.z - o.z) < o.r + 0.6) return true;
   return false;
@@ -103,6 +123,7 @@ function frame() {
   player.update(dt, input, t);
   interactables.update(t, player.group.position);
   grass.update(t);
+  trees.update(t);
 
   for (const p of palms) {
     p.crown.rotation.z = Math.sin(t * 0.9 + p.phase) * 0.025;
@@ -111,6 +132,12 @@ function frame() {
 
   // cámara en tercera persona con suavizado y sin atravesar el suelo
   const pp = player.group.position;
+  if (avatarUI?.open) {
+    // vista frontal del personaje mientras se edita
+    input.yaw = player.group.rotation.y;
+    input.pitch = 0.12;
+    input.dist = 4.2;
+  }
   const cp = Math.cos(input.pitch);
   camPos.set(
     pp.x + Math.sin(input.yaw) * cp * input.dist,

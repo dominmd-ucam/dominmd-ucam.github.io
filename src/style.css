@@ -45,6 +45,27 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0a1e2c; col
 .timebar button.on { background: rgba(255,184,77,.3); }
 @media (max-width: 560px) { .brand span { display: none; } .timebar output { display: none; } }
 
+/* editor de avatar */
+.timebar button:disabled { opacity: .35; cursor: default; }
+#avatarPanel { position: fixed; z-index: 15; left: 16px; top: 84px; bottom: 16px; width: min(340px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 22px; overflow: auto; background: linear-gradient(180deg, rgba(18,52,72,.9), rgba(10,30,44,.92)); border: 1px solid var(--glass-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 24px 60px rgba(0,0,0,.4); animation: rise .35s cubic-bezier(.22,1,.36,1) both; }
+.av-head { display: flex; align-items: center; gap: 10px; }
+.av-head h3 { margin: 0; font-size: 18px; flex: 1; }
+.av-status { font-size: 12px; color: var(--muted); }
+.av-close { width: 32px; height: 32px; border: 0; border-radius: 50%; color: var(--text); background: rgba(255,255,255,.1); cursor: pointer; }
+.av-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.av-tabs button, .av-grid button, .av-foot button { border: 1px solid transparent; border-radius: 10px; padding: 6px 11px; font: 600 13px var(--font); color: var(--text); background: rgba(255,255,255,.09); cursor: pointer; }
+.av-tabs button:hover, .av-grid button:hover, .av-foot button:hover { background: rgba(255,255,255,.18); }
+.av-tabs button.on, .av-grid button.on { background: var(--accent); color: var(--ink); }
+.av-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.av-grid button { min-width: 40px; }
+.av-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.av-swatches .sw { width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); cursor: pointer; }
+.av-swatches .sw.on { border-color: #fff; box-shadow: 0 0 0 3px var(--accent); }
+.av-foot { display: flex; gap: 8px; margin-top: auto; }
+.av-credit { margin: 0; font-size: 11px; color: var(--muted); }
+.av-credit a { color: var(--accent); }
+@media (max-width: 560px) { #avatarPanel { top: auto; bottom: 0; left: 0; width: 100%; max-height: 55vh; border-radius: 22px 22px 0 0; } }
+
 /* joystick */
 #joy { position: fixed; z-index: 5; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); pointer-events: none; }
 #joy i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.55); transform: translate(-50%, -50%); }

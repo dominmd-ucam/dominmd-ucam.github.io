@@ -86,12 +86,13 @@ export function heightAt(x: number, z: number): number {
   return h;
 }
 
-const C_WET = new THREE.Color('#b59a62');
-const C_SAND = new THREE.Color('#e6c987');
-const C_GRASS = new THREE.Color('#79c55a');
-const C_GRASS2 = new THREE.Color('#4a9e50');
+const C_WET = new THREE.Color('#cfae72');
+const C_SAND = new THREE.Color('#f1d28b');
+const C_GRASS = new THREE.Color('#86d14c');
+const C_GRASS_Y = new THREE.Color('#b9dc5a');
+const C_GRASS2 = new THREE.Color('#58b448');
 const C_ROCK = new THREE.Color('#b98260');
-const C_PATH = new THREE.Color('#e2cf9b');
+const C_PATH = new THREE.Color('#dfb98a');
 
 export function buildTerrain(): THREE.Mesh {
   const seg = 256;
@@ -107,7 +108,8 @@ export function buildTerrain(): THREE.Mesh {
     const h = pos.getY(i), x = pos.getX(i), z = pos.getZ(i);
     const n = fbm(x * 0.5, z * 0.5);
     c.copy(C_WET).lerp(C_SAND, THREE.MathUtils.smoothstep(h, -0.4, 0.35));
-    c.lerp(C_GRASS, THREE.MathUtils.smoothstep(h, 0.85, 1.25));
+    const patch = fbm(x * 0.07 + 11.3, z * 0.07 - 4.1); // manchas grandes de hierba más amarilla
+    c.lerp(C_GRASS.clone().lerp(C_GRASS_Y, THREE.MathUtils.smoothstep(patch, 0.45, 0.65)), THREE.MathUtils.smoothstep(h, 0.85, 1.25));
     c.lerp(C_GRASS2, THREE.MathUtils.smoothstep(h, 1.6, 3.2) * 0.8 + n * 0.25);
     c.lerp(C_ROCK, Math.max(THREE.MathUtils.smoothstep(1 - nor.getY(i), 0.3, 0.5) * (h > 0.6 ? 1 : 0), THREE.MathUtils.smoothstep(h, 5.2, 7.2) * 0.8));
     c.lerp(C_PATH, pathMask(x, z) * THREE.MathUtils.smoothstep(h, 0.6, 1.1) * 0.9);

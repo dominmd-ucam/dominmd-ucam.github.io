@@ -8,14 +8,19 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "postinstall": "node scripts/copy-decoders.mjs",
-    "models:optimize": "node scripts/optimize-models.mjs"
+    "models:optimize": "node scripts/optimize-models.mjs",
+    "avatar:optimize": "node scripts/optimize-avatar.mjs"
   },
   "dependencies": {
     "postprocessing": "^6.39.5",
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
     "@types/three": "^0.186.0",
+    "draco3dgltf": "^1.5.9",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"
   }

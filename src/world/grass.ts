@@ -5,7 +5,7 @@ import { heightAt, pathMask } from './terrain';
 export function buildGrass(count: number): { mesh: THREE.InstancedMesh; update(t: number): void } {
   // hoja: 3 tramos, afilada hacia la punta
   const segs = 3, pos: number[] = [], col: number[] = [], idx: number[] = [];
-  const base = new THREE.Color('#2f7d3c'), tip = new THREE.Color('#b6e86a'), c = new THREE.Color();
+  const base = new THREE.Color('#3f9d3f'), tip = new THREE.Color('#c9f06a'), c = new THREE.Color();
   for (let i = 0; i <= segs; i++) {
     const u = i / segs, w = 0.5 * (1 - u * u * 0.92);
     for (const s of [-1, 1]) {
