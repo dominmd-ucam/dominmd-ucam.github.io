@@ -107,6 +107,8 @@ export interface Water {
   /** Nueva onda en (x, z) en el instante t; `amp` 0–1. Se guardan las 6 más recientes. */
   ripple(x: number, z: number, t: number, amp?: number): void;
   update(t: number, center: THREE.Vector3, env: WaterEnv): void;
+  /** Uniformes de la malla interior y del anillo exterior (para ajustarlos en vivo con ?tune). */
+  uniformSets: Record<string, THREE.IUniform>[];
 }
 
 /**
@@ -177,6 +179,7 @@ export function buildWater(sunDir: THREE.Vector3): Water {
   let ripN = 0;
   return {
     mesh,
+    uniformSets: all,
     ripple(x, z, t, amp = 1) {
       for (const u of all) (u.uRipple.value as THREE.Vector4[])[ripN % 6].set(x, z, t, amp);
       ripN++;

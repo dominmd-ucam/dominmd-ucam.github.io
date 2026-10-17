@@ -56,6 +56,7 @@ dawn.sun.shadow.mapSize.set(q.shadowMap, q.shadowMap);
 const sc = dawn.sun.shadow.camera;
 sc.left = -30; sc.right = 30; sc.top = 30; sc.bottom = -30; sc.near = 1; sc.far = 150;
 dawn.sun.shadow.bias = -0.0004; dawn.sun.shadow.normalBias = 0.04;
+renderer.shadowMap.needsUpdate = true; // con autoUpdate apagado, el primer fotograma necesita generar el mapa o el sampler de sombra queda sin textura válida
 scene.fog = new THREE.FogExp2(dawn.fogColor, 0.0045);
 
 /* mundo: lo estático se fusiona al final para reducir llamadas de dibujo */
@@ -105,6 +106,9 @@ const player = new Player(obstacles, [6, 12]);
 scene.add(player.group);
 const post = createPost(renderer, scene, camera, q);
 const debug = new DebugOverlay();
+if (new URLSearchParams(location.search).has('tune')) {
+  void import('./tune').then((m) => m.openTune({ dawn, scene, terrain, water, post }));
+}
 
 let avatarUI: AvatarUI | null = null;
 const avatarBtn = document.getElementById('avatarBtn') as HTMLButtonElement;

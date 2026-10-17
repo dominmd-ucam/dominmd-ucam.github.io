@@ -16,7 +16,7 @@ export class Dawn {
   readonly fogColor = C('#ffd9b8');
   readonly waterEnv: WaterEnv;
   /** exposición que aplica el postprocesado */
-  readonly exposure = 0.5;
+  exposure = 0.5;
 
   constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
     // sol a ~14° sobre el horizonte, saliendo por el sureste
@@ -40,6 +40,13 @@ export class Dawn {
     envScene.add(envSky);
     scene.environment = pmrem.fromScene(envScene, 0, 1, 10000).texture;
     pmrem.dispose();
+  }
+
+  /** Reorienta el sol (grados sobre el horizonte y acimut): luz, cielo y reflejos del agua. */
+  setSun(elevDeg: number, azimDeg: number) {
+    this.sunDir.setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - elevDeg), THREE.MathUtils.degToRad(azimDeg));
+    this.sky.material.uniforms.sunPosition.value.copy(this.sunDir);
+    this.waterEnv.sunDir.copy(this.sunDir);
   }
 
   /** La luz y su sombra siguen al jugador. */

@@ -207,8 +207,10 @@ export function buildTerrain(): THREE.Mesh {
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
   const uTime = { value: 0 };
+  const uCaus = { value: 0.55 };
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = uTime;
+    sh.uniforms.uCaus = uCaus;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;');
@@ -216,6 +218,7 @@ export function buildTerrain(): THREE.Mesh {
       .replace('#include <common>', `#include <common>
 varying vec3 vWPos;
 uniform float uTime;
+uniform float uCaus;
 // Ruido de Worley: distancia al punto más cercano (F1) y al segundo (F2). Donde F2 - F1 ≈ 0 estás en un borde de Voronoi.
 vec2 hash2(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
 vec2 worley(vec2 p) {
@@ -236,11 +239,12 @@ float causticNet(vec2 p) { vec2 w = worley(p); return 1.0 - smoothstep(0.0, 0.17
         float net1 = causticNet(vWPos.xz * 0.42 + vec2(uTime * 0.05, 0.0));
         float net2 = causticNet(vWPos.xz * 0.63 + vec2(7.3, -uTime * 0.045));
         float caus = (net1 + net2) * 0.5 * (0.55 + 0.9 * net1 * net2);
-        diffuseColor.rgb += vec3(0.50, 0.85, 0.80) * caus * depthFade * 0.55;`);
+        diffuseColor.rgb += vec3(0.50, 0.85, 0.80) * caus * depthFade * uCaus;`);
   };
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
   mesh.userData.uTime = uTime;
+  mesh.userData.uCaus = uCaus;
   return mesh;
 }
 

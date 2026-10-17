@@ -17,6 +17,8 @@ export interface Post {
   setExposure(v: number): void;
   /** activa o desactiva bloom, viñeta y antialiasing (a nivel bajo siempre está desactivado) */
   setEnabled(on: boolean): void;
+  /** efectos ajustables en vivo (solo niveles medio/alto) */
+  fx?: { bloom: BloomEffect; hue: HueSaturationEffect; contrast: BrightnessContrastEffect; vignette: VignetteEffect };
 }
 
 /** Nivel bajo: render directo con el tone mapping nativo. Medio/alto: bloom, viñeta y SMAA. */
@@ -35,7 +37,10 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const exposure = new ExposureEffect();
   const bloom = new BloomEffect({ intensity: 0.4, luminanceThreshold: 1.15, luminanceSmoothing: 0.25, mipmapBlur: true, radius: 0.7 });
   const tone = new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC });
-  composer.addPass(new EffectPass(camera, exposure, bloom, tone, new HueSaturationEffect({ saturation: 0.34 }), new BrightnessContrastEffect({ contrast: 0.12 }), new VignetteEffect({ offset: 0.35, darkness: 0.28 })));
+  const hue = new HueSaturationEffect({ saturation: 0.34 });
+  const contrast = new BrightnessContrastEffect({ contrast: 0.12 });
+  const vignette = new VignetteEffect({ offset: 0.35, darkness: 0.28 });
+  composer.addPass(new EffectPass(camera, exposure, bloom, tone, hue, contrast, vignette));
   composer.addPass(new EffectPass(camera, new SMAAEffect()));
   let enabled = true, expo = 0.5;
   return {
@@ -46,5 +51,6 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
     setSize: (w, h) => composer.setSize(w, h, false),
     setExposure: (v) => { expo = v; exposure.exposure = v; },
     setEnabled: (on) => { enabled = on; },
+    fx: { bloom, hue, contrast, vignette },
   };
 }
