@@ -7,6 +7,7 @@ import { buildGrass } from './world/grass';
 import { buildLandmarks } from './world/landmarks';
 import { buildLife } from './world/life';
 import { buildSplash } from './world/splash';
+import { StudioLight } from './world/studio';
 import { buildDiorama } from './world/diorama';
 import { buildTrees } from './world/trees';
 import { buildVillage } from './world/village';
@@ -79,6 +80,7 @@ const interactables = new Interactables(scene, obstacles, q.tier); // antes que 
 const trees = buildTrees(scene, obstacles, q.tier === 'low' ? 8 : 15);
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
+const studio = new StudioLight(scene, dawn);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
 const grass = buildGrass(q.tier === 'high' ? 60000 : q.tier === 'med' ? 30000 : 10000, q.tier === 'low'); // en calidad baja, solo la hoja ligera
 scene.add(grass.group);
@@ -119,6 +121,7 @@ void Avatar.create().then(async (a) => {
   await a.apply(loadConfig());
   player.attachAvatar(a);
   avatarUI = new AvatarUI(a);
+  studio.prewarm(renderer, scene, camera); // compila ya los shaders con luz de estudio: abrir el editor no da tirones
   avatarBtn.disabled = false;
 }).catch((e) => console.warn('Avatar modular no disponible, uso el de respaldo:', e));
 
@@ -333,6 +336,7 @@ function frame() {
   camera.lookAt(camLook);
 
   dawn.update(pp);
+  studio.update(dt, pp, input.yaw, avatarUI?.open ?? false);
   terrainTime.value = t;
   landmarks.update(t, 0.35);
   diorama.update(t);
@@ -360,7 +364,7 @@ function frame() {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
+(window as unknown as { __dbg: unknown }).__dbg = { presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, studio, post, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }
