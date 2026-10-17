@@ -60,7 +60,7 @@ export function registerRoutes(app, { cfg, db }) {
     });
     const id = (req) => Number(req.params.id);
     // diagnóstico: qué cabeceras de IP llegan a través del túnel o proxy (para elegir IP_HEADER)
-    admin.get('/whoami', async (req) => ({ configuredHeader: cfg.ipHeader || '(ninguna)', detectedIpHash: ipOf(req), seen: { 'cf-connecting-ip': !!req.headers['cf-connecting-ip'], 'x-forwarded-for': !!req.headers['x-forwarded-for'], 'x-real-ip': !!req.headers['x-real-ip'] } }));
+    admin.get('/whoami', async (req) => ({ configuredHeader: cfg.ipHeader || '(ninguna)', detectedIpHash: ipOf(req), seen: { 'cf-connecting-ip': !!req.headers['cf-connecting-ip'], 'x-forwarded-for': !!req.headers['x-forwarded-for'], 'x-real-ip': !!req.headers['x-real-ip'] }, headerNames: Object.keys(req.headers).filter((h) => !['authorization', 'cookie'].includes(h)) }));
     admin.get('/summary', limit(60, '1 minute'), async () => q.counts.get());
     admin.get('/guestbook', limit(60, '1 minute'), async (req) => ({ entries: q.listGuest.all(['pending', 'approved', 'rejected'].includes(req.query.status) ? req.query.status : 'pending') }));
     admin.post('/guestbook/:id/approve', limit(60, '1 minute'), async (req) => { q.setStatus.run('approved', id(req)); return { ok: true }; });

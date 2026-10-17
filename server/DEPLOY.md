@@ -42,21 +42,35 @@ curl https://api.tudominio.com/health        # {"ok":true}
 
 Los WebSockets funcionan sin ajustes adicionales.
 
-## 3B. Sin dominio: Tailscale Funnel
+## 3B. Sin dominio: Tailscale con nombre propio (recomendado)
+
+Un contenedor de Tailscale aparte le da a la API **su propio nombre público** (`portfolio-api.TU-TAILNET.ts.net`). Así tu web no apunta al nombre de tu servidor, donde puede haber otros servicios abiertos con Funnel, y solo la API queda expuesta.
+
+1. Crea una clave en <https://login.tailscale.com/admin/settings/keys> (**Generate auth key**, sin *Reusable*, caducidad de 90 días o menos). Funnel y HTTPS deben estar activados en tu red (se comprueba en *DNS* y *Access controls*).
+2. Guárdala en `.env` **sin que quede en el historial de la terminal**:
 
 ```bash
-curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up
-docker compose up -d --build
-sudo tailscale funnel --bg 8787              # te da https://TU-SERVIDOR.TU-TAILNET.ts.net
+read -rs -p 'Clave de Tailscale: ' K; echo; sed -i "s|^TS_AUTHKEY=.*|TS_AUTHKEY=$K|" .env; unset K
 ```
 
-Después comprueba **qué cabecera lleva la IP del visitante** y ponla en `IP_HEADER` (puede ser `x-forwarded-for`):
+3. Arranca y comprueba:
 
 ```bash
-curl -s -H "Authorization: Bearer TU_ADMIN_TOKEN" https://TU-SERVIDOR.TU-TAILNET.ts.net/admin/api/whoami
+docker compose --profile tailscale up -d --build
+docker compose logs tailscale | tail -5
+curl https://portfolio-api.TU-TAILNET.ts.net/health        # {"ok":true}
+```
+
+4. Elige `IP_HEADER`: pregunta a la API qué cabeceras le llegan y ponla en `.env` (suele ser `x-forwarded-for`):
+
+```bash
+curl -s -H "Authorization: Bearer TU_ADMIN_TOKEN" https://portfolio-api.TU-TAILNET.ts.net/admin/api/whoami
+docker compose up -d        # tras editar .env
 ```
 
 Si `IP_HEADER` queda vacío tras un proxy, **todos los visitantes parecen la misma IP** y el límite de envíos se aplicaría a todos a la vez.
+
+> Alternativa más simple, pero menos aislada: `sudo tailscale funnel --bg --https=8443 http://127.0.0.1:8787` desde el propio servidor. Ojo: usa el nombre de tu servidor, así que cualquier otro servicio con Funnel en ese nombre quedaría asociado a tu web.
 
 ## 4. Conectar la web
 

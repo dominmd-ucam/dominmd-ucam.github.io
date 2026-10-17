@@ -1,7 +1,8 @@
 # API del portfolio. Uso:
 #   cp .env.example .env   # y rellénalo
 #   docker compose --profile cloudflare up -d --build     (con Cloudflare Tunnel)
-#   docker compose up -d --build                          (sin túnel: Tailscale Funnel o tu proxy inverso)
+#   docker compose --profile tailscale up -d --build     (con nombre propio de Tailscale: recomendado sin dominio)
+#   docker compose up -d --build                          (solo la API, para usar tu propio proxy)
 services:
   api:
     build: .
@@ -29,6 +30,26 @@ services:
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
-      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?define TUNNEL_TOKEN en .env}
+      # solo se usa con el perfil "cloudflare"; vacío no impide arrancar la API
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - api
+
+  # La API con su propio nombre en Tailscale (p. ej. portfolio-api.TU-TAILNET.ts.net), separado del de tu servidor:
+  # así la web nunca apunta al nombre donde corren otros servicios. Solo sale a internet esta API, por Funnel.
+  tailscale:
+    profiles: ["tailscale"]
+    image: tailscale/tailscale:stable
+    restart: unless-stopped
+    hostname: portfolio-api
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_HOSTNAME: ${TS_HOSTNAME:-portfolio-api}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /config/serve.json
+    volumes:
+      - ./ts-state:/var/lib/tailscale
+      - ./tailscale:/config:ro
     depends_on:
       - api
