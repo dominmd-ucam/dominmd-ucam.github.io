@@ -59,16 +59,36 @@ export function buildLife(scene: THREE.Scene, gullCount = 60): Life {
   /* ---------- peces ---------- */
   const fishGeo = new THREE.ConeGeometry(0.07, 0.34, 5); fishGeo.rotateX(Math.PI / 2);
   const FISH = 38;
-  const fishMesh = new THREE.InstancedMesh(fishGeo, new THREE.MeshBasicMaterial({ color: '#ffffff' }), FISH);
+  // Destello plateado (flashing): al girar o asustarse, el costado reflectante del pez brilla y el destello se contagia a los vecinos
+  const flashAttr = new THREE.InstancedBufferAttribute(new Float32Array(FISH), 1);
+  flashAttr.setUsage(THREE.DynamicDrawUsage);
+  fishGeo.setAttribute('aFlash', flashAttr);
+  // se dibujan después del agua y con opacidad parcial: el agua es casi opaca a esta profundidad y, si no, ni los peces ni su destello se verían
+  const fishMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.62, depthWrite: false });
+  fishMat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aFlash; varying float vFlash;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        // brilla el costado (normal lateral) cuando mira a la cámara: así se ve el destello, como en los documentales
+        vec3 vn = normalize(normalMatrix * mat3(instanceMatrix) * normal);
+        vFlash = aFlash * abs(normal.x) * pow(abs(vn.z), 0.7);`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vFlash;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        // por encima de 1: el agua lo atenúa y el bloom lo recoge
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(5.5, 5.8, 6.0), clamp(vFlash * 1.4, 0.0, 1.0));`);
+  };
+  const fishMesh = new THREE.InstancedMesh(fishGeo, fishMat, FISH);
   fishMesh.frustumCulled = false;
+  fishMesh.renderOrder = 5;
   const palette = ['#ffb347', '#ff7a59', '#ffe27a', '#7ad7ff'].map((c) => new THREE.Color(c));
-  const school: { cx: number; cz: number; r: number; sp: number; ph: number; dy: number; fx: number; fz: number; scare: number }[] = [];
+  const school: { cx: number; cz: number; r: number; sp: number; ph: number; dy: number; fx: number; fz: number; scare: number; flash: number; pend: number; cool: number; px: number; pz: number }[] = [];
   guard = 0;
   while (school.length < FISH && guard++ < 3000) {
     const cx = rnd(-34, 34), cz = rnd(-34, 34), h = heightAt(cx, cz);
     if (h > -0.9 || h < -2.4) continue;
     const k = school.length;
-    school.push({ cx, cz, r: rnd(0.8, 2.6), sp: rnd(0.4, 0.9) * (k % 2 ? 1 : -1), ph: Math.random() * 6, dy: rnd(0.35, 0.8), fx: 0, fz: 0, scare: 0 });
+    school.push({ cx, cz, r: rnd(0.8, 2.6), sp: rnd(0.4, 0.9) * (k % 2 ? 1 : -1), ph: Math.random() * 6, dy: rnd(0.35, 0.8), fx: 0, fz: 0, scare: 0, flash: 0, pend: -1, cool: 0, px: 0, pz: 0 });
     fishMesh.setColorAt(k, palette[k % palette.length]);
   }
   fishMesh.count = school.length;
@@ -107,8 +127,26 @@ export function buildLife(scene: THREE.Scene, gullCount = 60): Life {
         const a = t * f.sp + f.ph;
         let x = f.cx + Math.cos(a) * f.r, z = f.cz + Math.sin(a) * f.r;
         const dx = x - player.x, dz = z - player.z, d = Math.hypot(dx, dz);
-        if (d < 4.5) { f.scare = Math.min(1, f.scare + dt * 5); f.fx = dx / (d || 1); f.fz = dz / (d || 1); }
-        else f.scare = Math.max(0, f.scare - dt * 0.35);
+        if (d < 4.5) {
+          if (f.scare < 0.05 && f.pend < 0) f.pend = Math.random() * 0.25; // empieza a huir: destello con un pequeño retardo
+          f.scare = Math.min(1, f.scare + dt * 5); f.fx = dx / (d || 1); f.fz = dz / (d || 1);
+        } else f.scare = Math.max(0, f.scare - dt * 0.35);
+
+        // Flashing: el destello nace al asustarse (o al azar, como el centelleo de un banco) y salta a los vecinos con un retardo → onda de brillo
+        f.cool -= dt;
+        f.flash *= Math.exp(-dt * 3.6);
+        if (f.pend >= 0 && (f.pend -= dt) < 0) { f.flash = 1; f.pend = -1; f.cool = 1.2; }
+        else if (f.cool <= 0 && f.pend < 0) {
+          if (Math.random() < dt * 0.05) f.flash = 0.75;
+          else if (f.flash < 0.15) {
+            for (let k = 0; k < school.length; k++) {
+              const o = school[k];
+              if (o.flash > 0.6 && (o.px - f.px) ** 2 + (o.pz - f.pz) ** 2 < 9) { f.pend = 0.1 + Math.random() * 0.08; break; }
+            }
+          }
+        }
+        flashAttr.setX(i, f.flash);
+        f.px = x; f.pz = z;
         const push = f.scare * 3.2;
         x += f.fx * push; z += f.fz * push;
         const floor = heightAt(x, z);
@@ -118,6 +156,7 @@ export function buildLife(scene: THREE.Scene, gullCount = 60): Life {
         fishMesh.setMatrixAt(i, dummy.matrix);
       });
       fishMesh.instanceMatrix.needsUpdate = true;
+      flashAttr.needsUpdate = true;
     },
   };
 }

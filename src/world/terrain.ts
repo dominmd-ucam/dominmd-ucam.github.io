@@ -81,7 +81,9 @@ export function heightAt(x: number, z: number): number {
   h += (fbm(x * 0.12, z * 0.12) - 0.5) * 1.2 * k;
   // islote de arena
   const isd = (x - ISLET[0]) ** 2 + (z - ISLET[1]) ** 2;
-  h = Math.max(h, 1.7 * Math.exp(-isd / 22) - 0.5);
+  // el islote solo levanta su entorno (con un pequeño arrecife alrededor): si el max se aplicara en todo el mapa, el mar entero tendría el fondo en −0,5 m
+  const isW = 1 - THREE.MathUtils.smoothstep(isd, 25, 110);
+  h += (Math.max(h, 1.7 * Math.exp(-isd / 22) - 0.5) - h) * isW;
   return h;
 }
 
