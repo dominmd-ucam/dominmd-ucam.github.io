@@ -21,6 +21,7 @@ export async function buildApp(cfg = loadConfig()) {
     origin: (origin, cb) => cb(null, !origin || cfg.allowedOrigins.has(origin)),
     methods: ['GET', 'POST', 'DELETE'],
     allowedHeaders: ['content-type', 'authorization'],
+    maxAge: 86400, // el navegador recuerda la respuesta al preflight un día: los envíos del formulario no pagan una petición OPTIONS cada vez
   });
   await app.register(rateLimit, { global: false });
   await app.register(websocket, { options: { maxPayload: 512 } });

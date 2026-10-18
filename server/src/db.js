@@ -27,6 +27,7 @@ export function openDb(file) {
       handled     INTEGER NOT NULL DEFAULT 0,
       ip_hash     TEXT
     );
+    CREATE INDEX IF NOT EXISTS idx_contact_created ON contact(created_at DESC);
   `);
   return db;
 }
