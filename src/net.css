@@ -11,12 +11,12 @@
 .nf-field input:focus, .nf-field textarea:focus { border-color: var(--sea); outline: none; }
 .nf-count { justify-self: end; margin-top: -6px; color: var(--muted); font-weight: 700; }
 .nf-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
-.nf-send { justify-self: start; padding: .55em 1.6em; border: 0; font: 800 16px var(--body); color: var(--foam); background: var(--coral); cursor: pointer; clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%); transition: transform .25s var(--pop), background .2s; }
-.nf-send:hover:not(:disabled) { background: var(--coral-d); transform: translateY(-2px); }
+.nf-send { justify-self: start; padding: .55em 1.6em; border: 0; font: 800 16px var(--body); color: var(--ink); background: var(--coral); cursor: pointer; clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%); transition: transform .25s var(--pop), background .2s; }
+.nf-send:hover:not(:disabled) { background: #ff9a7e; transform: translateY(-2px); }
 .nf-send:disabled { opacity: .6; cursor: wait; }
 .nf-status { min-height: 1.4em; margin: 0; font-weight: 800; color: var(--muted); }
 .nf-status.ok { color: #1f8f4e; }
-.nf-status.err { color: var(--coral-d); }
+.nf-status.err { color: #a63a22; }
 
 /* panel del juego */
 #gbPanel { position: fixed; inset: 0; z-index: 28; background: rgba(14, 94, 122, .4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: fade .25s ease both; }
@@ -24,7 +24,7 @@
 #gbPanel .gb-card { position: relative; width: min(620px, 100%); max-height: calc(100dvh - 32px); overflow: auto; padding: 1.4em 1.7em; font-family: var(--body); clip-path: polygon(0 3%, 3% 0, 97% 0, 100% 3%, 100% 97%, 97% 100%, 3% 100%, 0 97%); animation: rise .45s var(--pop) both; }
 .gb-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
 .gb-tabs button { border: 0; padding: .35em 1.2em; font: 800 15px var(--body); background: var(--paper-2); cursor: pointer; clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%); }
-.gb-tabs button.on { background: var(--sea); color: var(--foam); }
+.gb-tabs button.on { background: var(--sea); color: var(--ink); }
 .gb-card h2 { margin: 0 0 12px; font: 700 28px var(--disp); color: var(--deep); }
 .gb-close { position: absolute; top: 14px; right: 18px; width: 36px; height: 36px; border: 0; background: var(--paper-2); font-weight: 800; cursor: pointer; clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); }
 .online { top: calc(max(14px, env(safe-area-inset-top)) + 62px); right: 16px; z-index: 2; padding: .15em 1em; font-size: 13px; font-weight: 800; color: var(--foam); background: rgba(15, 52, 64, .72); clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%); }
