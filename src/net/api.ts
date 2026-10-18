@@ -12,7 +12,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 7000);
   try {
-    const res = await fetch(`${BASE}${path}`, { ...init, signal: ctrl.signal, headers: { 'content-type': 'application/json', ...init?.headers } });
+    const res = await fetch(`${BASE}${path}`, { ...init, signal: ctrl.signal, headers: { ...(init?.body ? { 'content-type': 'application/json' } : {}), ...init?.headers } }); // sin cuerpo (GET) no hay cabecera personalizada → sin preflight CORS
     const data = (await res.json().catch(() => ({}))) as { error?: string };
     if (!res.ok) throw new ApiError(res.status === 429 ? 'Has enviado demasiados mensajes. Inténtalo más tarde.' : data.error ?? 'No se pudo completar la acción.', res.status);
     return data as T;

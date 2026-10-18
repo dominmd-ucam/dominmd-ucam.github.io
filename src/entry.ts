@@ -1,7 +1,7 @@
 import './shared.css';
 import './classic.css';
 import projects from './data/projects.json';
-import { ProjectModal, type ProjectLike } from './ui/projectModal';
+import type { ProjectLike } from './ui/projectModal';
 import { gameSupport, rememberMode, storedMode } from './mode';
 import { apiConfigured } from './net/api';
 import { mountContact, mountGuestbook } from './net/forms';
@@ -10,14 +10,16 @@ import { mountContact, mountGuestbook } from './net/forms';
  * Punto de entrada: la versión clásica ya viene en el HTML (indexable y rápida).
  * Aquí solo se conectan los botones y se carga el juego bajo demanda (import dinámico).
  */
-const modal = ProjectModal.get();
+// la ficha de proyecto y los demos simulados se descargan al abrir el primero (no pesan en la carga de la página)
+let modalReady: Promise<{ open(p: ProjectLike): void }> | null = null;
+const getModal = () => (modalReady ??= import('./ui/projectModal').then((m) => m.ProjectModal.get()));
 const byId = new Map((projects as unknown as ProjectLike[]).map((p) => [p.id, p]));
 
 document.addEventListener('click', (e) => {
   const t = (e.target as HTMLElement).closest<HTMLElement>('[data-project]');
   if (!t) return;
   const p = byId.get(t.dataset.project ?? '');
-  if (p) modal.open(p);
+  if (p) void getModal().then((m) => m.open(p));
 });
 
 // libro de visitas y contacto: solo si el backend está configurado

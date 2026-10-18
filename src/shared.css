@@ -33,12 +33,12 @@ button { font-family: inherit; color: inherit; }
 .m-card p { margin: 0 0 1em; color: #35525a; line-height: 1.5; font-weight: 600; }
 .m-close { position: absolute; top: 14px; right: 18px; width: 36px; height: 36px; border: 0; background: var(--paper-2); font-weight: 800; cursor: pointer; clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); transition: transform .25s var(--pop); }
 .m-close:hover { transform: scale(1.12) rotate(8deg); }
-.m-tag, .tag { display: inline-block; padding: .1em 1em; font: 700 .8em var(--disp); letter-spacing: .1em; text-transform: uppercase; color: var(--foam); background: var(--sea); clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%); }
+.m-tag, .tag { display: inline-block; padding: .1em 1em; font: 700 .8em var(--disp); letter-spacing: .1em; text-transform: uppercase; color: var(--ink); background: var(--sea); clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%); }
 .m-tag[data-type="bot"], .tag[data-type="bot"] { background: var(--coral); }
 .m-tag[data-type="plugin"], .tag[data-type="plugin"] { background: #e0a21f; }
-.m-tag[data-type="cli"], .tag[data-type="cli"] { background: #8a63d2; }
-.m-tag[data-type="mobile"], .tag[data-type="mobile"] { background: #e0488f; }
-.m-tag[data-type="device"], .tag[data-type="device"] { background: #e07a30; }
+.m-tag[data-type="cli"], .tag[data-type="cli"] { background: #805cc3; color: var(--foam); }
+.m-tag[data-type="mobile"], .tag[data-type="mobile"] { background: #c13e7b; color: var(--foam); }
+.m-tag[data-type="device"], .tag[data-type="device"] { background: #e8873f; }
 .m-note { margin: -.4em 0 1em; font-size: .82em; font-weight: 700; color: var(--muted); }
 .m-demo { margin-bottom: 1em; }
 .m-demo.empty { display: grid; place-items: center; min-height: 160px; background: rgba(15, 52, 64, .08); border: 2px dashed rgba(15, 52, 64, .2); color: var(--muted); font-weight: 700; font-size: .9em; }
