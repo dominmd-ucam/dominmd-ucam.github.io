@@ -2,6 +2,7 @@ import './style.css';
 import * as THREE from 'three';
 import { buildTerrain, heightAt, islandRadius, HILL, ISLET, DOCK, dockStart, onDock, caveFloor, caveLocal, CAVE } from './world/terrain';
 import { buildZones } from './world/zones';
+import { Robot } from './world/robot';
 import { buildWater } from './world/water';
 import { buildScenery } from './world/props';
 import { buildGrass } from './world/grass';
@@ -88,6 +89,8 @@ const grass = buildGrass(q.tier === 'high' ? 30 : q.tier === 'med' ? 18 : 6, q.t
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
+const robot = new Robot(scene, obstacles, [1.2, 1.5], 2.2); // pasea por la plaza y saluda
+void robot.load().catch((e) => console.warn('robot no disponible:', e));
 
 /* backend opcional: libro de visitas, contacto y visitantes fantasma (solo si hay API configurada) */
 const infoPoint = apiConfigured ? new InfoPoint(scene, obstacles, 3.2, 12.2) : null;
@@ -326,6 +329,7 @@ function frame(timestamp: number) {
   player.update(dt, input, t);
   interactables.update(t, player.group.position);
   guide.update(dt, t, player.group.position);
+  robot.update(dt, t, player.group.position);
   infoPoint?.update(t, player.group.position);
   presence?.send(player.group.position.x, player.group.position.z, player.group.rotation.y, Math.min(1, player.vel.length() / 6.5), player.swimming, performance.now());
   ghosts.update(dt, t, performance.now());
@@ -398,7 +402,7 @@ function frame(timestamp: number) {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, post, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
+(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, post, scene, camera, guide, robot, menu, dialogue, achievements, settings, adaptive };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }
