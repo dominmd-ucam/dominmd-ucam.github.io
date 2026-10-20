@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Delaunay } from 'd3-delaunay';
 import { CLOUD_GLSL } from './toon';
+import zones from '../data/zones.json';
 
 export const WORLD_SIZE = 320;
 export const ISLAND_R = 70;
@@ -82,25 +83,29 @@ function xz(p: [number, number]) { return { x: p[0], z: p[1] }; }
  * Están entre la vuelta a la isla y la playa, así los caminos principales no tienen que subirlas: ahí van los caminos secundarios.
  * La del suroeste tiene la cueva en su cara al mar.
  */
-export const PLATEAUS: { x: number; z: number; r: number; h: number; ramp: number }[] = [
-  { ...xz(polar(0.25, 0.79)), r: 8.5, h: 5, ramp: 0 },
-  { ...xz(polar(3.35, 0.78)), r: 8, h: 4, ramp: 0 },
-  { ...xz(polar(2.12, 0.73)), r: 7.5, h: 4.5, ramp: 0 },
+export const PLATEAUS: { x: number; z: number; r: number; h: number; ramp: number; rampL: number }[] = [
+  { ...xz(polar(0.25, 0.8)), r: 8, h: 3.5, ramp: 0, rampL: 0 },
+  { ...xz(polar(3.35, 0.8)), r: 7.5, h: 3, ramp: 0, rampL: 0 },
+  { ...xz(polar(2.12, 0.775)), r: 7.5, h: 4.5, ramp: 0, rampL: 0 },
 ];
-for (const p of PLATEAUS) p.ramp = Math.atan2(-p.z, -p.x);
-const RAMP_W = 2.4, RAMP_L = 10;
+// la rampa baja hacia el centro y termina justo en la vuelta a la isla (RING), así el sendero sube por ella
+for (const p of PLATEAUS) {
+  p.ramp = Math.atan2(-p.z, -p.x);
+  p.rampL = Math.hypot(p.x, p.z) - p.r - islandRadius(Math.atan2(p.z, p.x)) * 0.62 + 2.5;
+}
+const RAMP_W = 2.4;
 function plateauHeight(x: number, z: number): number {
   let best = 0;
   for (const p of PLATEAUS) {
     const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz);
-    if (d > p.r + RAMP_L + 2) continue;
+    if (d > p.r + p.rampL + 2) continue;
     // borde irregular (ruido según el ángulo) y caída corta: parece un escalón de roca
     const edge = p.r + (vnoise(Math.atan2(dz, dx) * 2.2 + p.x, p.z * 0.1) - 0.5) * 2.4;
     let k = 1 - THREE.MathUtils.smoothstep(d, edge - 1.6, edge + 0.4);
     // rampa: franja hacia el centro de la isla que baja en línea recta
     const u = dx * Math.cos(p.ramp) + dz * Math.sin(p.ramp), v = -dx * Math.sin(p.ramp) + dz * Math.cos(p.ramp);
     if (u > 0) {
-      const along = 1 - THREE.MathUtils.clamp((u - (edge - 2)) / RAMP_L, 0, 1);
+      const along = 1 - THREE.MathUtils.clamp((u - (edge - 2)) / p.rampL, 0, 1);
       const across = 1 - THREE.MathUtils.smoothstep(Math.abs(v), RAMP_W - 0.8, RAMP_W + 0.6);
       k = Math.max(k, THREE.MathUtils.smoothstep(along, 0, 1) * across);
     }
@@ -108,6 +113,43 @@ function plateauHeight(x: number, z: number): number {
   }
   return best;
 }
+
+/**
+ * Cueva explorable en la cara al mar de la meseta del suroeste. `s` = metros hacia dentro desde la boca, `v` = de lado.
+ * El terreno solo se rebaja en la entrada (la muesca); el túnel y la sala van por debajo de la meseta (zones.ts los dibuja
+ * y el jugador camina sobre `caveFloor` en vez de sobre el terreno).
+ */
+const CP = PLATEAUS[2], C_OUT = Math.atan2(CP.z, CP.x);
+export const CAVE = {
+  x: CP.x + Math.cos(C_OUT) * (CP.r + 0.3), z: CP.z + Math.sin(C_OUT) * (CP.r + 0.3),
+  /** dirección hacia dentro */
+  dx: -Math.cos(C_OUT), dz: -Math.sin(C_OUT),
+  /** medio ancho del túnel, final de la muesca abierta, final del túnel, sala del fondo y altura del techo */
+  w: 1.7, notch: 2.6, len: 9.2, room: { s: 11, r: 3 }, h: 2.9,
+  /** donde empieza el tubo de roca (asoma un poco por delante de la pared, como un arco) */
+  s0: 2.1,
+  f0: NaN,
+};
+export function caveLocal(x: number, z: number): [number, number] {
+  const ox = x - CAVE.x, oz = z - CAVE.z;
+  return [ox * CAVE.dx + oz * CAVE.dz, -ox * CAVE.dz + oz * CAVE.dx];
+}
+export function caveFloorY(s: number) { return CAVE.f0 + 0.05 * Math.max(0, s); }
+/** Altura del suelo de la cueva si (x, z) cae dentro del túnel o de la sala (con `margin` de holgura hacia dentro); si no, NaN. */
+export function caveFloor(x: number, z: number, margin = 0): number {
+  const [s, v] = caveLocal(x, z);
+  if (s < CAVE.notch - 1 || s > CAVE.room.s + CAVE.room.r) return NaN;
+  const inside = (s <= CAVE.len + 0.5 && Math.abs(v) < CAVE.w - margin) || Math.hypot(s - CAVE.room.s, v) < CAVE.room.r - margin;
+  return inside ? caveFloorY(s) : NaN;
+}
+function caveNotch(x: number, z: number, h: number): number {
+  if (Number.isNaN(CAVE.f0)) return h;
+  const [s, v] = caveLocal(x, z);
+  if (s < -2 || s > CAVE.notch + 1.4 || Math.abs(v) > CAVE.w + 1.6) return h;
+  const k = (1 - THREE.MathUtils.smoothstep(Math.abs(v), CAVE.w - 0.2, CAVE.w + 1.4)) * (1 - THREE.MathUtils.smoothstep(s, CAVE.notch, CAVE.notch + 1.2));
+  return h + (Math.min(h, caveFloorY(s)) - h) * k; // solo rebaja
+}
+CAVE.f0 = Math.max(0.75, heightAt(CAVE.x - CAVE.dx * 2.5, CAVE.z - CAVE.dz * 2.5)); // el suelo arranca a la altura de la playa delante de la boca
 
 /** Caminos: polilíneas. Los de piedra se empiedran con las losas del MegaKit; debajo, la tierra se pinta de color camino. */
 const RING = 0.62;
@@ -122,8 +164,32 @@ const PATHS: [number, number][][] = [
   [[0, 0], polar(-0.85, 0.35), polar(-0.85, RING), polar(-0.9, 0.86)], // plaza → prado → muelle
 ];
 export const STONE_PATHS = PATHS;
-/** Senderos de tierra, sin losas (caminos secundarios hacia las zonas reservadas): se rellenan en zones.ts. */
-export const TRAILS: [number, number][][] = [];
+/** Zonas reservadas (src/data/zones.json): parcelas, cofre y senderos de tierra sin losas que llevan a ellas. */
+export interface Plot { id: string; kind: string; x: number; z: number; r: number }
+export const PLOTS: Plot[] = zones.plots.map((p) => {
+  const c = 'plateau' in p ? PLATEAUS[p.plateau as number] : null;
+  const [x, z] = c ? [c.x, c.z] : polar(p.a as number, p.f as number);
+  return { id: p.id, kind: p.kind, x, z, r: p.r };
+});
+export const CHEST = { id: zones.chest.id, ...xz(polar(zones.chest.a, zones.chest.f)) };
+const caveOut = (s: number): [number, number] => [CAVE.x + CAVE.dx * s, CAVE.z + CAVE.dz * s];
+export const TRAILS: [number, number][][] = zones.trails.map((t) => {
+  const pts = t.pts.map(([a, f]) => polar(a, f));
+  if (t.to === 'cave') pts.push(caveOut(-4), caveOut(0.5));
+  return pts;
+});
+/** Finales de los senderos sin salida (llevan una valla). */
+export const DEAD_ENDS = zones.trails.filter((t) => t.end === 'fence').map((t) => {
+  const p = t.pts.map(([a, f]) => polar(a, f)), [ax, az] = p[p.length - 2], [bx, bz] = p[p.length - 1];
+  return { x: bx, z: bz, dir: Math.atan2(bx - ax, bz - az) };
+});
+/** Sitios que la vegetación deja libres (centro y radio). */
+export const RESERVED: [number, number, number][] = [
+  ...PLOTS.map((p): [number, number, number] => [p.x, p.z, p.r + 1.2]),
+  [CHEST.x, CHEST.z, 2.2],
+  [...caveOut(0.5), 3.4], [...caveOut(2.8), 3.2],
+  ...DEAD_ENDS.map((d): [number, number, number] => [d.x, d.z, 1.6]),
+];
 function segDist(px: number, pz: number, ax: number, az: number, bx: number, bz: number) {
   const dx = bx - ax, dz = bz - az;
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1)));
@@ -171,7 +237,7 @@ export function heightAt(x: number, z: number): number {
   // el islote solo levanta su entorno (con un pequeño arrecife alrededor): si el max se aplicara en todo el mapa, el mar entero tendría el fondo en −0,5 m
   const isW = 1 - THREE.MathUtils.smoothstep(isd, 25, 110);
   h += (Math.max(h, 1.7 * Math.exp(-isd / 22) - 0.5) - h) * isW;
-  return h;
+  return caveNotch(x, z, h);
 }
 
 const C_WET = new THREE.Color('#cfae72');
@@ -322,6 +388,9 @@ function pathLayer() {
   };
   draw(PATHS, 2.0);
   draw(TRAILS, 1.3);
+  draw([[caveOut(-1), caveOut(CAVE.notch + 0.8)]], CAVE.w * 1.6); // suelo de tierra en la entrada de la cueva
+  g.fillStyle = '#fff';
+  for (const p of PLOTS) { g.beginPath(); g.arc((p.x + half) * k, (p.z + half) * k, p.r * 0.8 * k, 0, Math.PI * 2); g.fill(); }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.NoColorSpace; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
   tex.flipY = false; // fila 0 del lienzo = z mínima, igual que pathCover
@@ -359,6 +428,9 @@ export function buildTerrain(detail = true): THREE.Mesh {
     sh.uniforms.uTime = uTime;
     sh.uniforms.uCaus = uCaus;
     sh.uniforms.uPath = uPath;
+    sh.uniforms.uCaveA = { value: new THREE.Vector4(CAVE.x, CAVE.z, CAVE.dx, CAVE.dz) };
+    sh.uniforms.uCaveB = { value: new THREE.Vector4(CAVE.f0, CAVE.w + 0.35, CAVE.h, CAVE.s0) };
+    sh.uniforms.uCaveC = { value: new THREE.Vector2(CAVE.room.s, CAVE.room.r + 0.4) };
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying float vUp;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;\nvUp = normal.y;');
@@ -369,6 +441,21 @@ varying float vUp;
 uniform float uTime;
 uniform float uCaus;
 uniform sampler2D uPath;
+uniform vec4 uCaveA, uCaveB;
+uniform vec2 uCaveC;
+// la pared de la meseta tapa la boca de la cueva: se recorta lo que quede dentro del tubo de roca (misma forma que en zones.ts, algo menor)
+void caveClip() {
+  vec2 o = vWPos.xz - uCaveA.xy;
+  float s = dot(o, uCaveA.zw), v = -o.x * uCaveA.w + o.y * uCaveA.z;
+  if (s < uCaveB.w || s > uCaveC.x + uCaveC.y) return;
+  float fl = uCaveB.x + 0.05 * s, y = vWPos.y - fl;
+  if (y < 0.08) return;
+  float room = sqrt(max(0.0, uCaveC.y * uCaveC.y - (s - uCaveC.x) * (s - uCaveC.x)));
+  float hw = s < uCaveC.x ? max(uCaveB.y, room) : room;
+  float hh = s < uCaveC.x ? max(uCaveB.z, hw * 0.95) : hw * 0.95;
+  vec2 e = vec2(v / (hw * 0.84), y / (hh * 0.84));
+  if (dot(e, e) < 1.0) discard;
+}
 float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float gNoise(vec2 p) {
   vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
@@ -388,7 +475,8 @@ vec2 worley(vec2 p) {
 }
 float causticNet(vec2 p) { vec2 w = worley(p); return 1.0 - smoothstep(0.0, 0.17, w.y - w.x); } // líneas finas brillantes alrededor de parches oscuros
 ${CLOUD_GLSL}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>
+      .replace('#include <color_fragment>', `caveClip();
+#include <color_fragment>
         float land = smoothstep(0.55, 1.05, vWPos.y);
         #ifdef TERRAIN_DETAIL
           // suelo pintado a mano: manchas grandes de dos tonos con borde de pincel y trazos cortos en la dirección del viento

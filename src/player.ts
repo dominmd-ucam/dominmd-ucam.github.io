@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { heightAt, onDock, DOCK } from './world/terrain';
+import { heightAt, onDock, DOCK, caveFloor, caveLocal, CAVE } from './world/terrain';
 import { waveHeight } from './world/water';
 import type { Obstacle } from './world/props';
 import type { Input } from './input';
@@ -54,6 +54,8 @@ export class Player {
   }
 
   swimming = false;
+  /** dentro de la cueva (bajo la meseta del suroeste) */
+  inCave = false;
   /** velocidad vertical y si está en el aire */
   private vy = 0;
   airborne = false;
@@ -98,8 +100,12 @@ export class Player {
     this.vel.lerp(target, 1 - Math.exp(-(this.airborne ? 4 : 12) * dt));
 
     const p = this.group.position;
+    // dentro de la cueva se camina por su suelo (por debajo de la meseta) y no se puede salir por las paredes
+    const cf = caveFloor(p.x, p.z);
+    this.inCave = !Number.isNaN(cf) && p.y < cf + 1.5;
     const tryMove = (nx: number, nz: number) => {
       if (Math.hypot(nx, nz) > LIMIT) return false;
+      if (this.inCave && caveLocal(nx, nz)[0] > CAVE.notch - 0.6 && Number.isNaN(caveFloor(nx, nz, 0.35))) return false;
       if (!onDock(nx, nz) && heightAt(nx, nz) < MAX_DEPTH) return false;
       for (const o of this.obstacles) {
         if (Math.hypot(nx - o.x, nz - o.z) < o.r + 0.35) return false;
@@ -112,7 +118,8 @@ export class Player {
     else if (tryMove(p.x, nz)) { p.z = nz; this.vel.x = 0; }
     else this.vel.set(0, 0);
 
-    const h = heightAt(p.x, p.z);
+    const cave = this.inCave ? caveFloor(p.x, p.z) : NaN;
+    const h = Number.isNaN(cave) ? heightAt(p.x, p.z) : cave;
     const dock = onDock(p.x, p.z);
     this.swimming = !dock && h < SWIM_FROM;
     // con los clips de natación el cuerpo va tumbado: flota más arriba que el muñeco de respaldo

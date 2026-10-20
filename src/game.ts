@@ -1,6 +1,7 @@
 import './style.css';
 import * as THREE from 'three';
-import { buildTerrain, heightAt, islandRadius, HILL, ISLET, DOCK, dockStart, onDock } from './world/terrain';
+import { buildTerrain, heightAt, islandRadius, HILL, ISLET, DOCK, dockStart, onDock, caveFloor, caveLocal, CAVE } from './world/terrain';
+import { buildZones } from './world/zones';
 import { buildWater } from './world/water';
 import { buildScenery } from './world/props';
 import { buildGrass } from './world/grass';
@@ -77,6 +78,7 @@ const diorama = buildDiorama(staticWorld);
 obstacles.push(...diorama.obstacles);
 const village = buildVillage(staticWorld);
 obstacles.push(...village.obstacles);
+obstacles.push(...buildZones(scene, q.tier).obstacles); // parcelas, cofre, vallas y el interior de la cueva
 const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
 const nature = buildNature(scene, obstacles, q.tier); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
@@ -284,12 +286,12 @@ applySettings();
 
 /* ---------- zonas para los logros ---------- */
 const zone = (a: number, f: number) => { const r = islandRadius(a) * f; return [Math.cos(a) * r, Math.sin(a) * r] as const; };
-const WRECK = zone(1.38, 0.93), CAVE = zone(2.15, 0.86);
+const WRECK = zone(1.38, 0.93);
 const DOCK_END = [Math.cos(DOCK.a) * (dockStart() + DOCK.len - 1.2), Math.sin(DOCK.a) * (dockStart() + DOCK.len - 1.2)] as const;
 function checkZones(p: THREE.Vector3) {
   const near = (c: readonly [number, number], r: number) => Math.hypot(p.x - c[0], p.z - c[1]) < r;
   if (near(WRECK, 5)) achievements.unlock('wreck');
-  if (near(CAVE, 5.5)) achievements.unlock('cave');
+  if (player.inCave) achievements.unlock('cave');
   if (near(HILL, 3.2) && p.y > 5) achievements.unlock('lighthouse');
   if (near(ISLET, 5)) achievements.unlock('islet');
   if (onDock(p.x, p.z) && near(DOCK_END, 1.8)) achievements.unlock('sailor');
@@ -303,6 +305,8 @@ timer.connect(document);
 const EYE = 1.15;
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), camHead = new THREE.Vector3();
 function camBlocked(p: THREE.Vector3): boolean {
+  // en la cueva la cámara no sale del túnel (salvo hacia la boca)
+  if (player.inCave) return caveLocal(p.x, p.z)[0] > CAVE.notch - 0.4 && Number.isNaN(caveFloor(p.x, p.z, 0.3));
   if (nature.blocks(p)) return true;
   if (p.y > 9) return false;
   for (const o of obstacles) if (o.r >= 1.4 && Math.hypot(p.x - o.x, p.z - o.z) < o.r + 0.6) return true;
@@ -354,9 +358,11 @@ function frame(timestamp: number) {
   // cámara en tercera persona con suavizado y sin atravesar el suelo
   if (avatarUI?.open) { input.yaw = player.group.rotation.y; input.pitch = 0.12; input.dist = 3.8; camDistChanged = true; }
   else if (camDistChanged && !avatarUI?.open) { input.dist = CAMERA_DIST[settings.value.camera]; camDistChanged = false; }
-  const cp = Math.cos(input.pitch);
-  camPos.set(pp.x + Math.sin(input.yaw) * cp * input.dist, pp.y + EYE + Math.sin(input.pitch) * input.dist, pp.z + Math.cos(input.yaw) * cp * input.dist);
-  camPos.y = Math.max(camPos.y, heightAt(camPos.x, camPos.z) + 0.8, 0.6);
+  const camDist = player.inCave ? Math.min(input.dist, 4.5) : input.dist, camPitch = player.inCave ? Math.min(input.pitch, 0.3) : input.pitch;
+  const cp = Math.cos(camPitch);
+  camPos.set(pp.x + Math.sin(input.yaw) * cp * camDist, pp.y + EYE + Math.sin(camPitch) * camDist, pp.z + Math.cos(input.yaw) * cp * camDist);
+  if (player.inCave) camPos.y = THREE.MathUtils.clamp(camPos.y, pp.y + 0.6, pp.y + 2.3); // bajo el techo
+  else camPos.y = Math.max(camPos.y, heightAt(camPos.x, camPos.z) + 0.8, 0.6);
   for (let k = 0; k < 14 && camBlocked(camPos); k++) camPos.lerp(camHead.set(pp.x, pp.y + EYE, pp.z), 0.12);
   camLook.set(pp.x, pp.y + EYE - 0.15, pp.z);
   if (first) camera.position.copy(camPos);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { loadGLTF } from '../assets/loader';
 import type { Tier } from '../quality';
-import { BIOMES, CLEARINGS, ISLAND_R, STONE_PATHS, biomeWeights, heightAt, pathDist, polar, type Biome } from './terrain';
+import { BIOMES, CAVE, CLEARINGS, ISLAND_R, RESERVED, STONE_PATHS, biomeWeights, caveLocal, heightAt, islandRadius, pathDist, polar, type Biome } from './terrain';
 import type { Obstacle } from './props';
 
 /*
@@ -79,7 +79,7 @@ function plan(obstacles: Obstacle[], tier: Tier) {
   const up = new THREE.Vector3(0, 1, 0), n = new THREE.Vector3();
   const blocked = (x: number, z: number, pad: number) => obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + pad);
   // plaza, punto de inicio y explanadas que deben quedar despejadas
-  const OPEN: [number, number, number][] = [[0, 0, 7], [6, 12, 7], [-7, -6, 4]];
+  const OPEN: [number, number, number][] = [[0, 0, 7], [6, 12, 7], [-7, -6, 4], ...RESERVED]; // + parcelas, cofre, boca de la cueva y vallas
   const open = (x: number, z: number) => OPEN.some(([ox, oz, r]) => Math.hypot(x - ox, z - oz) < r);
   const pickBiome = (x: number, z: number): Biome | 'core' => {
     biomeWeights(x, z, w);
@@ -346,11 +346,14 @@ function undergrowth(props: Prop[], obstacles: Obstacle[]): Spot[] {
     }
   }
   // junto a la cueva y al barco varado (antes había helechos rígidos sin viento)
-  for (const [a, f] of [[2.15, 0.84], [1.38, 0.9]]) {
+  const caveA = Math.atan2(CAVE.z, CAVE.x), caveF = Math.hypot(CAVE.x, CAVE.z) / islandRadius(caveA) + 0.02;
+  for (const [a, f] of [[caveA, caveF], [1.38, 0.9]]) {
     for (let i = 0; i < 26; i++) {
       const aa = a + (rand() - 0.5) * 0.6, rr = f + (rand() - 0.5) * 0.14;
       const [x, z] = polar(aa, rr);
       if (obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 0.3)) continue;
+      const [cs, cv] = caveLocal(x, z);
+      if (cs > -3 && cs < CAVE.notch + 1 && Math.abs(cv) < CAVE.w + 0.8) continue; // la entrada queda libre
       const [kit, sc] = KITS[Math.floor(rand() * 3)];
       add(kit, x, z, sc * (0.8 + rand() * 0.5));
     }

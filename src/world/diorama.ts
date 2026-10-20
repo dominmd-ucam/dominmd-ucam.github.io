@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { heightAt, islandRadius } from './terrain';
+import { heightAt, islandRadius, CAVE } from './terrain';
 import type { Obstacle } from './props';
 import { waveHeight } from './water';
 import { batchStatic } from './batch';
@@ -104,12 +104,10 @@ export function buildDiorama(scene: THREE.Object3D): Diorama {
 
   /* ---------- formación de roca con cueva, enredaderas y nido ---------- */
   {
-    const a = 2.15, r = islandRadius(a) * 0.86;
-    const cx = Math.cos(a) * r, cz = Math.sin(a) * r;
-    const g = new THREE.Group(); g.position.set(cx, heightAt(cx, cz) - 0.3, cz); g.rotation.y = Math.PI / 2 - a + 0.2; // la boca de la cueva mira al mar
-    // fondo oscuro de la cueva
-    add(g, new THREE.BoxGeometry(3.6, 3.2, 0.3), new THREE.MeshBasicMaterial({ color: '#1b1622' }), 0, 1.6, -1.4);
-    const pillars: [number, number, number, number][] = [[-2.7, 0, 0, 2.3], [2.7, 0, 0, 2.2], [-1.5, 0, -2.3, 2.0], [1.7, 0, -2.2, 2.2]];
+    // marco de roca de la entrada a la cueva (el túnel y la sala los pone zones.ts); la boca mira al mar
+    const cx = CAVE.x, cz = CAVE.z;
+    const g = new THREE.Group(); g.position.set(cx, heightAt(cx, cz) - 0.3, cz); g.rotation.y = Math.atan2(-CAVE.dx, -CAVE.dz);
+    const pillars: [number, number, number, number][] = [[-3.3, 0, 0.2, 2.1], [3.3, 0, 0.2, 2.0]];
     for (const [px, py, pz, pr] of pillars) add(g, rock(pr, px * 3 + pz, 1.5), px < 0 ? GREY : GREY_D, px, py + 1.7, pz);
     add(g, rock(2.9, 5, 0.65), GREY, 0, 4.0, -1.3).scale.x = 1.6;               // techo
     add(g, rock(1.7, 11, 1.2), GREY_D, -1.2, 5.3, -2.0);
@@ -125,11 +123,11 @@ export function buildDiorama(scene: THREE.Object3D): Diorama {
 
     // enredaderas: cadenas de hojas colgando de la roca
     const leafGeo = new THREE.IcosahedronGeometry(0.15, 0); leafGeo.scale(1.4, 0.8, 1);
-    const anchors = [[-2.7, 3.7, 2.2], [2.6, 3.5, 2.1], [-1.2, 4.2, 0.8], [1.0, 4.2, 0.9], [-3.4, 2.6, 1.1], [3.3, 2.7, 1.0], [0, 4.4, 0.5], [-0.6, 3.3, 2.4], [1.8, 3.2, 2.3]];
+    const anchors = [[-3.2, 3.7, 1.6], [3.1, 3.5, 1.5], [-3.9, 2.6, 0.9], [3.8, 2.7, 0.8], [-2.4, 4.3, 0.2], [2.3, 4.2, 0.3]]; // a los lados: la boca queda despejada
     const leaves: THREE.Vector3[] = [];
     for (const [ax, ay, az] of anchors) {
-      for (let c = 0; c < 9; c++) {
-        const ox = ax + (Math.random() - 0.5) * 1.8, oz = az + (Math.random() - 0.5) * 0.6, len = 3 + Math.floor(Math.random() * 7);
+      for (let c = 0; c < 7; c++) {
+        const ox = ax + (Math.random() - 0.5) * 1.2, oz = az + (Math.random() - 0.5) * 0.6, len = 3 + Math.floor(Math.random() * 7);
         for (let k = 0; k < len; k++) leaves.push(new THREE.Vector3(ox + (Math.random() - 0.5) * 0.15, ay - k * 0.32, oz));
       }
     }
@@ -154,7 +152,7 @@ export function buildDiorama(scene: THREE.Object3D): Diorama {
     ticks.push((t) => { uTime.value = t; });
 
     // espada en la piedra, junto a la cueva
-    const sa = a - 0.2, sr = islandRadius(sa) * 0.82, sx = Math.cos(sa) * sr, sz = Math.sin(sa) * sr;
+    const sx = cx - CAVE.dz * 5.5 - CAVE.dx * 2, sz = cz + CAVE.dx * 5.5 - CAVE.dz * 2; // a un lado de la boca
     const s = new THREE.Group(); s.position.set(sx, heightAt(sx, sz), sz);
     add(s, rock(0.7, 4, 0.7), GREY_D, 0, 0.3, 0);
     const steel = new THREE.MeshStandardMaterial({ userData: { unique: true }, color: '#cfe3f5', metalness: 0.8, roughness: 0.25, emissive: '#5aa9ff', emissiveIntensity: 0.35 });
