@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { loadGLTF } from '../assets/loader';
 import type { Tier } from '../quality';
-import { BIOMES, CLEARINGS, ISLAND_R, STONE_PATHS, biomeWeights, heightAt, pathDist, polar, type Biome } from './terrain';
+import { BIOMES, CAVE, CLEARINGS, ISLAND_R, RESERVED, STONE_PATHS, biomeWeights, caveLocal, heightAt, islandRadius, pathDist, polar, type Biome } from './terrain';
 import type { Obstacle } from './props';
 
 /*
@@ -38,17 +38,17 @@ const FLORA: Record<Biome | 'core', {
     under: [['Rock_Medium_1', 0.9, 1.2], ['Rock_Medium_2', 1, 1.2], ['Rock_Medium_3', 0.8, 1], ['Pebble_Round_1', 1.6, 2], ['Pebble_Round_2', 1.6, 2], ['Plant_7', 1.2, 1.4], ['Bush_Common', 0.8, 0.5]], underDensity: 0.22 },
   pine: { trees: ['Pine_1', 'Pine_2', 'Pine_3', 'Pine_4', 'Pine_5'], treeScale: [0.75, 1.05], density: 0.9, gap: 3.2,
     under: [['Fern_1', 0.5, 2], ['Rock_Medium_3', 0.6, 1.2], ['Rock_Medium_2', 0.5, 1], ['Mushroom_Common', 1, 1], ['Pebble_Round_3', 1.4, 1.5]], underDensity: 0.22 },
-  meadow: { trees: ['CommonTree_5', 'CommonTree_3'], treeScale: [0.75, 0.95], density: 0.04, gap: 8,
-    under: [['Flower_3_Group', 0.38, 3], ['Flower_4_Group', 0.34, 3], ['Bush_Common_Flowers', 0.9, 2], ['Clover_1', 0.45, 2], ['Plant_1', 0.6, 1]], underDensity: 0.45 },
-  core: { trees: ['CommonTree_2', 'CommonTree_5'], treeScale: [0.8, 0.95], density: 0.025, gap: 8,
-    under: [['Flower_3_Group', 0.34, 2], ['Flower_4_Group', 0.3, 2], ['Bush_Common_Flowers', 0.8, 1], ['Bush_Common', 0.8, 1], ['Clover_1', 0.4, 1.5]], underDensity: 0.1 },
+  meadow: { trees: ['CommonTree_5', 'CommonTree_3'], treeScale: [0.75, 0.95], density: 0.08, gap: 7,
+    under: [['Flower_3_Group', 0.24, 3], ['Flower_4_Group', 0.21, 3], ['Bush_Common_Flowers', 0.9, 2], ['Clover_1', 0.45, 2], ['Plant_1', 0.6, 1]], underDensity: 0.45 },
+  core: { trees: ['CommonTree_2', 'CommonTree_5'], treeScale: [0.8, 0.95], density: 0.045, gap: 8,
+    under: [['Flower_3_Group', 0.22, 2], ['Flower_4_Group', 0.19, 2], ['Bush_Common_Flowers', 0.8, 1], ['Bush_Common', 0.8, 1], ['Clover_1', 0.4, 1.5]], underDensity: 0.1 },
 };
 
-/** Radio del obstáculo por modelo (a escala 1). Lo que no aparece se atraviesa (flores, helechos, setas…). */
+/** Radio del obstáculo por modelo (a escala 1). Lo que no aparece se atraviesa (arbustos, flores, helechos, setas…): las plantas se apartan al pasar. */
 const SOLID: Partial<Record<Kit, number>> = {
   CommonTree_1: 0.55, CommonTree_2: 0.55, CommonTree_3: 0.55, CommonTree_4: 0.55, CommonTree_5: 0.55,
   Pine_1: 0.6, Pine_2: 0.6, Pine_3: 0.6, Pine_4: 0.6, Pine_5: 0.6, TwistedTree_1: 1.4, TwistedTree_2: 1.4, TwistedTree_3: 1.4,
-  DeadTree_1: 0.7, DeadTree_2: 0.7, Rock_Medium_1: 1.3, Rock_Medium_2: 1.2, Rock_Medium_3: 1.2, Bush_Common: 0.7, Bush_Common_Flowers: 0.7,
+  DeadTree_1: 0.7, DeadTree_2: 0.7, Rock_Medium_1: 1.3, Rock_Medium_2: 1.2, Rock_Medium_3: 1.2,
 };
 /** Copa de cada árbol (a escala 1): altura de la base y radio, para que la cámara no se meta dentro. */
 const CANOPY: Partial<Record<Kit, [number, number, number]>> = {};
@@ -58,6 +58,7 @@ for (const k of ['TwistedTree_1', 'TwistedTree_2', 'TwistedTree_3'] as Kit[]) CA
 
 const PATH_TILES: Kit[] = ['RockPath_Round_Small_1', 'RockPath_Round_Small_2', 'RockPath_Round_Small_3', 'RockPath_Round_Thin', 'RockPath_Round_Small_2', 'RockPath_Round_Wide'];
 
+const FAR_SMALL = 45;
 function rng(seed: number) { return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296); }
 const lerp = THREE.MathUtils.lerp;
 
@@ -78,7 +79,7 @@ function plan(obstacles: Obstacle[], tier: Tier) {
   const up = new THREE.Vector3(0, 1, 0), n = new THREE.Vector3();
   const blocked = (x: number, z: number, pad: number) => obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + pad);
   // plaza, punto de inicio y explanadas que deben quedar despejadas
-  const OPEN: [number, number, number][] = [[0, 0, 7], [6, 12, 7], [-7, -6, 4]];
+  const OPEN: [number, number, number][] = [[0, 0, 7], [6, 12, 7], [-7, -6, 4], ...RESERVED]; // + parcelas, cofre, boca de la cueva y vallas
   const open = (x: number, z: number) => OPEN.some(([ox, oz, r]) => Math.hypot(x - ox, z - oz) < r);
   const pickBiome = (x: number, z: number): Biome | 'core' => {
     biomeWeights(x, z, w);
@@ -93,7 +94,7 @@ function plan(obstacles: Obstacle[], tier: Tier) {
   const tStep = 2.0;
   for (let gz = -ext; gz < ext; gz += tStep) for (let gx = -ext; gx < ext; gx += tStep) {
     const x = gx + (rand() - 0.5) * tStep, z = gz + (rand() - 0.5) * tStep, h = heightAt(x, z);
-    if (h < 1.25 || h > 6.2 || open(x, z)) continue;
+    if (h < 1.25 || h > 12 || open(x, z)) continue;
     if (groundNormal(x, z, n).y < 0.82) continue;
     if (pathDist(x, z) < 2.3) continue;
     // claros: dentro, nada; en el borde, una pared de árboles
@@ -140,11 +141,11 @@ function plan(obstacles: Obstacle[], tier: Tier) {
   const uStep = 1.7;
   for (let gz = -ext; gz < ext; gz += uStep) for (let gx = -ext; gx < ext; gx += uStep) {
     const x = gx + (rand() - 0.5) * uStep, z = gz + (rand() - 0.5) * uStep, h = heightAt(x, z);
-    if (h < 1.15 || h > 6.5 || open(x, z) || pathDist(x, z) < 1.2) continue;
+    if (h < 1.15 || h > 12 || open(x, z) || pathDist(x, z) < 1.2) continue;
     const b = pickBiome(x, z), f = FLORA[b];
     // junto a los claros crece más (setas y helechos alrededor del tocón)
     const nearClear = CLEARINGS.some((c) => Math.abs(Math.hypot(x - c.x, z - c.z) - c.r) < 2.5);
-    if (rand() > f.underDensity * amount * (nearClear ? 1.8 : 1)) continue;
+    if (rand() > f.underDensity * amount * 1.3 * (nearClear ? 1.8 : 1)) continue;
     let total = 0; for (const u of f.under) total += u[2];
     let r = rand() * total, pick = f.under[0];
     for (const u of f.under) { r -= u[2]; if (r < 0) { pick = u; break; } }
@@ -233,21 +234,35 @@ function roundNormals(g: THREE.BufferGeometry) {
   }
 }
 
-/** Viento en hojas y flores (la fase sale de la posición de cada instancia) y alfa 0 para que el contorno no las recorra. */
-function patchFoliage(m: THREE.MeshStandardMaterial, uTime: { value: number }, uAlpha: { value: number }, amp: number, tint?: THREE.Color) {
+/**
+ * Viento en hojas y flores (la fase sale de la posición de cada instancia), alfa 0 para que el contorno no las recorra,
+ * y las plantas bajas (lo que queda por debajo de 1,6 m sobre su base: arbustos, helechos, flores) se apartan al paso del personaje, como la hierba.
+ */
+function patchFoliage(m: THREE.MeshStandardMaterial, uTime: { value: number }, uAlpha: { value: number }, uPlayer: { value: THREE.Vector3 }, amp: number, tint?: THREE.Color) {
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uTime = uTime; sh.uniforms.uAlpha = uAlpha; sh.uniforms.uTint = { value: tint ?? new THREE.Color(1, 1, 1) };
+    sh.uniforms.uTime = uTime; sh.uniforms.uAlpha = uAlpha; sh.uniforms.uPlayer = uPlayer; sh.uniforms.uTint = { value: tint ?? new THREE.Color(1, 1, 1) };
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;')
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uPlayer;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         #ifdef USE_BATCHING
           vec3 ip = batchingMatrix[3].xyz;
+          mat3 instRot = mat3(batchingMatrix);
         #else
           vec3 ip = vec3(0.0);
+          mat3 instRot = mat3(1.0);
         #endif
         float bend = max(position.y, 0.0) * ${amp.toFixed(3)};
         transformed.x += sin(uTime * 1.1 + ip.x * 0.6 + ip.z * 0.4 + position.y * 0.5) * bend;
-        transformed.z += cos(uTime * 0.8 + ip.z * 0.5 + position.x * 0.7) * bend * 0.7;`);
+        transformed.z += cos(uTime * 0.8 + ip.z * 0.5 + position.x * 0.7) * bend * 0.7;
+        // empuje: en el mundo, desde el personaje hacia fuera; más fuerte arriba y nulo en la raíz y por encima de 1,6 m
+        vec3 wp = ip + instRot * transformed;
+        vec2 dp = wp.xz - uPlayer.xz;
+        float dist = length(dp);
+        float hy = wp.y - ip.y;
+        float push = (1.0 - smoothstep(0.25, 1.1, dist)) * smoothstep(0.0, 0.5, hy) * (1.0 - smoothstep(1.2, 1.6, hy)) * step(abs(uPlayer.y - ip.y), 1.5);
+        vec2 off = dp / max(dist, 0.001) * push * 0.55;
+        vec3 w = vec3(off.x, -push * 0.15, off.y);
+        transformed += vec3(dot(instRot[0], w) / dot(instRot[0], instRot[0]), dot(instRot[1], w) / dot(instRot[1], instRot[1]), dot(instRot[2], w) / dot(instRot[2], instRot[2]));`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform float uAlpha;\nuniform vec3 uTint;')
       .replace('#include <opaque_fragment>', '#include <opaque_fragment>\ngl_FragColor.a = uAlpha;');
@@ -258,32 +273,119 @@ function patchFoliage(m: THREE.MeshStandardMaterial, uTime: { value: number }, u
   m.customProgramCacheKey = () => `foliage${amp}${tint ? 't' : ''}`;
 }
 
+/** Un modelo de Sketchfab ya colocado: centro, altura de apoyo, giro (su eje largo apunta a (sin rot, cos rot)) e inclinación a lo largo de ese eje. */
+interface Prop { name: string; size: number; long: boolean; x: number; y: number; z: number; rot: number; tilt: number }
+
+/**
+ * Coloca los modelos de Sketchfab en el borde de los claros, donde más lejos queden de los caminos (antes estaban en el centro,
+ * justo encima del camino). El tronco caído va tangente al claro. Se apoyan por el punto más bajo de su huella (o se inclinan
+ * siguiendo la pendiente, el tronco) para que no quede ningún extremo flotando.
+ */
+function placeProps(obstacles: Obstacle[]): Prop[] {
+  const [forest, mystic] = CLEARINGS;
+  const want: [string, number, boolean, typeof forest][] = [
+    // nombre, tamaño (m), alargado, claro
+    ['fallen-tree', 7.5, true, forest],
+    ['mossy-stump', 2.6, false, forest],
+    ['tree-stump', 3, false, mystic],
+  ];
+  const out: Prop[] = [];
+  for (const [name, size, long, c] of want) {
+    let best: Prop | null = null, bestScore = -1;
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 18) {
+      for (const f of long ? [0.85, 1.0, 1.15] : [0.55, 0.7, 0.85]) {
+        const x = c.x + Math.cos(a) * c.r * f, z = c.z + Math.sin(a) * c.r * f;
+        const rot = long ? -a : a;
+        const ax = Math.sin(rot), az = Math.cos(rot), half = long ? size / 2 : size * 0.4;
+        let score = 99, lo = 99, h0 = 0, h1 = 0;
+        for (let t = -half; t <= half + 1e-6; t += half / 4) {
+          const px = x + ax * t, pz = z + az * t;
+          score = Math.min(score, pathDist(px, pz));
+          lo = Math.min(lo, heightAt(px, pz));
+          if (t === -half) h0 = heightAt(px, pz);
+          h1 = heightAt(px, pz);
+        }
+        if (lo < 1.25) continue;
+        if (out.some((o) => Math.hypot(o.x - x, o.z - z) < (o.size + size) * 0.45)) continue;
+        if (score > bestScore) {
+          bestScore = score;
+          best = long
+            ? { name, size, long, x, z, rot, y: (h0 + h1) / 2 - 0.12, tilt: -Math.atan2(h1 - h0, size) }
+            : { name, size, long, x, z, rot, y: lo - 0.06, tilt: 0 };
+        }
+      }
+    }
+    if (!best) continue;
+    out.push(best);
+    if (long) for (const k of [-2.4, 0, 2.4]) obstacles.push({ x: best.x + Math.sin(best.rot) * k, z: best.z + Math.cos(best.rot) * k, r: 0.7 });
+    else obstacles.push({ x: best.x, z: best.z, r: size * 0.36 });
+  }
+  return out;
+}
+
+/** Helechos, setas y plantas alrededor de la base de los modelos de Sketchfab y junto a la cueva y el barco (tapan el contacto con el suelo). */
+function undergrowth(props: Prop[], obstacles: Obstacle[]): Spot[] {
+  const rand = rng(777), out: Spot[] = [], up = new THREE.Vector3(0, 1, 0), n = new THREE.Vector3();
+  const add = (kit: Kit, x: number, z: number, s: number) => {
+    const h = heightAt(x, z);
+    if (h < 1.1 || pathDist(x, z) < 1.1) return;
+    out.push({ kit, x, y: h - 0.03, z, rot: rand() * 6.28, s, tilt: new THREE.Quaternion().setFromUnitVectors(up, groundNormal(x, z, n).lerp(up, 0.5).normalize()) });
+  };
+  const KITS: [Kit, number][] = [['Fern_1', 0.5], ['Fern_1', 0.42], ['Plant_1', 0.6], ['Mushroom_Common', 0.9], ['Plant_7', 1.1]];
+  for (const p of props) {
+    const k = p.long ? 9 : 6;
+    for (let i = 0; i < k; i++) {
+      const [kit, sc] = KITS[Math.floor(rand() * KITS.length)];
+      if (p.long) {
+        const t = (rand() - 0.5) * p.size * 0.9, side = (rand() < 0.5 ? -1 : 1) * (0.55 + rand() * 0.5);
+        add(kit, p.x + Math.sin(p.rot) * t + Math.cos(p.rot) * side, p.z + Math.cos(p.rot) * t - Math.sin(p.rot) * side, sc * (0.8 + rand() * 0.4));
+      } else {
+        const a = rand() * 6.28, r = p.size * (0.38 + rand() * 0.2);
+        add(kit, p.x + Math.cos(a) * r, p.z + Math.sin(a) * r, sc * (0.8 + rand() * 0.4));
+      }
+    }
+  }
+  // junto a la cueva y al barco varado (antes había helechos rígidos sin viento)
+  const caveA = Math.atan2(CAVE.z, CAVE.x), caveF = Math.hypot(CAVE.x, CAVE.z) / islandRadius(caveA) + 0.02;
+  for (const [a, f] of [[caveA, caveF], [1.38, 0.9]]) {
+    for (let i = 0; i < 26; i++) {
+      const aa = a + (rand() - 0.5) * 0.6, rr = f + (rand() - 0.5) * 0.14;
+      const [x, z] = polar(aa, rr);
+      if (obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + 0.3)) continue;
+      const [cs, cv] = caveLocal(x, z);
+      if (cs > -3 && cs < CAVE.notch + 1 && Math.abs(cv) < CAVE.w + 0.8) continue; // la entrada queda libre
+      const [kit, sc] = KITS[Math.floor(rand() * 3)];
+      add(kit, x, z, sc * (0.8 + rand() * 0.5));
+    }
+  }
+  return out;
+}
+
 export interface Nature {
-  update(t: number): void;
+  /** `player`: posición del personaje, para que las plantas se aparten a su paso */
+  update(t: number, player?: THREE.Vector3): void;
   /** ¿está el punto (la cámara) dentro de alguna copa? */
   blocks(p: THREE.Vector3): boolean;
   setInkMask(on: boolean): void;
   ready: Promise<void>;
+  /** dónde quedaron los modelos de Sketchfab (para depurar) */
+  props: readonly Prop[];
 }
 
 export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tier): Nature {
+  // los modelos de Sketchfab van antes que los árboles (así no se plantan encima) y fuera de los caminos
+  const props = placeProps(obstacles);
   const { spots, trees } = plan(obstacles, tier);
-  const uTime = { value: 0 }, uAlpha = { value: 1 };
+  spots.push(...undergrowth(props, obstacles));
+  const uTime = { value: 0 }, uAlpha = { value: 1 }, uPlayer = { value: new THREE.Vector3(0, -99, 0) };
   const floats: { o: THREE.Object3D; y: number; ph: number }[] = [];
   /** copa real de cada modelo (de las hojas): centro en xz, radio y alturas; sustituye a CANOPY cuando llegan los modelos */
   const crowns = new Map<Kit, { x: number; z: number; r: number; y0: number; y1: number }>();
-
-  // los modelos de Sketchfab: posiciones fijas dentro de los claros y una isla flotante sobre el mar
-  const [forest, mystic] = CLEARINGS;
-  const props: [string, number, number, number, number, number][] = [
-    // nombre, tamaño (m), x, z, giro, radio del obstáculo
-    ['fallen-tree', 7.5, forest.x + 1.2, forest.z - 1.5, 0.6, 0],
-    ['mossy-stump', 2.6, forest.x - 2.6, forest.z + 2.2, 1.2, 0.9],
-    ['tree-stump', 3, mystic.x, mystic.z, 0.4, 1.1],
-  ];
-  // el tronco caído se rodea con tres círculos a lo largo
-  for (const k of [-2.4, 0, 2.4]) obstacles.push({ x: forest.x + 1.2 + Math.sin(0.6) * k, z: forest.z - 1.5 + Math.cos(0.6) * k, r: 0.8 });
-  for (const [, , x, z, , r] of props) if (r) obstacles.push({ x, z, r });
+  /** plantas pequeñas que se ocultan lejos del jugador (con la isla de 70 m serían miles de instancias diminutas) */
+  const small: { bm: THREE.BatchedMesh; id: number; x: number; z: number }[] = [];
+  const treeSet = new Set<Spot>(trees);
+  const isSmall = (sp: Spot) => !treeSet.has(sp) && !/^Rock(_|Path)/.test(sp.kit);
+  let frame = 0;
 
   const ready = (async () => {
     const gltf = await loadGLTF(`${BASE}megakit.glb`);
@@ -317,7 +419,7 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
       if (/Rock/.test(name)) mat.color.setRGB(1.45, 1.38, 1.25);
       if (/DeadTree/.test(name)) mat.color.setRGB(1.7, 1.55, 1.4);
       const foliage = /Lea|Flower/.test(name);
-      if (foliage) { mat.side = THREE.DoubleSide; mat.alphaTest = Math.max(mat.alphaTest, 0.45); patchFoliage(mat, uTime, uAlpha, /Flower/.test(name) ? 0.05 : /Pine/.test(name) ? 0.012 : 0.02, /Twisted/.test(name) ? new THREE.Color('#2f8a55') : undefined); }
+      if (foliage) { mat.side = THREE.DoubleSide; mat.alphaTest = Math.max(mat.alphaTest, 0.45); patchFoliage(mat, uTime, uAlpha, uPlayer, /Flower/.test(name) ? 0.05 : /Pine/.test(name) ? 0.012 : 0.02, /Twisted/.test(name) ? new THREE.Color('#2f8a55') : undefined); }
       const bm = new THREE.BatchedMesh(e.count, e.verts, e.idx, mat);
       for (const kit of e.geos.keys()) e.geos.set(kit, bm.addGeometry(parts.get(kit)!.get(name)!));
       for (const sp of spots) {
@@ -326,7 +428,9 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
         qy.setFromAxisAngle(up, sp.rot);
         q.copy(sp.tilt ?? q.identity()).multiply(qy);
         m4.compose(pos.set(sp.x, sp.y, sp.z), q, scl.setScalar(sp.s));
-        bm.setMatrixAt(bm.addInstance(gid), m4);
+        const id = bm.addInstance(gid);
+        bm.setMatrixAt(id, m4);
+        if (isSmall(sp)) small.push({ bm, id, x: sp.x, z: sp.z });
       }
       // las losas, guijarros y flores no proyectan sombra (no se notaría y la pasada de sombras es cara)
       bm.castShadow = tier !== 'low' && !/PathRocks|Flower/.test(name) && !(/^Leaves$/.test(name));
@@ -336,10 +440,10 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
     }
 
     // Sketchfab
-    for (const [name, size, x, z, rot] of props) {
-      const g = await sketchfab(name, size, tier);
+    for (const pr of props) {
+      const g = await sketchfab(pr.name, pr.size, tier);
       if (!g) continue;
-      g.position.set(x, heightAt(x, z) - 0.12, z); g.rotation.y = rot;
+      g.position.set(pr.x, pr.y, pr.z); g.rotation.set(pr.tilt, pr.rot, 0, 'YXZ');
       scene.add(g);
     }
     if (tier !== 'low') {
@@ -356,8 +460,13 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
 
   return {
     ready,
-    update: (t) => {
+    props,
+    update: (t, player) => {
       uTime.value = t;
+      if (player) {
+        uPlayer.value.copy(player);
+        if (frame++ % 30 === 0) for (const p of small) p.bm.setVisibleAt(p.id, Math.hypot(p.x - player.x, p.z - player.z) < FAR_SMALL);
+      }
       for (const f of floats) { f.o.position.y = f.y + Math.sin(t * 0.35 + f.ph) * 0.6; f.o.rotation.y += 0.0004; }
     },
     setInkMask: (on) => { uAlpha.value = on ? 0 : 1; },

@@ -1,6 +1,5 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { heightAt, islandRadius } from './terrain';
+import { heightAt, islandRadius, CAVE } from './terrain';
 import type { Obstacle } from './props';
 import { waveHeight } from './water';
 import { batchStatic } from './batch';
@@ -18,27 +17,71 @@ function add(parent: THREE.Object3D, geo: THREE.BufferGeometry, m: THREE.Materia
 const rock = (r: number, seed: number, sy = 1) => stoneGeometry(r, seed, sy);
 const world = (g: THREE.Object3D, lx: number, lz: number) => { g.updateMatrixWorld(true); const v = g.localToWorld(new THREE.Vector3(lx, 0, lz)); return { x: v.x, z: v.z }; };
 
-/* ---------- casco del barco varado ---------- */
-const L = 9.5, BEAM = 1.9, DEPTH = 1.5, S_MIN = -0.5;
-const widthAt = (s: number) => (s > 0 ? Math.pow(1 - Math.pow(s, 2.2), 0.6) : 1 - Math.pow(-s, 6) * 0.15);
-const liftAt = (s: number) => 1.5 * Math.pow(Math.abs(s), 3) * (s > 0 ? 1 : 0.5);
-
+/* ---------- casco del barco varado ----------
+   Velero mercante de 12 m tumbado en la arena. El casco se genera por secciones: s recorre la eslora (−1 popa, 1 proa) y
+   φ la sección de una borda a la otra pasando por la quilla. Tablas por franjas (tracas), cinta oscura arriba, algas abajo
+   y un boquete en el costado de estribor que deja ver las cuadernas. */
+const L = 12, BEAM = 2.3, DEPTH = 2.0;
+const widthAt = (s: number) => (s > 0 ? Math.pow(Math.max(0, 1 - Math.pow(s, 2.4)), 0.55) : 1 - Math.pow(-s, 5) * 0.25);
+const sheerAt = (s: number) => 0.9 * Math.pow(Math.abs(s), 2.5) * (s > 0 ? 1 : 0.7); // la borda sube hacia proa y popa
+const depthAt = (s: number) => DEPTH * (s > 0 ? 1 - Math.pow(s, 3) * 0.55 : 1 - Math.pow(-s, 4) * 0.3);
+/** ¿cae en el boquete? (borde irregular) */
+const inHole = (s: number, f: number) => {
+  const j = Math.sin(s * 37.1) * 0.04 + Math.sin(f * 23.3) * 0.05;
+  return s > -0.32 + j && s < 0.12 + j && f > 0.62 + j && f < 0.9 - j;
+};
+function hullPoint(s: number, f: number, out: THREE.Vector3) {
+  const phi = f * Math.PI, w = Math.max(widthAt(s), 0.015);
+  return out.set(s * L / 2, sheerAt(s) - Math.pow(Math.sin(phi), 0.75) * depthAt(s), -Math.cos(phi) * BEAM * w);
+}
 function hullGeometry(): THREE.BufferGeometry {
-  const g = new THREE.CylinderGeometry(1, 1, 1, 18, 14, true, Math.PI, Math.PI);
-  const pos = g.attributes.position as THREE.BufferAttribute;
-  const col = new Float32Array(pos.count * 3);
-  const a = new THREE.Color('#b5603a'), b = new THREE.Color('#9a4a2c');
-  for (let i = 0; i < pos.count; i++) {
-    const px = pos.getX(i), py = pos.getY(i), pz = pos.getZ(i);
-    const s = THREE.MathUtils.lerp(S_MIN, 1, py + 0.5); // posición a lo largo del barco
-    const w = Math.max(widthAt(s), 0.02);
-    pos.setXYZ(i, s * (L / 2), px * DEPTH * Math.pow(w, 0.6) + liftAt(s), pz * BEAM * w);
-    const ring = Math.round((Math.atan2(px, pz) + Math.PI) / (Math.PI / 18));
-    (ring % 2 ? a : b).toArray(col, i * 3);
+  const NS = 34, NF = 18, pos: number[] = [], col: number[] = [], v = new THREE.Vector3(), c = new THREE.Color();
+  const planks = [new THREE.Color('#c08a58'), new THREE.Color('#a87448')], wale = new THREE.Color('#6a4128'), algae = new THREE.Color('#5f8a4a');
+  const quad = (i: number, k: number) => {
+    const s0 = -1 + (2 * i) / NS, s1 = -1 + (2 * (i + 1)) / NS, f0 = k / NF, f1 = (k + 1) / NF;
+    if (inHole((s0 + s1) / 2, (f0 + f1) / 2)) return;
+    const base = planks[k % 2], f = (f0 + f1) / 2;
+    c.copy(base).multiplyScalar(0.92 + 0.16 * ((Math.sin(i * 12.9 + k * 7.3) + 1) / 2)); // tablas de tono distinto
+    if (k === 1 || k === NF - 2) c.copy(wale);
+    c.lerp(algae, THREE.MathUtils.smoothstep(Math.sin(f * Math.PI), 0.9, 1) * 0.7);
+    for (const [ss, ff] of [[s0, f0], [s1, f0], [s1, f1], [s0, f0], [s1, f1], [s0, f1]]) {
+      hullPoint(ss, ff, v); pos.push(v.x, v.y, v.z); col.push(c.r, c.g, c.b);
+    }
+  };
+  for (let i = 0; i < NS; i++) for (let k = 0; k < NF; k++) quad(i, k);
+  // espejo de popa: cierra la sección de s = −1
+  const st = new THREE.Vector3(), sb = new THREE.Vector3(), cen = new THREE.Vector3(-L / 2, sheerAt(-1) - depthAt(-1) * 0.35, 0);
+  c.set('#7a4d32');
+  for (let k = 0; k < NF; k++) {
+    hullPoint(-1, k / NF, st); hullPoint(-1, (k + 1) / NF, sb);
+    for (const p of [cen, sb, st]) { pos.push(p.x, p.y, p.z); col.push(c.r, c.g, c.b); }
   }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.computeVertexNormals();
   return g;
+}
+
+/** Vela rasgada caída sobre la arena: una lona con pliegues y el borde comido. */
+function sailGeometry(): THREE.BufferGeometry {
+  const g = new THREE.PlaneGeometry(3.2, 2.6, 12, 10).toNonIndexed();
+  const p = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i);
+    p.setZ(i, Math.sin(x * 2.1) * 0.12 + Math.sin(y * 3.3 + x) * 0.08 + Math.max(0, x - 0.6) * 0.35);
+  }
+  // quita triángulos del borde para que parezca rota
+  const keep: number[] = [];
+  for (let t = 0; t < p.count / 3; t++) {
+    const cx = (p.getX(t * 3) + p.getX(t * 3 + 1) + p.getX(t * 3 + 2)) / 3, cy = (p.getY(t * 3) + p.getY(t * 3 + 1) + p.getY(t * 3 + 2)) / 3;
+    const ragged = cy < -0.9 + Math.abs(Math.sin(cx * 5.3)) * 0.5 || (cx > 1.1 && cy > 0.6 + Math.sin(cy * 9) * 0.2);
+    if (!ragged) for (let k = 0; k < 3; k++) keep.push(t * 3 + k);
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(keep.flatMap((i) => [p.getX(i), p.getY(i), p.getZ(i)]), 3));
+  out.computeVertexNormals();
+  return out;
 }
 
 export interface Diorama {
@@ -49,68 +92,88 @@ export interface Diorama {
 export function buildDiorama(scene: THREE.Object3D): Diorama {
   const obstacles: Obstacle[] = [];
   const ticks: ((t: number) => void)[] = [];
-  const WOOD = mat('#d08c5a'), WOOD_D = mat('#7d3d26'), WOOD_L = mat('#e0a572');
+  const WOOD = mat('#d08c5a'), WOOD_D = mat('#7d3d26');
   const GREY = stoneMaterial('#b3a08c'), GREY_D = stoneMaterial('#8f7d6e');
 
   /* ---------- barco varado ---------- */
   {
     const a = 1.38, r = islandRadius(a) * 0.93;
+    const sx = Math.cos(a) * r, sz = Math.sin(a) * r;
     const ship = new THREE.Group();
-    ship.position.set(Math.cos(a) * r, heightAt(Math.cos(a) * r, Math.sin(a) * r) + 0.7, Math.sin(a) * r);
-    ship.rotation.set(0.12, -a + 0.25, 0.1, 'YXZ'); // proa hacia el mar, escorado
-    const hull = new THREE.Mesh(hullGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.8 }));
+    ship.position.set(sx, heightAt(sx, sz) + 0.95, sz);
+    ship.rotation.set(-0.36, -a + 0.25, 0.06, 'YXZ'); // proa hacia el mar y tumbado sobre babor (el boquete de estribor queda a la vista)
+    const hull = new THREE.Mesh(hullGeometry(), new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.85, flatShading: true }));
     hull.castShadow = hull.receiveShadow = true;
     ship.add(hull);
-
-    // cubierta
-    for (let k = 0; k < 15; k++) {
-      const s = S_MIN + 0.04 + k * 0.095;
-      if (s > 0.95 || (k === 3 || k === 4)) continue; // huecos rotos
+    const WOOD_W = mat('#b88a5e'), TAR = mat('#4a2e1e'), v = new THREE.Vector3();
+    // cubierta de tablas con huecos
+    for (let k = 0; k < 22; k++) {
+      const s = -0.95 + k * 0.088;
+      if (s > 0.86 || k === 7 || k === 8 || k === 13) continue;
       const w = Math.max(widthAt(s), 0.05);
-      add(ship, new THREE.BoxGeometry(0.62, 0.08, 2 * BEAM * w * 0.93), k % 2 ? WOOD : WOOD_L, s * (L / 2), -0.15 + liftAt(s) * 0.8, 0);
+      add(ship, new THREE.BoxGeometry(L * 0.04, 0.07, 2 * BEAM * w * 0.94), k % 3 ? WOOD : WOOD_W, s * L / 2, sheerAt(s) - 0.18, 0);
     }
-    // costillas al aire en la popa rota
-    [-2.9, -3.5, -4.1].forEach((x, i) => {
-      const pivot = new THREE.Group(); pivot.position.set(x, 0.1, 0); pivot.rotation.y = Math.PI / 2;
-      const rib = add(pivot, new THREE.TorusGeometry(1, 0.07, 5, 12, Math.PI), WOOD_D);
-      rib.rotation.z = Math.PI; rib.scale.set(BEAM * (1 - i * 0.07), DEPTH * (1 - i * 0.12), 1);
-      ship.add(pivot);
-    });
-    // barandilla con huecos
-    for (let k = 0; k < 11; k++) {
-      const s = -0.4 + k * 0.13;
-      if (s > 0.9) break;
-      const w = widthAt(s);
-      for (const side of [-1, 1]) {
-        if (side === 1 && (k === 4 || k === 5)) continue;
-        add(ship, new THREE.CylinderGeometry(0.04, 0.05, 0.8, 5), WOOD_D, s * (L / 2), 0.35 + liftAt(s) + 0.45, side * BEAM * w * 0.97);
+    // cuadernas que asoman por el boquete
+    for (const s of [-0.26, -0.16, -0.06, 0.04]) {
+      for (let k = 0; k < 7; k++) {
+        const f0 = 0.5 + k * 0.065, f1 = f0 + 0.065;
+        const p0 = hullPoint(s, f0, new THREE.Vector3()), p1 = hullPoint(s, f1, v);
+        const seg = add(ship, new THREE.BoxGeometry(0.16, p0.distanceTo(p1) + 0.04, 0.16), WOOD_D, (p0.x + p1.x) / 2, (p0.y + p1.y) / 2, (p0.z + p1.z) / 2);
+        seg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p1.clone().sub(p0).normalize());
       }
     }
-    for (const side of [-1, 1]) {
-      const rail = add(ship, new THREE.BoxGeometry(L * 0.7, 0.07, 0.09), WOOD_D, L * 0.12, 1.2 + liftAt(0.2) * 0.6, side * BEAM * 0.95);
-      rail.rotation.z = 0.06;
-      if (side === 1) rail.scale.x = 0.55;
+    // borda: cinta y candeleros, con un tramo arrancado
+    for (const side of [-1, 1]) for (let k = 0; k < 16; k++) {
+      const s = -0.9 + k * 0.11;
+      if (side === 1 && (k === 6 || k === 7 || k === 8)) continue;
+      hullPoint(s, side < 0 ? 0.02 : 0.98, v);
+      add(ship, new THREE.CylinderGeometry(0.05, 0.06, 0.7, 5), WOOD_D, v.x, v.y + 0.3, v.z * 0.97);
     }
-    // palo roto con vela rasgada
-    const mast = add(ship, new THREE.CylinderGeometry(0.09, 0.14, 4.6, 7), WOOD_D, 0.4, 2.6, 0.2);
-    mast.rotation.z = -0.38; mast.rotation.x = 0.1;
-    const sail = add(ship, new THREE.PlaneGeometry(1.6, 1.3, 4, 3), mat('#efe0c0', { side: THREE.DoubleSide }), 0.1, 3.4, 0.55);
-    sail.rotation.y = 0.5; sail.rotation.z = -0.3;
-    // escalones a cubierta
-    for (let i = 0; i < 4; i++) add(ship, new THREE.BoxGeometry(0.5, 0.1, 1.1), WOOD_L, -2.2 + i * 0.5, 0.25 + i * 0.28, 0.9);
+    // quilla y roda (la proa sube en curva)
+    add(ship, new THREE.BoxGeometry(L * 0.9, 0.22, 0.2), TAR, 0.2, -depthAt(0) - 0.05, 0);
+    const stem = add(ship, new THREE.TorusGeometry(1.4, 0.11, 5, 8, Math.PI / 2), TAR, L / 2 - 1.3, sheerAt(1) - 0.9, 0);
+    stem.rotation.z = -0.15;
+    // palo mayor partido: el muñón en cubierta y el resto caído en la arena con la vela
+    add(ship, new THREE.CylinderGeometry(0.17, 0.2, 1.8, 8), WOOD_D, 0.6, sheerAt(0.1) + 0.6, 0);
+    add(ship, new THREE.ConeGeometry(0.2, 0.5, 6, 1, true), WOOD_W, 0.6, sheerAt(0.1) + 1.7, 0).rotation.z = Math.PI;
     batchStatic(ship);
     scene.add(ship);
-    for (const lx of [-2.5, -0.8, 0.9, 2.6, 4]) { const w = world(ship, lx, 0); obstacles.push({ x: w.x, z: w.z, r: 1.5 }); }
+    const side = new THREE.Vector3(Math.sin(-a + 0.25 + Math.PI / 2), 0, Math.cos(-a + 0.25 + Math.PI / 2));
+    const mx = sx - side.x * 4.2 + Math.cos(a) * 1.5, mz = sz - side.z * 4.2 + Math.sin(a) * 1.5;
+    const fallen = new THREE.Group(); fallen.position.set(mx, heightAt(mx, mz) + 0.12, mz); fallen.rotation.y = -a + 0.9;
+    add(fallen, new THREE.CylinderGeometry(0.13, 0.17, 6, 8), WOOD_D, 0, 0, 0).rotation.z = Math.PI / 2 - 0.05;
+    add(fallen, new THREE.CylinderGeometry(0.07, 0.07, 2.6, 6), WOOD_D, -1.2, 0.05, 0).rotation.x = Math.PI / 2; // verga
+    const sail = add(fallen, sailGeometry(), mat('#efe2c4', { side: THREE.DoubleSide, flatShading: false }), -1.3, 0.12, 1.1);
+    sail.rotation.x = -Math.PI / 2 + 0.08;
+    scene.add(fallen);
+    obstacles.push({ x: mx, z: mz, r: 0.5 });
+    // carga desperdigada: cajas y barriles medio hundidos
+    const crate = mat('#a8794c'), band = mat('#5a3a24');
+    const cargo: [number, number, number, boolean][] = [[-3.2, 2.6, 0.4, true], [-2.4, 3.4, 1.1, false], [2.8, 3.6, 0.2, true], [3.6, 2.2, 2.2, false], [-4.6, -1.2, 0.7, true]];
+    for (const [ox, oz, rot, isCrate] of cargo) {
+      const cx2 = sx + side.x * ox + Math.cos(a) * oz * 0.3, cz2 = sz + side.z * ox + Math.sin(a) * oz * 0.3;
+      const g = new THREE.Group(); g.position.set(cx2, heightAt(cx2, cz2) - 0.12, cz2); g.rotation.set(0.15 * Math.sin(rot * 3), rot, 0.2 * Math.cos(rot * 5));
+      if (isCrate) { add(g, new THREE.BoxGeometry(0.75, 0.75, 0.75), crate, 0, 0.37, 0); add(g, new THREE.BoxGeometry(0.78, 0.1, 0.78), band, 0, 0.6, 0); }
+      else { const b = add(g, new THREE.CylinderGeometry(0.34, 0.3, 0.85, 10), crate, 0, 0.3, 0); b.rotation.z = Math.PI / 2; for (const dx of [-0.25, 0.25]) add(g, new THREE.TorusGeometry(0.33, 0.035, 4, 12), band, dx, 0.3, 0).rotation.y = Math.PI / 2; }
+      scene.add(g);
+      obstacles.push({ x: cx2, z: cz2, r: 0.5 });
+    }
+    // montículo de arena contra el costado enterrado
+    const sand = new THREE.MeshStandardMaterial({ color: '#ecc985', roughness: 1 });
+    for (let k = 0; k < 6; k++) {
+      const lx = -4.5 + k * 1.8; const w = world(ship, lx, -BEAM * 0.7);
+      const m = add(scene, new THREE.SphereGeometry(1.5, 10, 6), sand, w.x, heightAt(w.x, w.z) - 0.85, w.z);
+      m.scale.set(1.3, 0.55, 1); m.castShadow = false;
+    }
+    for (const lx of [-4.6, -2.6, -0.6, 1.4, 3.4, 5]) { const w = world(ship, lx, 0); obstacles.push({ x: w.x, z: w.z, r: 1.8 }); }
   }
 
   /* ---------- formación de roca con cueva, enredaderas y nido ---------- */
   {
-    const a = 2.15, r = islandRadius(a) * 0.86;
-    const cx = Math.cos(a) * r, cz = Math.sin(a) * r;
-    const g = new THREE.Group(); g.position.set(cx, heightAt(cx, cz) - 0.3, cz); g.rotation.y = Math.PI / 2 - a + 0.2; // la boca de la cueva mira al mar
-    // fondo oscuro de la cueva
-    add(g, new THREE.BoxGeometry(3.6, 3.2, 0.3), new THREE.MeshBasicMaterial({ color: '#1b1622' }), 0, 1.6, -1.4);
-    const pillars: [number, number, number, number][] = [[-2.7, 0, 0, 2.3], [2.7, 0, 0, 2.2], [-1.5, 0, -2.3, 2.0], [1.7, 0, -2.2, 2.2]];
+    // marco de roca de la entrada a la cueva (el túnel y la sala los pone zones.ts); la boca mira al mar
+    const cx = CAVE.x, cz = CAVE.z;
+    const g = new THREE.Group(); g.position.set(cx, heightAt(cx, cz) - 0.3, cz); g.rotation.y = Math.atan2(-CAVE.dx, -CAVE.dz);
+    const pillars: [number, number, number, number][] = [[-3.3, 0, 0.2, 2.1], [3.3, 0, 0.2, 2.0]];
     for (const [px, py, pz, pr] of pillars) add(g, rock(pr, px * 3 + pz, 1.5), px < 0 ? GREY : GREY_D, px, py + 1.7, pz);
     add(g, rock(2.9, 5, 0.65), GREY, 0, 4.0, -1.3).scale.x = 1.6;               // techo
     add(g, rock(1.7, 11, 1.2), GREY_D, -1.2, 5.3, -2.0);
@@ -126,11 +189,11 @@ export function buildDiorama(scene: THREE.Object3D): Diorama {
 
     // enredaderas: cadenas de hojas colgando de la roca
     const leafGeo = new THREE.IcosahedronGeometry(0.15, 0); leafGeo.scale(1.4, 0.8, 1);
-    const anchors = [[-2.7, 3.7, 2.2], [2.6, 3.5, 2.1], [-1.2, 4.2, 0.8], [1.0, 4.2, 0.9], [-3.4, 2.6, 1.1], [3.3, 2.7, 1.0], [0, 4.4, 0.5], [-0.6, 3.3, 2.4], [1.8, 3.2, 2.3]];
+    const anchors = [[-3.2, 3.7, 1.6], [3.1, 3.5, 1.5], [-3.9, 2.6, 0.9], [3.8, 2.7, 0.8], [-2.4, 4.3, 0.2], [2.3, 4.2, 0.3]]; // a los lados: la boca queda despejada
     const leaves: THREE.Vector3[] = [];
     for (const [ax, ay, az] of anchors) {
-      for (let c = 0; c < 9; c++) {
-        const ox = ax + (Math.random() - 0.5) * 1.8, oz = az + (Math.random() - 0.5) * 0.6, len = 3 + Math.floor(Math.random() * 7);
+      for (let c = 0; c < 7; c++) {
+        const ox = ax + (Math.random() - 0.5) * 1.2, oz = az + (Math.random() - 0.5) * 0.6, len = 3 + Math.floor(Math.random() * 7);
         for (let k = 0; k < len; k++) leaves.push(new THREE.Vector3(ox + (Math.random() - 0.5) * 0.15, ay - k * 0.32, oz));
       }
     }
@@ -155,7 +218,7 @@ export function buildDiorama(scene: THREE.Object3D): Diorama {
     ticks.push((t) => { uTime.value = t; });
 
     // espada en la piedra, junto a la cueva
-    const sa = a - 0.2, sr = islandRadius(sa) * 0.82, sx = Math.cos(sa) * sr, sz = Math.sin(sa) * sr;
+    const sx = cx - CAVE.dz * 5.5 - CAVE.dx * 2, sz = cz + CAVE.dx * 5.5 - CAVE.dz * 2; // a un lado de la boca
     const s = new THREE.Group(); s.position.set(sx, heightAt(sx, sz), sz);
     add(s, rock(0.7, 4, 0.7), GREY_D, 0, 0.3, 0);
     const steel = new THREE.MeshStandardMaterial({ userData: { unique: true }, color: '#cfe3f5', metalness: 0.8, roughness: 0.25, emissive: '#5aa9ff', emissiveIntensity: 0.35 });
@@ -168,54 +231,7 @@ export function buildDiorama(scene: THREE.Object3D): Diorama {
     ticks.push((t) => { steel.emissiveIntensity = 0.5 + Math.sin(t * 2) * 0.3; });
   }
 
-  /* ---------- helechos y plantas tropicales ---------- */
-  {
-    const blades: THREE.BufferGeometry[] = [];
-    for (let i = 0; i < 8; i++) {
-      const b = new THREE.PlaneGeometry(0.26, 1.2, 1, 5);
-      const p = b.attributes.position as THREE.BufferAttribute;
-      const col = new Float32Array(p.count * 3), c = new THREE.Color();
-      for (let k = 0; k < p.count; k++) {
-        const u = p.getY(k) + 0.6;
-        const w = (1 - Math.abs(u / 1.2 - 0.45) * 1.4) * p.getX(k) * 2.4;
-        p.setXYZ(k, w, u * 0.7 - u * u * 0.32 + 0.02, u * 0.85);
-        c.set('#2d9e3f').lerp(c.clone().set('#8ee86a'), u / 1.2);
-        c.toArray(col, k * 3);
-      }
-      b.setAttribute('color', new THREE.BufferAttribute(col, 3));
-      b.rotateY((i / 8) * Math.PI * 2 + (i % 2) * 0.2);
-      b.rotateX(0);
-      blades.push(b);
-    }
-    const fernGeo = mergeGeometries(blades)!;
-    fernGeo.computeVertexNormals();
-    const ferns = new THREE.InstancedMesh(fernGeo, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.7, flatShading: true }), 180);
-    let n = 0, guard = 0;
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), tint = new THREE.Color();
-    const hot = [[2.15, 0.84], [1.38, 0.9]]; // cerca de la cueva y del barco
-    while (n < 180 && guard++ < 6000) {
-      let x: number, z: number;
-      if (n < 70) {
-        const [ha, hf] = hot[n % 2];
-        const aa = ha + (Math.random() - 0.5) * 0.6, rr = islandRadius(aa) * (hf + (Math.random() - 0.5) * 0.12);
-        x = Math.cos(aa) * rr; z = Math.sin(aa) * rr;
-      } else {
-        const aa = Math.random() * 6.28, rr = islandRadius(aa) * (0.7 + Math.random() * 0.22);
-        x = Math.cos(aa) * rr; z = Math.sin(aa) * rr;
-      }
-      const h = heightAt(x, z);
-      if (h < 0.7 || h > 3) continue;
-      q.setFromAxisAngle(up, Math.random() * 6.28);
-      m4.compose(new THREE.Vector3(x, h - 0.03, z), q, new THREE.Vector3().setScalar(0.42 + Math.random() * 0.45));
-      ferns.setMatrixAt(n, m4);
-      tint.setHSL(0.28 + Math.random() * 0.05, 0.6, 0.8 + Math.random() * 0.3);
-      ferns.setColorAt(n, tint);
-      n++;
-    }
-    ferns.count = n;
-    ferns.castShadow = true;
-    scene.add(ferns);
-  }
+  // los helechos de la cueva y el barco los pone nature.ts (con viento y se apartan al pasar)
 
   /* ---------- tablones flotando en la cala ---------- */
   {

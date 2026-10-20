@@ -13,7 +13,7 @@ export interface Settings {
   camera: number;
 }
 
-export const CAMERA_DIST = [6.5, 10, 15];
+export const CAMERA_DIST = [5.5, 8.5, 13];
 export const RESOLUTIONS: Resolution[] = ['auto', 'high', 'medium', 'low'];
 export const RESOLUTION_LABEL: Record<Resolution, string> = { auto: 'AUTO', high: 'ALTA', medium: 'MEDIA', low: 'BAJA' };
 

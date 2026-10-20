@@ -1,14 +1,14 @@
 import * as THREE from 'three';
-import { heightAt, onDock, DOCK } from './world/terrain';
+import { heightAt, onDock, DOCK, caveFloor, caveLocal, CAVE } from './world/terrain';
 import { waveHeight } from './world/water';
 import type { Obstacle } from './world/props';
 import type { Input } from './input';
 import type { Avatar, Motion } from './avatar/avatar';
 
-const SPEED = 6.5;
+const SPEED = 5.5;
 const MAX_DEPTH = -3.4;  // límite de profundidad a nado
 const SWIM_FROM = -0.55; // por debajo de esto, nada en vez de andar
-const LIMIT = 70;        // borde del mundo
+const LIMIT = 125;       // borde del mundo
 const SPRINT = 1.45;     // multiplicador de velocidad al esprintar
 const CROUCH = 0.38;     // y al ir agachado
 const JUMP_V = 7.2, GRAVITY = 22; // salto de ~1,2 m
@@ -49,10 +49,13 @@ export class Player {
     this.armL = limb(0.075, 0.36, skin, -0.4, 1.3); this.armR = limb(0.075, 0.36, skin, 0.4, 1.3);
     this.armL.rotation.z = 0.12; this.armR.rotation.z = -0.12;
 
+    this.body.scale.setScalar(Player.AVATAR_HEIGHT / 2.05); // el muñeco de respaldo mide ~2,05 m con el sombrero
     this.group.position.set(start[0], heightAt(start[0], start[1]), start[1]);
   }
 
   swimming = false;
+  /** dentro de la cueva (bajo la meseta del suroeste) */
+  inCave = false;
   /** velocidad vertical y si está en el aire */
   private vy = 0;
   airborne = false;
@@ -61,8 +64,10 @@ export class Player {
   private motion: Motion = { speed: 0, swimming: false, t: 0 };
   avatar: Avatar | null = null;
   private holder = new THREE.Group();
-  /** altura objetivo del avatar y giro para que mire a +Z del jugador (se ajusta según el modelo) */
-  static AVATAR_HEIGHT = 2.0;
+  /** altura objetivo del avatar (m) y giro para que mire a +Z del jugador (se ajusta según el modelo) */
+  static AVATAR_HEIGHT = 1.7;
+  /** altura real del avatar modular a escala 1 (medida en el juego: cabeza y pelo incluidos) */
+  static MODEL_HEIGHT = 2.19;
   static AVATAR_YAW = 0;
 
   /** Sustituye el cuerpo procedural por el avatar modular cuando termina de cargar. */
@@ -70,7 +75,7 @@ export class Player {
     this.avatar = a;
     this.body.visible = false;
     this.holder.rotation.y = Player.AVATAR_YAW;
-    this.holder.scale.setScalar(Player.AVATAR_HEIGHT / 1.8);
+    this.holder.scale.setScalar(Player.AVATAR_HEIGHT / Player.MODEL_HEIGHT);
     this.holder.add(a.root);
     this.group.add(this.holder);
   }
@@ -95,8 +100,12 @@ export class Player {
     this.vel.lerp(target, 1 - Math.exp(-(this.airborne ? 4 : 12) * dt));
 
     const p = this.group.position;
+    // dentro de la cueva se camina por su suelo (por debajo de la meseta) y no se puede salir por las paredes
+    const cf = caveFloor(p.x, p.z);
+    this.inCave = !Number.isNaN(cf) && p.y < cf + 1.5;
     const tryMove = (nx: number, nz: number) => {
       if (Math.hypot(nx, nz) > LIMIT) return false;
+      if (this.inCave && caveLocal(nx, nz)[0] > CAVE.notch - 0.6 && Number.isNaN(caveFloor(nx, nz, 0.35))) return false;
       if (!onDock(nx, nz) && heightAt(nx, nz) < MAX_DEPTH) return false;
       for (const o of this.obstacles) {
         if (Math.hypot(nx - o.x, nz - o.z) < o.r + 0.35) return false;
@@ -109,7 +118,8 @@ export class Player {
     else if (tryMove(p.x, nz)) { p.z = nz; this.vel.x = 0; }
     else this.vel.set(0, 0);
 
-    const h = heightAt(p.x, p.z);
+    const cave = this.inCave ? caveFloor(p.x, p.z) : NaN;
+    const h = Number.isNaN(cave) ? heightAt(p.x, p.z) : cave;
     const dock = onDock(p.x, p.z);
     this.swimming = !dock && h < SWIM_FROM;
     // con los clips de natación el cuerpo va tumbado: flota más arriba que el muñeco de respaldo

@@ -80,6 +80,10 @@ export function loadConfig(): AvatarConfig {
   } catch { /* sin almacenamiento */ }
   return defaultConfig();
 }
+/** ¿Hay un avatar guardado? (si no, es la primera visita y se enseña el selector de personaje) */
+export function hasSavedConfig(): boolean {
+  try { return localStorage.getItem(KEY) !== null; } catch { return false; }
+}
 export function saveConfig(cfg: AvatarConfig) {
   try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch { /* ignorar */ }
 }

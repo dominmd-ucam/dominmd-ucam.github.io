@@ -2,6 +2,9 @@
 
 - **Sistema de avatar modular y modelos del avatar** (piezas GLB, esqueleto Mixamo y poses): [Wawa Sensei — r3f-ultimate-character-configurator](https://github.com/wass08/r3f-ultimate-character-configurator). El repositorio original no declara licencia; se usan los modelos con su atribución. Si el autor lo solicita, basta con borrar `public/models/avatar/` y el avatar vuelve al personaje de respaldo.
 - **Naturaleza (árboles, arbustos, flores, rocas y losas de los caminos)**: [Stylized Nature MegaKit](https://quaternius.com/) de Quaternius, CC0. Optimizado con `scripts/build-nature.mjs`.
+- **Casas del pueblo**: piezas del [Medieval Village MegaKit](https://quaternius.com/) de Quaternius, CC0. Montadas con `scripts/blender/houses.py` y optimizadas con `scripts/build-glb.mjs`.
+- **Misu**: modelo "Casual Assassin Cat" de Sketchfab (licencia gratuita que permite modificarlo; autor y enlace pendientes de añadir). Sin la base ni la hierba, con esqueleto y animaciones propias (`scripts/blender/misu.py`).
+- **Robot Claude**: modelo generado por Domingo con Tripo a partir de su diseño; separado, reducido y animado con `scripts/blender/robot.py`.
 - **Animaciones del personaje** (andar, correr, esprintar, saltar, agacharse, voltereta, nadar): [Universal Animation Library](https://quaternius.com/) de Quaternius, CC0. Pasadas al esqueleto del avatar con `scripts/retarget-ual.mjs`.
 - Modelos de Sketchfab, licencia [CC-BY 4.0](http://creativecommons.org/licenses/by/4.0/) (reducidos de polígonos y texturas para la web):
   - "[Cartoon fallen tree](https://sketchfab.com/3d-models/cartoon-fallen-tree-85be5e12759d460cb5f1f0d7a4c109b6)" de [neon_dust](https://sketchfab.com/h_miller).

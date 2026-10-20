@@ -3,6 +3,7 @@ import { DOCK, HILL, ISLET, dockStart, heightAt, islandRadius } from './terrain'
 import type { Obstacle } from './props';
 import { waveHeight } from './water';
 import { batchStatic } from './batch';
+import { placeHouse } from './houses';
 import { roughen, stoneGeometry, stoneMaterial } from './stone';
 
 const mat = (color: string, o: THREE.MeshStandardMaterialParameters = {}) =>
@@ -36,32 +37,11 @@ export function buildLandmarks(scene: THREE.Object3D): Landmarks {
   /* ---------- cabaña ---------- */
   {
     const [hx, hz] = [-14.5, -3];
-    const g = new THREE.Group(); g.position.set(hx, heightAt(hx, hz) - 0.05, hz); g.rotation.y = Math.PI / 2 + 0.25;
-    add(g, box(3.4, 0.35, 3.4), WOOD_D, 0, 0.55, 0);
-    for (const [px, pz] of [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]]) add(g, new THREE.CylinderGeometry(0.12, 0.15, 0.9, 6), WOOD_D, px, 0.2, pz);
-    // paredes (con puerta en el frente, +z)
-    add(g, box(3.2, 2.2, 0.15), WOOD, 0, 1.85, -1.55);
-    add(g, box(0.15, 2.2, 3.2), WOOD, -1.55, 1.85, 0);
-    add(g, box(0.15, 2.2, 3.2), WOOD, 1.55, 1.85, 0);
-    add(g, box(1.1, 2.2, 0.15), WOOD, -1.05, 1.85, 1.55);
-    add(g, box(1.1, 2.2, 0.15), WOOD, 1.05, 1.85, 1.55);
-    add(g, box(1.0, 0.6, 0.15), WOOD, 0, 2.65, 1.55);
-    add(g, box(0.9, 0.9, 0.05), mat('#79d4ee', { emissive: '#79d4ee', emissiveIntensity: 0.2 }), 1.56, 2.0, 0.2, false).rotation.y = Math.PI / 2;
-    // tejado a dos aguas
-    const roofM = mat('#58c468');
-    for (const s of [-1, 1]) {
-      const r = add(g, box(2.4, 0.18, 4.0), roofM, s * 1.0, 3.45, 0);
-      r.rotation.z = -s * 0.78;
-    }
-    add(g, box(0.3, 0.2, 4.1), WOOD_D, 0, 4.1, 0);
-    // escalones
-    for (let i = 0; i < 3; i++) add(g, box(1.0, 0.16, 0.45), WOOD_L, 0, 0.12 + i * 0.2, 2.15 - i * 0.4);
-    batchStatic(g);
-    scene.add(g);
-    obstacles.push({ x: hx, z: hz, r: 2.3 });
+    const rot = Math.PI / 2 + 0.25;
+    placeHouse(scene, 'cabin', hx, hz, rot, [4, 4], obstacles);
 
     // barriles y cofre junto a la cabaña
-    const bx = hx + 2.6 * Math.cos(g.rotation.y + 0.9), bz = hz - 2.6 * Math.sin(g.rotation.y + 0.9);
+    const bx = hx + 3.4 * Math.cos(rot + 0.9), bz = hz - 3.4 * Math.sin(rot + 0.9);
     for (let i = 0; i < 2; i++) {
       const b = add(scene, new THREE.CylinderGeometry(0.42, 0.38, 0.8, 9), WOOD_D, bx + i * 0.9, heightAt(bx, bz) + 0.4, bz + i * 0.3);
       b.rotation.y = i;

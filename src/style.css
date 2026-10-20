@@ -94,8 +94,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #f6c9a0; col
 @keyframes dlgOut { to { opacity: 0; transform: translateY(25%) scale(.95); } }
 .portrait { flex: none; width: clamp(70px, 14vw, 150px); aspect-ratio: 1; clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); background: var(--sea); }
 .portrait svg { width: 100%; height: 100%; display: block; }
-.portrait .eyes { transform-box: fill-box; transform-origin: center; animation: blinkE 3.4s infinite; }
-@keyframes blinkE { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+.portrait .head { transform-box: fill-box; transform-origin: 50% 100%; }
 .portrait.talking .head { animation: nod .24s ease-in-out infinite alternate; }
 @keyframes nod { to { transform: translateY(-2.5px) rotate(-1.5deg); } }
 .name { position: absolute; top: -.9em; left: calc(clamp(70px, 14vw, 150px) + 1.4vw + 1em); z-index: 1; font: 700 .85em var(--disp); letter-spacing: .08em; background: var(--coral); color: var(--foam); padding: .12em 1em; clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%); }
@@ -146,6 +145,36 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #f6c9a0; col
 .av-credit { margin: 0; font-size: 11px; font-weight: 700; color: var(--muted); }
 .av-credit a { color: var(--coral-d); }
 @media (max-width: 640px) { #avatarPanel { top: auto; bottom: 0; left: 0; width: 100%; max-height: 52vh; } .hint { display: none; } .brand span { display: none; } .menu-wrap { font-size: 17px; } }
+
+/* ---------- selector de personaje ---------- */
+.cs { position: fixed; inset: 0; z-index: 32; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+.cs[hidden] { display: none; }
+.cs .veil { background: rgba(14, 94, 122, .55); }
+.cs-wrap { position: relative; width: min(880px, 100%); filter: drop-shadow(8px 10px 0 rgba(15, 52, 64, .3)); animation: rise .45s var(--pop) both; }
+.cs-card { max-height: calc(100dvh - 32px); overflow: auto; padding: 1.1em 1.4em 1em; clip-path: polygon(0 3%, 3% 0, 97% 0, 100% 3%, 100% 97%, 97% 100%, 3% 100%, 0 97%); }
+.cs-head { display: flex; align-items: center; gap: 10px; }
+.cs-head h2 { flex: 1; margin: 0; font: 700 clamp(26px, 4vw, 34px)/1.1 var(--disp); color: var(--deep); }
+.cs-close { width: 40px; height: 40px; flex: none; }
+.cs-sub { margin: .2em 0 .9em; font-size: 14px; font-weight: 700; color: var(--muted); }
+.cs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.cs-item { display: grid; justify-items: center; gap: 2px; min-width: 0; padding: 8px 8px 12px; border: 0; cursor: pointer; font-family: var(--body); color: var(--ink); background: var(--paper-2); clip-path: polygon(0 4%, 6% 0, 94% 0, 100% 4%, 100% 96%, 94% 100%, 6% 100%, 0 96%); transition: background .2s, color .2s, transform .25s var(--pop); animation: itemIn .45s var(--out) both; }
+.cs-item:focus-visible { outline: none; }
+.cs-item b { font: 700 20px/1.1 var(--disp); }
+.cs-item small { font-size: 12px; font-weight: 700; color: var(--muted); text-align: center; }
+.cs-item.sel { background: var(--sea); color: var(--foam); transform: translateY(-3px); }
+.cs-item.sel small { color: var(--foam); }
+.cs-pic { position: relative; display: block; width: 100%; aspect-ratio: 4 / 5; }
+.cs-pic::before { content: ""; position: absolute; inset: 16% 4% 2%; background: var(--sea-hi); opacity: .5; clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); transition: background .2s; }
+.cs-item.sel .cs-pic::before { background: var(--foam); opacity: .35; }
+.cs-pic canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .4s ease; }
+.cs-pic canvas.on { opacity: 1; }
+.cs-custom { display: flex; align-items: center; justify-content: center; gap: .6em; width: 100%; margin-top: 12px; padding: 14px; clip-path: polygon(2% 0, 98% 0, 100% 50%, 98% 100%, 2% 100%, 0 50%); }
+.cs-custom .gem { transform: scale(1); }
+.cs-custom.sel { background: var(--coral); }
+.cs-custom.sel .gem { background: var(--sun); transform: scale(1) rotate(180deg); }
+.cs .hint2 { font-size: 13px; }
+@media (max-width: 640px) { .cs-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } .cs-card { padding: 1em; } .cs-item b { font-size: 18px; } }
+@media (pointer: coarse) { .cs .hint2 { display: none; } }
 
 /* ---------- joystick y depuración ---------- */
 #joy { position: fixed; z-index: 5; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 3px solid rgba(255, 250, 240, .6); background: rgba(255, 250, 240, .15); pointer-events: none; }

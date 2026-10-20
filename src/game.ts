@@ -1,6 +1,8 @@
 import './style.css';
 import * as THREE from 'three';
-import { buildTerrain, heightAt, islandRadius, HILL, ISLET, DOCK, dockStart, onDock } from './world/terrain';
+import { buildTerrain, heightAt, islandRadius, HILL, ISLET, DOCK, dockStart, onDock, caveFloor, caveLocal, CAVE } from './world/terrain';
+import { buildZones } from './world/zones';
+import { Robot } from './world/robot';
 import { buildWater } from './world/water';
 import { buildScenery } from './world/props';
 import { buildGrass } from './world/grass';
@@ -8,7 +10,6 @@ import { installToon } from './world/toon';
 import { buildLandmarks } from './world/landmarks';
 import { buildLife } from './world/life';
 import { buildSplash } from './world/splash';
-import { StudioLight } from './world/studio';
 import { buildDiorama } from './world/diorama';
 import { buildNature } from './world/nature';
 import { buildVillage } from './world/village';
@@ -36,8 +37,9 @@ import { createPost } from './post';
 import { AdaptiveRes, DebugOverlay } from './perf';
 import { initAssets } from './assets/loader';
 import { Avatar } from './avatar/avatar';
-import { loadConfig } from './avatar/config';
+import { hasSavedConfig, loadConfig, saveConfig } from './avatar/config';
 import { AvatarUI } from './avatar/ui';
+import { CharacterSelect } from './avatar/select';
 
 installToon(); // antes de compilar ningún material
 const q = detectQuality();
@@ -66,7 +68,7 @@ scene.fog = new THREE.FogExp2(dawn.fogColor, 0.0045);
 /* mundo: lo estático se fusiona al final para reducir llamadas de dibujo */
 const staticWorld = new THREE.Group();
 scene.add(staticWorld);
-const terrain = buildTerrain();
+const terrain = buildTerrain(q.tier !== 'low');
 scene.add(terrain);
 const terrainTime = terrain.userData.uTime as { value: number };
 const water = buildWater(dawn.sunDir);
@@ -78,16 +80,18 @@ const diorama = buildDiorama(staticWorld);
 obstacles.push(...diorama.obstacles);
 const village = buildVillage(staticWorld);
 obstacles.push(...village.obstacles);
+obstacles.push(...buildZones(scene, q.tier).obstacles); // parcelas, cofre, vallas y el interior de la cueva
 const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
 const nature = buildNature(scene, obstacles, q.tier); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
-const studio = new StudioLight(scene, dawn);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
-const grass = buildGrass(q.tier === 'high' ? 150000 : q.tier === 'med' ? 80000 : 24000, q.tier === 'low', q.shadows); // en calidad baja, solo la hoja ligera
+const grass = buildGrass(q.tier === 'high' ? 30 : q.tier === 'med' ? 18 : 6, q.tier === 'low', q.shadows); // en calidad baja, solo la hoja ligera
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
+const robot = new Robot(scene, obstacles, [-1.2, -0.8], 2.2); // pasea por la plaza y saluda
+void robot.load().catch((e) => console.warn('robot no disponible:', e));
 
 /* backend opcional: libro de visitas, contacto y visitantes fantasma (solo si hay API configurada) */
 const infoPoint = apiConfigured ? new InfoPoint(scene, obstacles, 3.2, 12.2) : null;
@@ -116,7 +120,7 @@ if (new URLSearchParams(location.search).has('tune')) {
   void import('./tune').then((m) => m.openTune({ dawn, scene, terrain, water, post }));
 }
 
-let avatarUI: AvatarUI | null = null;
+let avatarUI: AvatarUI | null = null, charSelect: CharacterSelect | null = null;
 const avatarBtn = document.getElementById('avatarBtn') as HTMLButtonElement;
 avatarBtn.disabled = true;
 /* pantalla de carga: se mantiene hasta que el avatar esté puesto (o falle) y pasen al menos 2 s, para que no se vea al personaje de respaldo cambiar de golpe */
@@ -129,14 +133,19 @@ function checkReveal() {
   if (!avatarSettled && elapsed < MAX_LOAD_MS) return;
   revealed = true;
   ui.setLoad(1, 'Todo listo');
-  setTimeout(() => ui.ready(), Math.max(350, MIN_LOAD_MS - elapsed)); // 350 ms: se ve la barra llena antes del fundido
+  setTimeout(() => {
+    ui.ready();
+    if (charSelect && !hasSavedConfig()) charSelect.toggle(true, false); // primera visita: elegir personaje antes de jugar
+  }, Math.max(350, MIN_LOAD_MS - elapsed)); // 350 ms: se ve la barra llena antes del fundido
 }
 void Avatar.create().then(async (a) => {
   await a.apply(loadConfig());
   player.attachAvatar(a);
   avatarUI = new AvatarUI(a);
-  studio.prewarm(renderer, scene, camera); // compila ya los shaders con luz de estudio: abrir el editor no da tirones
   avatarBtn.disabled = false;
+  charSelect = new CharacterSelect(renderer);
+  charSelect.onPick = (cfg) => void a.apply(cfg);
+  charSelect.onCustom = () => { saveConfig(a.getConfig()); avatarUI?.toggle(true); }; // se guarda ya: así no vuelve a salir el selector
 }).catch((e) => console.warn('Avatar modular no disponible, uso el de respaldo:', e)).finally(() => { avatarSettled = true; ui.setLoad(0.95, 'Todo listo'); });
 
 /* ---------- menú ---------- */
@@ -155,7 +164,9 @@ function creditsView(): View {
     title: 'Créditos', sub: 'Gracias', hint: 'Esc volver',
     rows: [
       { type: 'info', label: 'Avatar y modelos', value: 'Wawa Sensei' },
-      { type: 'info', label: 'Naturaleza y animaciones', value: 'Quaternius (CC0)' },
+      { type: 'info', label: 'Naturaleza, casas y animaciones', value: 'Quaternius (CC0)' },
+      { type: 'info', label: 'Misu (Casual Assassin Cat)', value: 'Sketchfab' },
+      { type: 'info', label: 'Robot Claude', value: 'Domingo, con Tripo' },
       { type: 'info', label: 'Tronco caído y tocón musgoso', value: 'neon_dust (CC-BY 4.0)' },
       { type: 'info', label: 'Tocón', value: 'metrosp (CC-BY 4.0)' },
       { type: 'info', label: 'Isla flotante', value: 'Tom Verbeeck (CC-BY 4.0)' },
@@ -188,6 +199,7 @@ function mainView(): View {
     rows: [
       { type: 'action', label: 'Continuar', run: () => menu.close() },
       { type: 'action', label: 'Mi avatar', run: () => { menu.close(); avatarUI?.toggle(true); } },
+      ...(charSelect ? [{ type: 'action' as const, label: 'Cambiar de personaje', run: () => { menu.close(); charSelect?.toggle(true); } }] : []),
       { type: 'action', label: 'Ajustes', run: () => menu.push(settingsView()) },
       { type: 'action', label: 'Logros', run: () => menu.push(achievementsView()) },
       { type: 'action', label: 'Créditos', run: () => menu.push(creditsView()) },
@@ -235,7 +247,7 @@ function applySettings(key?: string) {
 settings.onChange((_, key) => applySettings(key));
 
 /* ---------- interacción ---------- */
-const blocked = () => menu.open || dialogue.open || ui.isOpen || (guestbook?.open ?? false) || (avatarUI?.open ?? false);
+const blocked = () => menu.open || dialogue.open || ui.isOpen || (guestbook?.open ?? false) || (avatarUI?.open ?? false) || (charSelect?.open ?? false);
 type Target = { kind: 'station'; project: Project } | { kind: 'npc' } | { kind: 'guestbook' } | null;
 const NPC_TARGET: Target = { kind: 'npc' }, GUESTBOOK_TARGET: Target = { kind: 'guestbook' };
 const stationTargets = new Map<Project, Target>(); // se llama cada fotograma: no se crean objetos nuevos
@@ -270,8 +282,9 @@ function interact() {
 input.onInteract = interact;
 input.onEscape = () => { if (!blocked()) menu.show(); };
 ui.onPromptClick = interact;
-ui.onAvatar = () => { if (!menu.open && !dialogue.open && !ui.isOpen) avatarUI?.toggle(); };
-dialogue.onStart = () => achievements.unlock('friend');
+ui.onAvatar = () => { if (!menu.open && !dialogue.open && !ui.isOpen && !charSelect?.open) avatarUI?.toggle(); };
+dialogue.onStart = () => { achievements.unlock('friend'); guide.talking = true; };
+dialogue.onClose = () => { guide.talking = false; };
 dialogue.onAction = (a) => { if (a === 'showPaths') interactables.pulse(4.5, timer.getElapsed()); };
 
 function resize() {
@@ -287,12 +300,12 @@ applySettings();
 
 /* ---------- zonas para los logros ---------- */
 const zone = (a: number, f: number) => { const r = islandRadius(a) * f; return [Math.cos(a) * r, Math.sin(a) * r] as const; };
-const WRECK = zone(1.38, 0.93), CAVE = zone(2.15, 0.86);
+const WRECK = zone(1.38, 0.93);
 const DOCK_END = [Math.cos(DOCK.a) * (dockStart() + DOCK.len - 1.2), Math.sin(DOCK.a) * (dockStart() + DOCK.len - 1.2)] as const;
 function checkZones(p: THREE.Vector3) {
   const near = (c: readonly [number, number], r: number) => Math.hypot(p.x - c[0], p.z - c[1]) < r;
   if (near(WRECK, 5)) achievements.unlock('wreck');
-  if (near(CAVE, 5.5)) achievements.unlock('cave');
+  if (player.inCave) achievements.unlock('cave');
   if (near(HILL, 3.2) && p.y > 5) achievements.unlock('lighthouse');
   if (near(ISLET, 5)) achievements.unlock('islet');
   if (onDock(p.x, p.z) && near(DOCK_END, 1.8)) achievements.unlock('sailor');
@@ -302,8 +315,12 @@ function checkZones(p: THREE.Vector3) {
 // THREE.Timer sustituye a Clock (obsoleto): con connect() ignora el tiempo en que la pestaña está oculta y no da un salto enorme al volver
 const timer = new THREE.Timer();
 timer.connect(document);
+/** altura de la mirada de la cámara sobre los pies (el personaje mide 1,70 m) */
+const EYE = 1.15;
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), camHead = new THREE.Vector3();
 function camBlocked(p: THREE.Vector3): boolean {
+  // en la cueva la cámara no sale del túnel (salvo hacia la boca)
+  if (player.inCave) return caveLocal(p.x, p.z)[0] > CAVE.notch - 0.4 && Number.isNaN(caveFloor(p.x, p.z, 0.3));
   if (nature.blocks(p)) return true;
   if (p.y > 9) return false;
   for (const o of obstacles) if (o.r >= 1.4 && Math.hypot(p.x - o.x, p.z - o.z) < o.r + 0.6) return true;
@@ -323,11 +340,12 @@ function frame(timestamp: number) {
   player.update(dt, input, t);
   interactables.update(t, player.group.position);
   guide.update(dt, t, player.group.position);
+  robot.update(dt, t, player.group.position);
   infoPoint?.update(t, player.group.position);
   presence?.send(player.group.position.x, player.group.position.z, player.group.rotation.y, Math.min(1, player.vel.length() / 6.5), player.swimming, performance.now());
   ghosts.update(dt, t, performance.now());
   grass.update(t, camera.position, player.group.position);
-  nature.update(t);
+  nature.update(t, player.group.position);
   for (const p of palms) {
     // LOD: a más de 48 m se dibuja la versión ligera (con 4 m de histéresis para que no parpadee en el límite)
     const dp = Math.hypot(camera.position.x - p.group.position.x, camera.position.z - p.group.position.z);
@@ -353,19 +371,20 @@ function frame(timestamp: number) {
   wasWet = wet;
 
   // cámara en tercera persona con suavizado y sin atravesar el suelo
-  if (avatarUI?.open) { input.yaw = player.group.rotation.y; input.pitch = 0.12; input.dist = 4.2; camDistChanged = true; }
+  if (avatarUI?.open) { input.yaw = player.group.rotation.y; input.pitch = 0.12; input.dist = 3.8; camDistChanged = true; }
   else if (camDistChanged && !avatarUI?.open) { input.dist = CAMERA_DIST[settings.value.camera]; camDistChanged = false; }
-  const cp = Math.cos(input.pitch);
-  camPos.set(pp.x + Math.sin(input.yaw) * cp * input.dist, pp.y + 1.5 + Math.sin(input.pitch) * input.dist, pp.z + Math.cos(input.yaw) * cp * input.dist);
-  camPos.y = Math.max(camPos.y, heightAt(camPos.x, camPos.z) + 0.8, 0.6);
-  for (let k = 0; k < 14 && camBlocked(camPos); k++) camPos.lerp(camHead.set(pp.x, pp.y + 1.5, pp.z), 0.12);
-  camLook.set(pp.x, pp.y + 1.3, pp.z);
+  const camDist = player.inCave ? Math.min(input.dist, 4.5) : input.dist, camPitch = player.inCave ? Math.min(input.pitch, 0.3) : input.pitch;
+  const cp = Math.cos(camPitch);
+  camPos.set(pp.x + Math.sin(input.yaw) * cp * camDist, pp.y + EYE + Math.sin(camPitch) * camDist, pp.z + Math.cos(input.yaw) * cp * camDist);
+  if (player.inCave) camPos.y = THREE.MathUtils.clamp(camPos.y, pp.y + 0.6, pp.y + 2.3); // bajo el techo
+  else camPos.y = Math.max(camPos.y, heightAt(camPos.x, camPos.z) + 0.8, 0.6);
+  for (let k = 0; k < 14 && camBlocked(camPos); k++) camPos.lerp(camHead.set(pp.x, pp.y + EYE, pp.z), 0.12);
+  camLook.set(pp.x, pp.y + EYE - 0.15, pp.z);
   if (first) camera.position.copy(camPos);
   else camera.position.lerp(camPos, 1 - Math.exp(-14 * dt));
   camera.lookAt(camLook);
 
   dawn.update(pp, t);
-  studio.update(dt, pp, input.yaw, avatarUI?.open ?? false);
   terrainTime.value = t;
   landmarks.update(t, 0.35);
   diorama.update(t);
@@ -394,7 +413,7 @@ function frame(timestamp: number) {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, studio, post, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
+(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, post, scene, camera, guide, robot, menu, dialogue, achievements, settings, adaptive, charSelect: () => charSelect };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }

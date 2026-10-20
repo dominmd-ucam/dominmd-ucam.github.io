@@ -1,0 +1,24 @@
+{
+  "_comment": "Zonas reservadas del modo 3D, sin funcionalidad todavía. Posiciones en polares: a = ángulo (rad), f = fracción del radio de la costa en ese ángulo.",
+  "plots": [
+    { "id": "parcela-1", "kind": "project", "a": 1.05, "f": 0.42, "r": 3.2 },
+    { "id": "parcela-2", "kind": "project", "a": -1.6, "f": 0.42, "r": 3.2 },
+    { "id": "parcela-3", "kind": "project", "a": 2.95, "f": 0.42, "r": 3.2 },
+    { "id": "parcela-4", "kind": "project", "a": -1.35, "f": 0.8, "r": 3.2 },
+    { "id": "puzle-meseta-este", "kind": "puzzle", "plateau": 0, "r": 3.6 },
+    { "id": "puzle-meseta-oeste", "kind": "puzzle", "plateau": 1, "r": 3.6 }
+  ],
+  "chest": { "id": "cofre-playa", "a": -0.3, "f": 0.955 },
+  "trails": [
+    { "id": "a-parcela-1", "to": "parcela-1", "pts": [[1.05, 0.62], [1.05, 0.42]] },
+    { "id": "a-parcela-2", "to": "parcela-2", "pts": [[-1.6, 0.62], [-1.6, 0.42]] },
+    { "id": "a-parcela-3", "to": "parcela-3", "pts": [[2.95, 0.62], [2.95, 0.42]] },
+    { "id": "a-parcela-4", "to": "parcela-4", "pts": [[-1.35, 0.62], [-1.35, 0.8]] },
+    { "id": "subida-meseta-este", "to": "puzle-meseta-este", "pts": [[0.25, 0.62], [0.25, 0.8]] },
+    { "id": "subida-meseta-oeste", "to": "puzle-meseta-oeste", "pts": [[3.35, 0.62], [3.35, 0.8]] },
+    { "id": "a-la-cueva", "to": "cave", "pts": [[2.42, 0.62], [2.42, 0.8], [2.3, 0.92]] },
+    { "id": "al-cofre", "to": "cofre-playa", "pts": [[-0.3, 0.62], [-0.3, 0.8], [-0.27, 0.93]] },
+    { "id": "sin-salida-pinar", "end": "fence", "pts": [[-2.5, 0.62], [-2.56, 0.7], [-2.64, 0.77]] },
+    { "id": "sin-salida-bosque", "end": "fence", "pts": [[1.62, 0.62], [1.5, 0.52], [1.38, 0.47]] }
+  ]
+}

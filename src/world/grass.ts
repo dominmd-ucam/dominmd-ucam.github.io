@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ISLAND_R, groundColor, heightAt, pathMask } from './terrain';
+import { fbm, groundColor, heightAt, pathCover, pathDist } from './terrain';
 import { CLOUD_GLSL } from './toon';
 
 const NEAR_FULL = 18; // metros hasta los que se dibuja la hoja completa
@@ -36,11 +36,14 @@ function bladeLite(): THREE.BufferGeometry {
  *  - cada hoja toma el color del suelo donde crece y se ilumina con la normal del suelo (hacia arriba): la pradera y el terreno se funden;
  *  - el viento son ráfagas que recorren el campo en una dirección (las hojas inclinadas se aclaran, como las olas de hierba de BotW);
  *  - las sombras de las nubes pasan por encima igual que por el terreno;
- *  - la hierba se aparta al paso del personaje.
+ *  - la hierba se aparta al paso del personaje;
+ *  - se genera por bloques alrededor del jugador (la isla es grande): `density` hojas por m² en los bloques cercanos, la mitad
+ *    a media distancia y una cuarta parte lejos; los bloques que quedan atrás se liberan;
+ *  - hay manchas de hierba alta (0,9–1,25 m) lejos de los caminos, que tapan lo que hay detrás.
  * Con `setInkMask(true)` el fragment shader escribe alfa 0: el postprocesado lo usa para no dibujar contornos en la hierba.
  * Solo debe activarse cuando se dibuja a través del postprocesado: directo al lienzo, el alfa 0 dejaría ver el fondo de la página en algunos navegadores.
  */
-export function buildGrass(count: number, liteOnly = false, receiveShadow = false): { group: THREE.Group; update(t: number, cam?: THREE.Vector3, player?: THREE.Vector3): void; setInkMask(on: boolean): void } {
+export function buildGrass(density: number, liteOnly = false, receiveShadow = false): { group: THREE.Group; update(t: number, cam?: THREE.Vector3, player?: THREE.Vector3): void; setInkMask(on: boolean): void } {
   const geoFull = liteOnly ? null : bladeFull(), geoLite = bladeLite();
 
   const uTime = { value: 0 }, uPlayer = { value: new THREE.Vector3(0, -99, 0) }, uAlpha = { value: 1 };
@@ -85,63 +88,128 @@ export function buildGrass(count: number, liteOnly = false, receiveShadow = fals
       .replace('#include <opaque_fragment>', '#include <opaque_fragment>\ngl_FragColor.a = uAlpha;');
   };
 
-  // posiciones primero; después se reparten en bloques de 16 m para que el motor pueda descartar los que no se ven
   const CELL = 16;
-  const chunks = new Map<string, { m: THREE.Matrix4; c: THREE.Color }[]>();
-  const q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-  let n = 0, guard = 0;
-  while (n < count && guard++ < count * 12) {
-    const x = (Math.random() - 0.5) * ISLAND_R * 2.6, z = (Math.random() - 0.5) * ISLAND_R * 2.6, h = heightAt(x, z);
-    if (h < 1.0 || h > 5.4 || pathMask(x, z) > 0.25) continue;
-    const e = 0.4, ny = 1 / Math.hypot(1, (heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e), (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e));
-    if (ny < 0.8) continue; // en las rocas no crece
-    const hh = 0.3 + Math.random() * 0.45;
-    p.set(x, h - 0.02, z);
-    q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
-    s.set(0.09 + Math.random() * 0.05, hh, 1);
-    const key = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
-    let list = chunks.get(key);
-    if (!list) { list = []; chunks.set(key, list); }
-    const c = groundColor(x, z, h, ny, new THREE.Color()).offsetHSL((Math.random() - 0.5) * 0.03, 0.02, (Math.random() - 0.5) * 0.06);
-    list.push({ m: new THREE.Matrix4().compose(p, q, s), c });
-    n++;
-  }
+  /** fracción de la densidad según el anillo de bloques (distancia de Chebyshev al bloque del jugador): 0–1, 2, 3 */
+  const RING_FRAC = [1, 1, 0.5, 0.22];
+  const MAX_RING = liteOnly ? 2 : 3;
   const group = new THREE.Group();
-  const lod: { near: THREE.InstancedMesh | null; far: THREE.InstancedMesh; center: THREE.Vector3; full: number }[] = [];
-  for (const list of chunks.values()) {
-    const far = new THREE.InstancedMesh(geoLite, mat, list.length);
-    list.forEach((it, i) => { far.setMatrixAt(i, it.m); far.setColorAt(i, it.c); });
-    far.instanceMatrix.needsUpdate = true;
-    if (far.instanceColor) far.instanceColor.needsUpdate = true;
+  interface Cell { cx: number; cz: number; gen: number; full: number; far: THREE.InstancedMesh; near: THREE.InstancedMesh | null; center: THREE.Vector3 }
+  const cells = new Map<string, Cell>();
+  const key = (cx: number, cz: number) => `${cx},${cz}`;
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  const col = new THREE.Color();
+
+  /** Rejilla de 9×9 puntos por bloque (cada 2 m): color del suelo, y si puede crecer hierba alta (lejos de los caminos). Las hojas interpolan. */
+  const G = 9;
+  const gridCol = new Float32Array(G * G * 3), gridTall = new Float32Array(G * G);
+  function fillGrid(x0: number, z0: number) {
+    const c = new THREE.Color(), e = 0.4;
+    for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
+      const x = x0 + (i * CELL) / (G - 1), z = z0 + (j * CELL) / (G - 1), h = heightAt(x, z);
+      const ny = 1 / Math.hypot(1, (heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e), (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e));
+      groundColor(x, z, h, ny, c);
+      const k = j * G + i;
+      gridCol[k * 3] = c.r; gridCol[k * 3 + 1] = c.g; gridCol[k * 3 + 2] = c.b;
+      gridTall[k] = THREE.MathUtils.smoothstep(pathDist(x, z), 2.2, 4) * THREE.MathUtils.smoothstep(fbm(x * 0.045 + 20, z * 0.045 - 11), 0.56, 0.64);
+    }
+  }
+  function sampleGrid(u: number, v: number, out: THREE.Color): number {
+    const fx = u * (G - 1), fz = v * (G - 1), i = Math.min(G - 2, Math.floor(fx)), j = Math.min(G - 2, Math.floor(fz)), a = fx - i, b = fz - j;
+    const k00 = j * G + i, k10 = k00 + 1, k01 = k00 + G, k11 = k01 + 1;
+    const w00 = (1 - a) * (1 - b), w10 = a * (1 - b), w01 = (1 - a) * b, w11 = a * b;
+    out.setRGB(
+      gridCol[k00 * 3] * w00 + gridCol[k10 * 3] * w10 + gridCol[k01 * 3] * w01 + gridCol[k11 * 3] * w11,
+      gridCol[k00 * 3 + 1] * w00 + gridCol[k10 * 3 + 1] * w10 + gridCol[k01 * 3 + 1] * w01 + gridCol[k11 * 3 + 1] * w11,
+      gridCol[k00 * 3 + 2] * w00 + gridCol[k10 * 3 + 2] * w10 + gridCol[k01 * 3 + 2] * w01 + gridCol[k11 * 3 + 2] * w11);
+    return gridTall[k00] * w00 + gridTall[k10] * w10 + gridTall[k01] * w01 + gridTall[k11] * w11;
+  }
+
+  /** Crea (o rehace con más hojas) el bloque (cx, cz) para el anillo `ring`. Determinista: el mismo bloque sale siempre igual. */
+  function build(cx: number, cz: number, ring: number) {
+    const old = cells.get(key(cx, cz));
+    if (old) dispose(old);
+    let seed = (cx * 73856093) ^ (cz * 19349663) ^ 0x5bd1e995;
+    const rnd = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+    const x0 = cx * CELL, z0 = cz * CELL;
+    fillGrid(x0, z0);
+    const tries = Math.round(density * CELL * CELL * RING_FRAC[ring]);
+    const mats: number[] = [], cols: number[] = [];
+    for (let n = 0; n < tries; n++) {
+      const u = rnd(), v = rnd(), x = x0 + u * CELL, z = z0 + v * CELL, h = heightAt(x, z);
+      if (h < 1.0 || pathCover(x, z) > 0.32) continue;
+      const e = 0.4, ny = 1 / Math.hypot(1, (heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e), (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e));
+      if (ny < 0.8) continue; // en las rocas no crece
+      const tall = sampleGrid(u, v, col) > rnd() * 0.6 + 0.3;
+      const hh = tall ? 0.9 + rnd() * 0.35 : 0.25 + rnd() * 0.35;
+      p.set(x, h - 0.02, z);
+      q.setFromAxisAngle(up, rnd() * Math.PI * 2);
+      sc.set(tall ? 0.12 + rnd() * 0.05 : 0.09 + rnd() * 0.05, hh, 1);
+      m4.compose(p, q, sc);
+      mats.push(...m4.elements);
+      col.offsetHSL((rnd() - 0.5) * 0.03, 0.02, (rnd() - 0.5) * 0.06 + (tall ? -0.02 : 0));
+      cols.push(col.r, col.g, col.b);
+    }
+    const count = cols.length / 3;
+    const far = new THREE.InstancedMesh(geoLite, mat, Math.max(1, count));
+    far.instanceMatrix.array.set(mats);
+    far.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(3, cols.length)).fill(1), 3);
+    (far.instanceColor.array as Float32Array).set(cols);
+    far.count = count;
     far.computeBoundingSphere();
-    far.boundingSphere!.radius += 0.8; // margen para el movimiento del viento
+    far.boundingSphere!.radius += 1.2; // margen para el movimiento del viento
     group.add(far);
     let near: THREE.InstancedMesh | null = null;
     if (geoFull) {
-      near = new THREE.InstancedMesh(geoFull, mat, list.length);
+      near = new THREE.InstancedMesh(geoFull, mat, Math.max(1, count));
       near.instanceMatrix = far.instanceMatrix; near.instanceColor = far.instanceColor; // mismos datos, otra geometría
+      near.count = count;
       near.boundingSphere = far.boundingSphere!.clone();
       near.receiveShadow = receiveShadow; // solo de cerca: lejos la sombra apenas se ve y es lo que más cuesta por píxel
       group.add(near);
     }
-    lod.push({ near, far, center: far.boundingSphere!.center.clone(), full: list.length });
+    cells.set(key(cx, cz), { cx, cz, gen: ring, full: count, far, near, center: new THREE.Vector3(x0 + CELL / 2, 0, z0 + CELL / 2) });
   }
-  // LOD: las instancias están en orden aleatorio, así que dibujar solo las N primeras adelgaza el césped de forma uniforme.
-  // Cerca se ve todo; a media distancia la mitad; lejos una cuarta parte; más allá de 90 m, nada. Hasta 18 m (centro del bloque) se usa la hoja completa y desde ahí la ligera: a esa distancia una hoja mide 1–5 píxeles de ancho y no se distinguen.
+  function dispose(c: Cell) {
+    group.remove(c.far); c.far.dispose();
+    if (c.near) { group.remove(c.near); c.near.dispose(); }
+    cells.delete(key(c.cx, c.cz));
+  }
+
+  let pcx = 1e9, pcz = 1e9;
+  const queue: [number, number, number][] = [];
+  /** Bloques que faltan o que necesitan más hojas, ordenados del más cercano al más lejano. */
+  function plan(cx: number, cz: number) {
+    queue.length = 0;
+    for (const c of [...cells.values()]) if (Math.max(Math.abs(c.cx - cx), Math.abs(c.cz - cz)) > MAX_RING + 1) dispose(c);
+    for (let dz = -MAX_RING; dz <= MAX_RING; dz++) for (let dx = -MAX_RING; dx <= MAX_RING; dx++) {
+      const ring = Math.max(Math.abs(dx), Math.abs(dz)), c = cells.get(key(cx + dx, cz + dz));
+      if (!c || RING_FRAC[c.gen] < RING_FRAC[ring]) queue.push([cx + dx, cz + dz, ring]);
+    }
+    queue.sort((a, b) => a[2] - b[2]);
+  }
+
   return {
     group,
     setInkMask: (on: boolean) => { uAlpha.value = on ? 0 : 1; },
     update: (t: number, cam?: THREE.Vector3, player?: THREE.Vector3) => {
       uTime.value = t;
       if (player) uPlayer.value.copy(player);
+      const focus = player ?? cam;
+      if (!focus) return;
+      const cx = Math.floor(focus.x / CELL), cz = Math.floor(focus.z / CELL);
+      if (cx !== pcx || cz !== pcz) { pcx = cx; pcz = cz; plan(cx, cz); }
+      // los bloques se generan poco a poco (unos 6 ms por fotograma) para no dar tirones; el primero de cada vez siempre
+      const t0 = performance.now();
+      while (queue.length && (performance.now() - t0 < 6 || queue[0][2] <= 1 && cells.size < 9)) { const [x, z, r] = queue.shift()!; build(x, z, r); }
       if (!cam) return;
-      for (const { near, far, center, full } of lod) {
-        const d = Math.hypot(center.x - cam.x, center.z - cam.z);
-        const f = d < 26 ? 1 : d < 46 ? 0.5 : d < 90 ? 0.22 : 0;
-        const useNear = near !== null && d < NEAR_FULL;
-        const k = Math.round(full * f);
-        if (near) { near.count = k; near.visible = f > 0 && useNear; }
-        far.count = k; far.visible = f > 0 && !useNear;
+      // LOD: hasta 18 m (centro del bloque) la hoja completa y desde ahí la ligera; los bloques lejanos dibujan solo parte de sus hojas
+      // (están en orden aleatorio, así que dibujar las N primeras adelgaza el césped de forma uniforme)
+      for (const c of cells.values()) {
+        const ring = Math.max(Math.abs(c.cx - cx), Math.abs(c.cz - cz));
+        const k = ring > MAX_RING ? 0 : Math.round(c.full * Math.min(1, RING_FRAC[ring] / RING_FRAC[c.gen]));
+        const useNear = c.near !== null && Math.hypot(c.center.x - cam.x, c.center.z - cam.z) < NEAR_FULL;
+        if (c.near) { c.near.count = k; c.near.visible = k > 0 && useNear; }
+        c.far.count = k; c.far.visible = k > 0 && !useNear;
       }
     },
   };
