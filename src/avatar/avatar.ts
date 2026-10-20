@@ -5,7 +5,18 @@ import { CATEGORIES, LOCKS, SKIN_COLORS, type AvatarConfig, defaultConfig } from
 const BASE = `${import.meta.env.BASE_URL}models/avatar/`;
 
 const AXIS_X = new THREE.Vector3(1, 0, 0);
-export interface Motion { speed: number; swimming: boolean; t: number; /** 0–1: saluda con el brazo derecho */ wave?: number }
+export interface Motion {
+  speed: number; swimming: boolean; t: number;
+  /** 0–1: saluda con el brazo derecho */ wave?: number;
+  /** en el aire (salto o caída) */ airborne?: boolean;
+  crouch?: boolean;
+  sprint?: boolean;
+  /** se pone a 1 para lanzar una voltereta; el avatar lo vuelve a 0 */ roll?: number;
+}
+
+/** Clips de Moves.glb (Universal Animation Library de Quaternius, CC0, pasados al esqueleto Mixamo con scripts/retarget-ual.mjs). */
+type Clip = 'Idle' | 'Walk' | 'Run' | 'Sprint' | 'JumpStart' | 'JumpLoop' | 'JumpLand' | 'CrouchIdle' | 'CrouchWalk' | 'Roll' | 'SwimIdle' | 'Swim' | 'Interact' | 'Dance';
+const ONCE: Clip[] = ['JumpStart', 'JumpLand', 'Roll', 'Interact'];
 
 /**
  * Avatar modular: un esqueleto Mixamo compartido y piezas SkinnedMesh intercambiables.
@@ -26,6 +37,14 @@ export class Avatar {
   private applying = Promise.resolve();
   /** puntero a la última petición de apply (descarta las obsoletas) */
   private ticket = 0;
+  /** acciones de Moves.glb; vacío si no cargó (se usa entonces el balanceo procedural) */
+  private acts = new Map<Clip, THREE.AnimationAction>();
+  private cur: THREE.AnimationAction | null = null;
+  private curName: Clip | null = null;
+  private wasAir = false;
+  /** acción de una sola vez que manda hasta que termina (salto, aterrizaje, voltereta) */
+  private once: Clip | null = null;
+  get animated() { return this.acts.size > 0; }
 
   static async create(): Promise<Avatar> {
     const a = new Avatar();
@@ -34,7 +53,10 @@ export class Avatar {
   }
 
   private async init() {
-    const [arm, poses] = await Promise.all([loadGLTF(`${BASE}Armature.glb`), loadGLTF(`${BASE}Poses.glb`)]);
+    const [arm, poses, moves] = await Promise.all([
+      loadGLTF(`${BASE}Armature.glb`), loadGLTF(`${BASE}Poses.glb`),
+      loadGLTF(`${BASE}Moves.glb`).catch((e) => { console.warn('avatar: sin Moves.glb, uso el balanceo procedural', e); return null; }),
+    ]);
     const hips = arm.scene.getObjectByName('mixamorigHips');
     const plane = arm.scene.getObjectByName('Plane') as THREE.SkinnedMesh | undefined;
     if (!hips || !plane) throw new Error('Armature.glb sin Hips o Plane');
@@ -49,8 +71,16 @@ export class Avatar {
 
     // animaciones (poses): descartamos pistas de huesos que no existen en este esqueleto
     this.mixer = new THREE.AnimationMixer(this.root);
+    for (const c of moves?.animations ?? []) {
+      const tracks = c.tracks.filter((t) => this.root.getObjectByName(t.name.split('.')[0]));
+      const a = this.mixer.clipAction(new THREE.AnimationClip(c.name, c.duration, tracks));
+      if (ONCE.includes(c.name as Clip)) { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
+      this.acts.set(c.name as Clip, a);
+    }
+    this.mixer.addEventListener('finished', (e) => { if (this.once && e.action === this.acts.get(this.once)) this.once = null; });
     const idle = poses.animations.find((c) => c.name === 'Idle') ?? poses.animations[0];
-    if (idle) {
+    if (this.acts.size) this.play('Idle', 0);
+    else if (idle) {
       const tracks = idle.tracks.filter((t) => this.root.getObjectByName(t.name.split('.')[0]));
       this.mixer.clipAction(new THREE.AnimationClip('Idle', idle.duration, tracks)).play();
     }
@@ -156,11 +186,56 @@ export class Avatar {
     bone.quaternion.premultiply(this._pw);
   }
 
+  /** Pasa a `name` fundiendo en `fade` segundos. `from` es el punto del clip por el que empieza. */
+  private play(name: Clip, fade = 0.2, from = 0) {
+    const next = this.acts.get(name);
+    if (!next || next === this.cur) return;
+    next.reset(); next.time = from; next.setEffectiveWeight(1); next.play();
+    if (this.cur) next.crossFadeFrom(this.cur, fade, false);
+    this.cur = next; this.curName = name;
+  }
+
+  /** Elige el clip según el movimiento. */
+  private pick(m: Motion) {
+    const k = m.speed;
+    if (m.roll) { m.roll = 0; this.once = 'Roll'; this.play('Roll', 0.1, 0.05); this.acts.get('Roll')!.timeScale = 1.35; }
+    if (m.airborne && !m.swimming) {
+      if (!this.wasAir) { this.once = 'JumpStart'; this.play('JumpStart', 0.08, 0.04); this.acts.get('JumpStart')!.timeScale = 1.6; }
+      else if (this.once !== 'JumpStart' && this.once !== 'Roll') this.play('JumpLoop', 0.25);
+      this.wasAir = true;
+      return;
+    }
+    if (this.wasAir) {
+      this.wasAir = false;
+      if (this.once !== 'Roll') { this.once = k > 0.3 ? null : 'JumpLand'; if (this.once) { this.play('JumpLand', 0.08, 0.05); this.acts.get('JumpLand')!.timeScale = 1.5; } }
+    }
+    // la voltereta termina sola; el aterrizaje se corta si ya echas a andar
+    if (this.once === 'Roll') return;
+    if (this.once === 'JumpLand' && k < 0.15) return;
+    this.once = null;
+    let want: Clip, rate = 1;
+    if (m.swimming) { want = k > 0.12 ? 'Swim' : 'SwimIdle'; rate = 0.7 + k * 0.6; }
+    else if (m.crouch) { want = k > 0.06 ? 'CrouchWalk' : 'CrouchIdle'; rate = k > 0.06 ? Math.max(0.6, k / 0.32) : 1; }
+    else if (k < 0.06) want = 'Idle';
+    else if (m.sprint && k > 0.9) { want = 'Sprint'; rate = k / 1.45; }
+    // Walk_Loop avanza ~1,5 m/s y Jog_Fwd_Loop ~4 m/s a escala real; aquí la velocidad va en fracciones de 6,5 m/s
+    else if (k < 0.42) { want = 'Walk'; rate = Math.max(0.55, k / 0.26); }
+    else { want = 'Run'; rate = Math.max(0.75, k / 0.68); }
+    this.play(want, this.curName === 'JumpLand' ? 0.25 : 0.2);
+    this.acts.get(want)!.timeScale = rate;
+  }
+
   update(dt: number, m: Motion) {
+    if (this.acts.size) this.pick(m);
     this.mixer.update(dt);
     // los giros leen las rotaciones locales (ya actualizadas por el mezclador), así que no hace falta recalcular las matrices del mundo aquí: el render lo hace una vez
     this.worldQuat(this.armature, this._armQ);
     this.worldQuat(this.root, this._gq);
+    if (m.wave && m.wave > 0.01 && this.acts.size) {
+      this.swing('mixamorigRightArm', -2.6 * m.wave + Math.sin(m.t * 9) * 0.25 * m.wave);
+      this.swing('mixamorigRightForeArm', -0.5 * m.wave + Math.sin(m.t * 9) * 0.45 * m.wave);
+    }
+    if (this.acts.size) return; // con clips no hace falta el balanceo de abajo
     const k = Math.min(1, m.speed);
     this.phase += dt * (m.swimming ? 5.5 : 3 + 7 * k);
     const s = Math.sin(this.phase);

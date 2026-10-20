@@ -5,11 +5,19 @@ export class Input {
   pitch = 0.5;
   dist = 10;
   enabled = true;
+  /** se pulsó saltar (lo consume el jugador) */
+  jump = false;
+  /** agachado (C o Ctrl alterna; en móvil, su botón) */
+  crouch = false;
+  /** Mayús: esprint */
+  sprint = false;
+  /** se pidió una voltereta (agacharse mientras esprintas) */
+  roll = false;
   onInteract: () => void = () => {};
   onEscape: () => void = () => {};
 
   private keys = new Set<string>();
-  private stick = { id: -1, ox: 0, oy: 0, x: 0, y: 0 };
+  private stick = { id: -1, ox: 0, oy: 0, x: 0, y: 0, over: 0 };
   private look = { id: -1, x: 0, y: 0 };
   private joy = document.getElementById('joy') as HTMLElement;
   private joyKnob = this.joy.querySelector('i') as HTMLElement;
@@ -22,9 +30,19 @@ export class Input {
       if (!this.enabled) return;
       this.keys.add(k);
       if (k === 'e' || k === 'enter') this.onInteract();
+      if (k === ' ') { this.jump = true; e.preventDefault(); }
+      if (k === 'c' || k === 'control') this.toggleCrouch();
     });
     addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
     addEventListener('blur', () => this.keys.clear());
+
+    // botones táctiles de saltar y agacharse
+    const press = (id: string, fn: () => void) => document.getElementById(id)?.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (this.enabled) fn();
+    });
+    press('jumpBtn', () => { this.jump = true; });
+    press('crouchBtn', () => this.toggleCrouch());
 
     canvas.addEventListener('pointerdown', (e) => {
       if (!this.enabled) return;
@@ -42,7 +60,8 @@ export class Input {
       if (e.pointerId === this.stick.id) {
         const dx = e.clientX - this.stick.ox, dy = e.clientY - this.stick.oy;
         const len = Math.hypot(dx, dy), max = 48, k = len > max ? max / len : 1;
-        this.stick.x = (dx * k) / max; this.stick.y = (dy * k) / max;
+        this.stick.x = (dx * k) / max; this.stick.y = (dy * k) / max; this.stick.over = len / max;
+        this.joy.classList.toggle('sprint', this.stick.over > 1.5);
         this.joyKnob.style.transform = `translate(calc(-50% + ${dx * k}px), calc(-50% + ${dy * k}px))`;
       } else if (e.pointerId === this.look.id) {
         this.yaw -= (e.clientX - this.look.x) * 0.0055;
@@ -51,7 +70,7 @@ export class Input {
       }
     });
     const up = (e: PointerEvent) => {
-      if (e.pointerId === this.stick.id) { this.stick.id = -1; this.stick.x = this.stick.y = 0; this.joy.hidden = true; }
+      if (e.pointerId === this.stick.id) { this.stick.id = -1; this.stick.x = this.stick.y = this.stick.over = 0; this.joy.hidden = true; }
       if (e.pointerId === this.look.id) this.look.id = -1;
     };
     canvas.addEventListener('pointerup', up);
@@ -61,6 +80,15 @@ export class Input {
       this.dist = clamp(this.dist * (1 + Math.sign(e.deltaY) * 0.08), 4, 22);
     }, { passive: false });
   }
+
+  private toggleCrouch() {
+    // agacharse corriendo a toda velocidad es una voltereta
+    if (!this.crouch && this.sprintHeld()) { this.roll = true; return; }
+    this.crouch = !this.crouch;
+    document.getElementById('crouchBtn')?.classList.toggle('on', this.crouch);
+  }
+
+  private sprintHeld() { return this.keys.has('shift') || (this.stick.id >= 0 && this.stick.over > 1.5); }
 
   update() {
     let x = 0, y = 0;
@@ -75,6 +103,7 @@ export class Input {
       if (len < 0.12) { x = 0; y = 0; }
     }
     this.move.x = x; this.move.y = y;
+    this.sprint = this.enabled && this.sprintHeld() && !this.crouch;
   }
 }
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));

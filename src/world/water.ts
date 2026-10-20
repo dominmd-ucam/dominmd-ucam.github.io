@@ -127,7 +127,7 @@ function radialWaterGeometry(): THREE.BufferGeometry {
   const pts: [number, number][] = [[0, 0]];
   const maxR = 450;
   for (let rho = 2.3; rho <= maxR + 20; ) {
-    const step = THREE.MathUtils.lerp(2.3, 28, THREE.MathUtils.smoothstep(rho, 30, 420));
+    const step = THREE.MathUtils.lerp(2.3, 28, THREE.MathUtils.smoothstep(rho, 52, 420));
     const n = Math.max(6, Math.round((2 * Math.PI * rho) / step));
     const off = rnd() * Math.PI * 2;
     for (let i = 0; i < n; i++) {

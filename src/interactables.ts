@@ -23,6 +23,11 @@ export interface Project {
 interface Station { project: Project; group: THREE.Group; label: THREE.Sprite; marker: THREE.Mesh; beam: THREE.Mesh; tick?: (t: number) => void; baseY: number }
 
 const REACH = 3.2;
+/**
+ * Las estaciones de proyectos (modelo, columna de luz, rombo y cartel) están retiradas de la isla mientras se rehace el entorno.
+ * El código se queda: al volver a `true` reaparecen con su interacción y el contador de proyectos.
+ */
+export const SHOW_STATIONS = false;
 
 /** Nombre del proyecto flotando sobre la estación: así se reconoce desde lejos. */
 export function makeLabel(text: string): THREE.Sprite {
@@ -50,6 +55,7 @@ export class Interactables {
   pulse(seconds: number, now: number) { this.pulseUntil = now + seconds; }
 
   constructor(scene: THREE.Scene, obstacles: Obstacle[], tier: Tier) {
+    if (!SHOW_STATIONS) return;
     for (const project of data as unknown as Project[]) {
       const [x, z] = project.position;
       const { group, accent, tick } = makeStation(project.type);

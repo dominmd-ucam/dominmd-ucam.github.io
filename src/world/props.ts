@@ -1,7 +1,6 @@
 import * as THREE from 'three';
-import { heightAt, islandRadius, pathMask } from './terrain';
+import { heightAt, islandRadius } from './terrain';
 import { batchStatic } from './batch';
-import { stoneGeometry, stoneMaterial } from './stone';
 
 export interface Obstacle { x: number; z: number; r: number }
 
@@ -120,8 +119,9 @@ export function buildScenery(scene: THREE.Object3D) {
   const palms: Palm[] = [];
   const obstacles: Obstacle[] = [];
   const spots: [number, number][] = [
-    [0.3, 0.7], [0.8, 0.8], [1.5, 0.74], [2.0, 0.6], [2.8, 0.76], [3.5, 0.62],
-    [4.2, 0.78], [4.9, 0.66], [5.6, 0.7], [0.1, 0.3], [2.4, 0.42], [4.1, 0.38],
+    // en la franja de playa (dentro, los bosques del MegaKit) y un par junto a la plaza
+    [0.3, 0.84], [0.8, 0.86], [1.5, 0.8], [2.0, 0.78], [2.8, 0.85], [3.5, 0.83],
+    [4.2, 0.86], [4.9, 0.84], [5.6, 0.85], [1.2, 0.82], [0.1, 0.3], [4.1, 0.34],
   ];
   for (const [a, f] of spots) {
     const r = islandRadius(a) * f;
@@ -132,52 +132,7 @@ export function buildScenery(scene: THREE.Object3D) {
     obstacles.push({ x, z, r: 0.55 });
   }
 
-  // rocas
-  const rockMats = [stoneMaterial('#c9795a'), stoneMaterial('#b86a4f'), stoneMaterial('#a7adb4')];
-  for (let i = 0; i < 22; i++) {
-    const a = rnd() * Math.PI * 2, f = i < 12 ? 0.9 + rnd() * 0.2 : 0.3 + rnd() * 0.55;
-    const r = islandRadius(a) * f, x = Math.cos(a) * r, z = Math.sin(a) * r;
-    const h = heightAt(x, z);
-    if (h < -0.8 || h > 3.4) continue;
-    const s = 0.35 + rnd() * 0.8;
-    const m = new THREE.Mesh(stoneGeometry(s, i * 7.3, 1, s > 0.7 ? 3 : 2), rockMats[i % 3]);
-    m.position.set(x, Math.max(h, -0.6) + s * 0.25, z);
-    m.scale.y = 0.7; m.rotation.y = rnd() * 6;
-    m.castShadow = m.receiveShadow = true;
-    scene.add(m);
-    if (s > 0.55) obstacles.push({ x, z, r: s * 0.9 });
-  }
-
-  // arbustos y flores
-  const bushMats = [std('#4fb866'), std('#3ca457'), std('#63c874')];
-  for (let i = 0; i < 16; i++) {
-    const a = rnd() * Math.PI * 2, r = islandRadius(a) * (0.3 + rnd() * 0.35);
-    const x = Math.cos(a) * r, z = Math.sin(a) * r, h = heightAt(x, z);
-    if (h < 0.9) continue;
-    const s = 0.5 + rnd() * 0.5;
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 2), bushMats[i % 3]);
-    m.position.set(x, h + s * 0.4, z); m.scale.y = 0.75;
-    m.castShadow = m.receiveShadow = true;
-    scene.add(m);
-    obstacles.push({ x, z, r: s * 0.8 });
-  }
-  // flores: 2 mallas instanciadas (tallos y flores) en vez de ~140 mallas sueltas
-  const petalColors = ['#ff7a59', '#ffc857', '#ff9ac1', '#ffffff'].map((c) => new THREE.Color(c));
-  const spots2: { x: number; z: number; h: number; i: number }[] = [];
-  for (let i = 0; i < 90; i++) {
-    const a = rnd() * Math.PI * 2, r = islandRadius(a) * (0.2 + rnd() * 0.6);
-    const x = Math.cos(a) * r, z = Math.sin(a) * r, h = heightAt(x, z);
-    if (h < 1.0 || pathMask(x, z) > 0.2) continue;
-    spots2.push({ x, z, h, i });
-  }
-  const stems = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.015, 0.015, 0.3, 4).translate(0, 0.15, 0), std('#3a9a4a'), spots2.length);
-  const blooms = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.08, 1).translate(0, 0.32, 0), std('#ffffff'), spots2.length);
-  const fm = new THREE.Matrix4();
-  spots2.forEach((f, k) => {
-    fm.makeTranslation(f.x, f.h, f.z);
-    stems.setMatrixAt(k, fm); blooms.setMatrixAt(k, fm); blooms.setColorAt(k, petalColors[f.i % 4]);
-  });
-  scene.add(stems, blooms);
+  // flores, arbustos y rocas: ahora los pone nature.ts con el Stylized Nature MegaKit
   return { palms, obstacles };
 }
 

@@ -8,7 +8,11 @@ import type { Avatar, Motion } from './avatar/avatar';
 const SPEED = 6.5;
 const MAX_DEPTH = -3.4;  // límite de profundidad a nado
 const SWIM_FROM = -0.55; // por debajo de esto, nada en vez de andar
-const LIMIT = 46;        // borde del mundo
+const LIMIT = 70;        // borde del mundo
+const SPRINT = 1.45;     // multiplicador de velocidad al esprintar
+const CROUCH = 0.38;     // y al ir agachado
+const JUMP_V = 7.2, GRAVITY = 22; // salto de ~1,2 m
+const ROLL_T = 0.75, ROLL_V = 9;   // voltereta: duración y velocidad
 
 export class Player {
   group = new THREE.Group();
@@ -49,6 +53,10 @@ export class Player {
   }
 
   swimming = false;
+  /** velocidad vertical y si está en el aire */
+  private vy = 0;
+  airborne = false;
+  private rollT = 0;
   private tgt = new THREE.Vector2();
   private motion: Motion = { speed: 0, swimming: false, t: 0 };
   avatar: Avatar | null = null;
@@ -72,8 +80,19 @@ export class Player {
     // dirección relativa a la cámara
     const wx = input.move.x * cy - input.move.y * sy;
     const wz = -input.move.x * sy - input.move.y * cy;
-    const target = this.tgt.set(wx, wz).multiplyScalar(this.swimming ? SPEED * 0.6 : SPEED);
-    this.vel.lerp(target, 1 - Math.exp(-12 * dt));
+    const crouch = input.crouch && !this.swimming;
+    const mult = this.swimming ? 0.6 : crouch ? CROUCH : input.sprint ? SPRINT : 1;
+    const target = this.tgt.set(wx, wz).multiplyScalar(SPEED * mult);
+    // voltereta: impulso hacia delante que no se puede frenar hasta que acaba
+    if (input.roll) {
+      input.roll = false;
+      if (!this.swimming && !this.airborne && this.rollT <= 0) { this.rollT = ROLL_T; this.motion.roll = 1; }
+    }
+    if (this.rollT > 0) {
+      this.rollT -= dt;
+      target.set(Math.sin(this.heading), Math.cos(this.heading)).multiplyScalar(ROLL_V * Math.min(1, this.rollT / ROLL_T + 0.35));
+    }
+    this.vel.lerp(target, 1 - Math.exp(-(this.airborne ? 4 : 12) * dt));
 
     const p = this.group.position;
     const tryMove = (nx: number, nz: number) => {
@@ -93,8 +112,18 @@ export class Player {
     const h = heightAt(p.x, p.z);
     const dock = onDock(p.x, p.z);
     this.swimming = !dock && h < SWIM_FROM;
-    const targetY = dock ? DOCK.y : this.swimming ? waveHeight(p.x, p.z, t) * 0.7 - 0.85 : Math.max(h, -0.4);
-    p.y += (targetY - p.y) * (1 - Math.exp(-(dock || this.swimming ? 10 : 40) * dt));
+    // con los clips de natación el cuerpo va tumbado: flota más arriba que el muñeco de respaldo
+    const swimY = this.avatar?.animated ? -0.25 : -0.85;
+    const targetY = dock ? DOCK.y : this.swimming ? waveHeight(p.x, p.z, t) * 0.7 + swimY : Math.max(h, -0.4);
+    if (input.jump) {
+      input.jump = false;
+      if (!this.airborne && !this.swimming && this.rollT <= 0) { this.airborne = true; this.vy = JUMP_V; }
+    }
+    if (this.airborne) {
+      this.vy -= GRAVITY * dt;
+      p.y += this.vy * dt;
+      if (p.y <= targetY && this.vy < 0) { p.y = targetY; this.airborne = false; this.vy = 0; }
+    } else p.y += (targetY - p.y) * (1 - Math.exp(-(dock || this.swimming ? 10 : 40) * dt));
 
     const speed = this.vel.length();
     if (speed > 0.4) {
@@ -105,6 +134,7 @@ export class Player {
       this.group.rotation.y = this.heading;
     }
     const mo = this.motion; mo.speed = speed / SPEED; mo.swimming = this.swimming; mo.t = t;
+    mo.airborne = this.airborne; mo.crouch = crouch; mo.sprint = input.sprint;
     this.avatar?.update(dt, mo);
     this.phase += speed * dt * 1.7;
     const k = Math.min(1, speed / SPEED), s = Math.sin(this.phase) * 0.9 * k;

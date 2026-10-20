@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import { Delaunay } from 'd3-delaunay';
-import projects from '../data/projects.json';
 import { CLOUD_GLSL } from './toon';
 
-export const WORLD_SIZE = 128;
-const ISLAND_R = 26;
+export const WORLD_SIZE = 176;
+export const ISLAND_R = 38;
 const HMIN = -4;
 const HMAX = 4;
 
@@ -39,24 +38,70 @@ export function islandRadius(a: number): number {
 /** Colina del faro. */
 export const HILL: [number, number] = [-9, -9];
 /** Islote cercano, alcanzable a nado. */
-export const ISLET: [number, number] = [-33, 20];
+export const ISLET: [number, number] = [-48, 29];
 
-/** Caminos de arena: polilíneas entre el punto de inicio, las estaciones y el faro. */
-const PATHS: [number, number][][] = [
-  [[6, 13], [8, 9], [4, 4], [0, 0]],   // desde el punto de inicio
-  [[0, 0], [-7, -6]],                  // hacia el faro
-  ...(projects as unknown as { position: [number, number] }[]).map((p) => [[0, 0], p.position] as [number, number][]), // un camino por proyecto
+/** Punto a una fracción `f` del radio de la costa en el ángulo `a`. */
+export function polar(a: number, f: number): [number, number] {
+  const r = islandRadius(a) * f;
+  return [Math.cos(a) * r, Math.sin(a) * r];
+}
+
+/* ---------- biomas ----------
+   El centro (pueblo, faro, punto de inicio) es pradera abierta. Alrededor, por sectores:
+   bosque (al este), bosque retorcido (junto a la cueva, al suroeste), zona seca (oeste), pinar (en el promontorio del faro)
+   y un prado de flores (norte, junto al muelle). La cala del sur se queda en playa. */
+export type Biome = 'forest' | 'mystic' | 'dry' | 'pine' | 'meadow';
+export const BIOMES: { name: Biome; a: number; w: number }[] = [
+  { name: 'forest', a: 0.7, w: 0.62 },
+  { name: 'mystic', a: 2.5, w: 0.45 },
+  { name: 'dry', a: 3.33, w: 0.38 },
+  { name: 'pine', a: -2.3, w: 0.55 },
+  { name: 'meadow', a: -0.85, w: 0.75 },
 ];
+/** Peso de cada bioma en un punto (0–1; fuera del centro suman ~1). El borde entre sectores se deforma con ruido para que no sea recto. */
+export function biomeWeights(x: number, z: number, out: Record<Biome, number>): Record<Biome, number> {
+  const a = Math.atan2(z, x) + (fbm(x * 0.06 + 3.1, z * 0.06 - 7.7) - 0.5) * 0.6;
+  const f = Math.hypot(x, z) / islandRadius(Math.atan2(z, x));
+  const inland = THREE.MathUtils.smoothstep(f, 0.4, 0.52);
+  for (const b of BIOMES) out[b.name] = (1 - THREE.MathUtils.smoothstep(Math.abs(angDiff(a, b.a)), b.w - 0.12, b.w + 0.12)) * inland;
+  return out;
+}
+
+/** Claros rodeados de árboles (centro y radio). Los caminos entran por los huecos. */
+export const CLEARINGS: { x: number; z: number; r: number; biome: Biome }[] = [
+  { ...xz(polar(0.72, 0.62)), r: 6, biome: 'forest' },
+  { ...xz(polar(2.55, 0.6)), r: 5.5, biome: 'mystic' },
+  { ...xz(polar(-2.05, 0.64)), r: 4.5, biome: 'pine' },
+];
+function xz(p: [number, number]) { return { x: p[0], z: p[1] }; }
+
+/** Caminos: polilíneas. Los de piedra se empiedran con las losas del MegaKit; debajo, la tierra se pinta de color camino. */
+const RING = 0.62;
+const ring: [number, number][] = [];
+for (let a = -Math.PI; a <= Math.PI + 1e-6; a += 0.16) ring.push(polar(a, RING));
+const PATHS: [number, number][][] = [
+  [[6, 13], [8, 9], [4, 4], [0, 0]],          // desde el punto de inicio a la plaza
+  [[0, 0], [-7, -6]],                         // al faro
+  ring,                                       // la vuelta a la isla, que pasa por los claros
+  [[0, 0], polar(0.72, 0.35), polar(0.72, RING)],   // plaza → claro del bosque
+  [[0, 0], polar(2.5, 0.35), polar(2.55, RING)],    // plaza → bosque retorcido
+  [[0, 0], polar(-0.85, 0.35), polar(-0.85, RING), polar(-0.9, 0.86)], // plaza → prado → muelle
+];
+export const STONE_PATHS = PATHS;
 function segDist(px: number, pz: number, ax: number, az: number, bx: number, bz: number) {
   const dx = bx - ax, dz = bz - az;
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1)));
   return Math.hypot(px - (ax + t * dx), pz - (az + t * dz));
 }
-/** 1 sobre el camino, 0 fuera (con borde suave). */
-export function pathMask(x: number, z: number): number {
+/** Distancia al camino más cercano. */
+export function pathDist(x: number, z: number): number {
   let d = 99;
   for (const poly of PATHS) for (let i = 0; i < poly.length - 1; i++) d = Math.min(d, segDist(x, z, poly[i][0], poly[i][1], poly[i + 1][0], poly[i + 1][1]));
-  return 1 - THREE.MathUtils.smoothstep(d, 0.45, 1.15);
+  return d;
+}
+/** 1 sobre el camino, 0 fuera (con borde suave). */
+export function pathMask(x: number, z: number): number {
+  return 1 - THREE.MathUtils.smoothstep(pathDist(x, z), 0.45, 1.15);
 }
 
 /** Muelle: sale de la costa en el ángulo DOCK.a y se adentra DOCK.len metros. */
@@ -74,7 +119,7 @@ export function heightAt(x: number, z: number): number {
   const t = 1 - r / islandRadius(a);
   let h: number;
   if (t < 0) h = Math.max(HMIN, t * 10 - 0.3);
-  else h = Math.pow(t, 0.4) * 2.4 - 0.3;
+  else h = Math.pow(t, 0.33) * 2.6 - 0.3; // la isla creció: playa más estrecha y más prado
   const k = Math.min(1, Math.max(0, t * 3));
   // colina rocosa del faro (con meseta arriba)
   const hd = ((x - HILL[0]) ** 2 + (z - HILL[1]) ** 2);
@@ -94,7 +139,7 @@ const C_GRASS = new THREE.Color('#86d14c');
 const C_GRASS_Y = new THREE.Color('#b9dc5a');
 const C_GRASS2 = new THREE.Color('#58b448');
 const C_ROCK = new THREE.Color('#b98260');
-const C_PATH = new THREE.Color('#dfb98a');
+const C_PATH = new THREE.Color('#b99a6e');
 
 /**
  * Color del suelo en un punto (`ny` = componente vertical de la normal). Lo usa el terreno por vértice
@@ -107,10 +152,21 @@ export function groundColor(x: number, z: number, h: number, ny: number, c: THRE
   c.lerp(tmpC.copy(C_GRASS).lerp(C_GRASS_Y, THREE.MathUtils.smoothstep(patch, 0.45, 0.65)), THREE.MathUtils.smoothstep(h, 0.85, 1.25));
   c.lerp(C_GRASS2, THREE.MathUtils.smoothstep(h, 1.6, 3.2) * 0.8 + n * 0.25);
   c.lerp(C_ROCK, Math.max(THREE.MathUtils.smoothstep(1 - ny, 0.3, 0.5) * (h > 0.6 ? 1 : 0), THREE.MathUtils.smoothstep(h, 5.2, 7.2) * 0.8));
+  // tinte de cada bioma sobre la hierba
+  const land = THREE.MathUtils.smoothstep(h, 0.9, 1.4);
+  biomeWeights(x, z, bw);
+  c.lerp(C_FOREST, bw.forest * 0.55 * land).lerp(C_MYSTIC, bw.mystic * 0.6 * land).lerp(C_DRY, bw.dry * 0.65 * land)
+    .lerp(C_PINE, bw.pine * 0.5 * land).lerp(C_MEADOW, bw.meadow * 0.35 * land);
   c.lerp(C_PATH, pathMask(x, z) * THREE.MathUtils.smoothstep(h, 0.6, 1.1) * 0.9);
   return c.multiplyScalar(0.94 + n * 0.12);
 }
 const tmpC = new THREE.Color();
+const bw = {} as Record<Biome, number>;
+const C_FOREST = new THREE.Color('#4f9a3a');
+const C_MYSTIC = new THREE.Color('#3f9c78');
+const C_DRY = new THREE.Color('#c9b061');
+const C_PINE = new THREE.Color('#477f3a');
+const C_MEADOW = new THREE.Color('#a8dc4e');
 
 /**
  * Cuánto detalle necesita cada punto del mapa (0 = llano y sin interés, 1 = máximo).
@@ -264,7 +320,7 @@ ${CLOUD_GLSL}`)
 }
 
 /** Mapa de alturas de 8 bits para que el shader del agua pinte espuma y profundidad. */
-export function buildHeightTexture(size = 256): THREE.DataTexture {
+export function buildHeightTexture(size = 352): THREE.DataTexture {
   const data = new Uint8Array(size * size);
   for (let j = 0; j < size; j++) {
     for (let i = 0; i < size; i++) {
