@@ -187,6 +187,7 @@ export const DEAD_ENDS = zones.trails.filter((t) => t.end === 'fence').map((t) =
 export const RESERVED: [number, number, number][] = [
   ...PLOTS.map((p): [number, number, number] => [p.x, p.z, p.r + 1.2]),
   [CHEST.x, CHEST.z, 2.2],
+  [...polar(1.38, 0.88), 7], // barco varado
   [...caveOut(0.5), 3.4], [...caveOut(2.8), 3.2],
   ...DEAD_ENDS.map((d): [number, number, number] => [d.x, d.z, 1.6]),
 ];
