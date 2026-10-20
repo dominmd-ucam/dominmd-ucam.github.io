@@ -6,17 +6,8 @@ interface Node { text: string; choices: Choice[] }
 const PORTRAIT = `<svg viewBox="0 0 100 100" aria-hidden="true">
   <polygon points="0,0 100,0 100,58 0,42" fill="#7fe0d6"/><polygon points="0,42 100,58 100,100 0,100" fill="#1fb5b0"/>
   <polygon points="0,80 100,72 100,100 0,100" fill="#f3d9a4"/><polygon points="0,80 40,76 0,100" fill="#e6c689"/>
-  <g class="head">
-    <polygon points="22,18 38,34 62,34 78,18 86,52 50,86 14,52" fill="#2d3748"/>
-    <polygon points="22,18 38,34 26,40" fill="#ff9ac1"/><polygon points="78,18 62,34 74,40" fill="#ff9ac1"/>
-    <polygon points="14,52 30,50 50,86" fill="#232c3a"/><polygon points="86,52 70,50 50,86" fill="#3a465c"/>
-    <polygon points="50,60 62,60 50,74 38,60" fill="#fbf7ee" opacity=".9"/>
-    <g class="eyes"><polygon points="30,46 42,48 36,56" fill="#ffc857"/><polygon points="70,46 58,48 64,56" fill="#ffc857"/>
-    <polygon points="34,48 38,49 36,54" fill="#0f3440"/><polygon points="66,48 62,49 64,54" fill="#0f3440"/></g>
-    <polygon points="46,62 54,62 50,68" fill="#ff9ac1"/>
-    <polyline points="40,70 50,76 60,70" fill="none" stroke="#fbf7ee" stroke-width="2" stroke-linejoin="round"/>
-    <path d="M14,60 L34,64 M14,70 L34,68 M86,60 L66,64 M86,70 L66,68" fill="none" stroke="#fbf7ee" stroke-width="1.6"/>
-  </g></svg>`;
+  <image class="head" href="${import.meta.env.BASE_URL}models/characters/misu-portrait.webp" x="4" y="8" width="92" height="92"/>
+</svg>`; // retrato renderizado del mismo modelo 3D de Misu (scripts/blender/misu.py)
 
 /** Caja de diálogo con retrato, escritura letra a letra y opciones navegables (teclado, ratón y toque). */
 export class Dialogue {

@@ -3,7 +3,7 @@
   "start": "hola",
   "nodes": {
     "hola": {
-      "text": "¡Miau! Soy Misu, la guía de esta isla. Bienvenido al portfolio de Domin: aquí cada objeto brillante es uno de sus proyectos.",
+      "text": "¡Miau! Soy Misu, la guía de esta isla. Bienvenido al portfolio de Domin. ¿Has visto al robot de la plaza? Saluda a todo el que pasa.",
       "choices": [
         { "label": "¿Qué hay en la isla?", "next": "isla" },
         { "label": "¿Quién es Domin?", "next": "domin" },
@@ -12,7 +12,7 @@
       ]
     },
     "isla": {
-      "text": "Hay 14 estaciones repartidas por la isla: webs, bots, plugins, herramientas de consola, una app móvil y hasta un dispositivo con pantalla. El nombre de cada proyecto flota sobre su estación: acércate y pulsa E para probar su demo. También hay un faro, un barco varado, una cueva con espada… ¡y un islote al que se llega a nado!",
+      "text": "La isla ha crecido: hay un faro, un barco varado, mesetas a las que se sube por rampas, una cueva que se puede recorrer por dentro, un cofre medio enterrado en la playa… ¡y un islote al que se llega a nado! Los terrenos vallados están reservados: pronto habrá proyectos de Domin en ellos.",
       "choices": [
         { "label": "¿Quién es Domin?", "next": "domin" },
         { "label": "Enséñame el camino", "next": "camino", "action": "showPaths" },
@@ -28,7 +28,7 @@
       ]
     },
     "camino": {
-      "text": "¡Mira las columnas de luz! Cada una marca un proyecto. Del cruce central salen caminos hasta todos ellos, y los carteles te dicen cuál es cuál. ¡Buen viaje!",
+      "text": "Del cruce central salen los caminos de piedra que dan la vuelta a la isla, y de ellos los senderos de tierra hacia los rincones escondidos. Los carteles te dicen cuál es cuál. ¡Buen viaje!",
       "choices": [
         { "label": "¡Gracias, Misu!", "next": null }
       ]

@@ -273,7 +273,8 @@ input.onInteract = interact;
 input.onEscape = () => { if (!blocked()) menu.show(); };
 ui.onPromptClick = interact;
 ui.onAvatar = () => { if (!menu.open && !dialogue.open && !ui.isOpen) avatarUI?.toggle(); };
-dialogue.onStart = () => achievements.unlock('friend');
+dialogue.onStart = () => { achievements.unlock('friend'); guide.talking = true; };
+dialogue.onClose = () => { guide.talking = false; };
 dialogue.onAction = (a) => { if (a === 'showPaths') interactables.pulse(4.5, timer.getElapsed()); };
 
 function resize() {

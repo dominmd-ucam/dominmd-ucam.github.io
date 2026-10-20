@@ -94,8 +94,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #f6c9a0; col
 @keyframes dlgOut { to { opacity: 0; transform: translateY(25%) scale(.95); } }
 .portrait { flex: none; width: clamp(70px, 14vw, 150px); aspect-ratio: 1; clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); background: var(--sea); }
 .portrait svg { width: 100%; height: 100%; display: block; }
-.portrait .eyes { transform-box: fill-box; transform-origin: center; animation: blinkE 3.4s infinite; }
-@keyframes blinkE { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+.portrait .head { transform-box: fill-box; transform-origin: 50% 100%; }
 .portrait.talking .head { animation: nod .24s ease-in-out infinite alternate; }
 @keyframes nod { to { transform: translateY(-2.5px) rotate(-1.5deg); } }
 .name { position: absolute; top: -.9em; left: calc(clamp(70px, 14vw, 150px) + 1.4vw + 1em); z-index: 1; font: 700 .85em var(--disp); letter-spacing: .08em; background: var(--coral); color: var(--foam); padding: .12em 1em; clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%); }
