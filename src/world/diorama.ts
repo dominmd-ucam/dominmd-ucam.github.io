@@ -36,7 +36,7 @@ function hullPoint(s: number, f: number, out: THREE.Vector3) {
 }
 function hullGeometry(): THREE.BufferGeometry {
   const NS = 34, NF = 18, pos: number[] = [], col: number[] = [], v = new THREE.Vector3(), c = new THREE.Color();
-  const planks = [new THREE.Color('#9a6640'), new THREE.Color('#87573a')], wale = new THREE.Color('#4a2e1e'), algae = new THREE.Color('#5f8a4a');
+  const planks = [new THREE.Color('#c08a58'), new THREE.Color('#a87448')], wale = new THREE.Color('#6a4128'), algae = new THREE.Color('#5f8a4a');
   const quad = (i: number, k: number) => {
     const s0 = -1 + (2 * i) / NS, s1 = -1 + (2 * (i + 1)) / NS, f0 = k / NF, f1 = (k + 1) / NF;
     if (inHole((s0 + s1) / 2, (f0 + f1) / 2)) return;
