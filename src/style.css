@@ -149,6 +149,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #f6c9a0; col
 
 /* ---------- joystick y depuración ---------- */
 #joy { position: fixed; z-index: 5; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 3px solid rgba(255, 250, 240, .6); background: rgba(255, 250, 240, .15); pointer-events: none; }
+#joy.sprint { border-color: var(--coral); background: rgba(255, 122, 89, .22); }
+.acts { right: 16px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 2; display: none; align-items: flex-end; gap: 10px; }
+.acts .hex { color: var(--deep); touch-action: none; }
+.acts .hex.big { width: 68px; }
+.acts .hex.on { background: var(--coral); color: var(--foam); }
+@media (pointer: coarse) { .acts { display: flex; } }
 #joy i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; background: rgba(255, 250, 240, .8); transform: translate(-50%, -50%); clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); }
 #debug { position: fixed; right: 12px; bottom: 12px; z-index: 60; padding: 6px 10px; font: 12px/1.4 ui-monospace, Consolas, monospace; color: #bfffd8; background: rgba(0, 0, 0, .65); white-space: pre; pointer-events: none; }
 

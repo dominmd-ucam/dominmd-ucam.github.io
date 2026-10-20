@@ -10,7 +10,7 @@ import { buildLife } from './world/life';
 import { buildSplash } from './world/splash';
 import { StudioLight } from './world/studio';
 import { buildDiorama } from './world/diorama';
-import { buildTrees } from './world/trees';
+import { buildNature } from './world/nature';
 import { buildVillage } from './world/village';
 import { batchStatic } from './world/batch';
 import { Dawn } from './world/dawn';
@@ -79,12 +79,12 @@ obstacles.push(...diorama.obstacles);
 const village = buildVillage(staticWorld);
 obstacles.push(...village.obstacles);
 const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
-const trees = buildTrees(scene, obstacles, q.tier === 'low' ? 8 : 15, q.tier !== 'low', dawn.sunDir);
+const nature = buildNature(scene, obstacles, q.tier); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
 const studio = new StudioLight(scene, dawn);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
-const grass = buildGrass(q.tier === 'high' ? 90000 : q.tier === 'med' ? 48000 : 14000, q.tier === 'low', q.shadows); // en calidad baja, solo la hoja ligera
+const grass = buildGrass(q.tier === 'high' ? 150000 : q.tier === 'med' ? 80000 : 24000, q.tier === 'low', q.shadows); // en calidad baja, solo la hoja ligera
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
@@ -155,6 +155,10 @@ function creditsView(): View {
     title: 'Créditos', sub: 'Gracias', hint: 'Esc volver',
     rows: [
       { type: 'info', label: 'Avatar y modelos', value: 'Wawa Sensei' },
+      { type: 'info', label: 'Naturaleza y animaciones', value: 'Quaternius (CC0)' },
+      { type: 'info', label: 'Tronco caído y tocón musgoso', value: 'neon_dust (CC-BY 4.0)' },
+      { type: 'info', label: 'Tocón', value: 'metrosp (CC-BY 4.0)' },
+      { type: 'info', label: 'Isla flotante', value: 'Tom Verbeeck (CC-BY 4.0)' },
       { type: 'info', label: 'Estilo de referencia', value: 'Petit Island' },
       { type: 'info', label: 'Motor', value: 'three.js' },
       { type: 'info', label: 'Interfaz', value: 'Isla Coral' },
@@ -219,7 +223,7 @@ function applySettings(key?: string) {
   renderer.shadowMap.needsUpdate = true;
   post.setEnabled(s.effects && q.tier !== 'low');
   grass.setInkMask(s.effects && q.tier !== 'low'); // la máscara de contornos solo sirve (y solo es segura) con el postprocesado
-  trees.setInkMask(s.effects && q.tier !== 'low');
+  nature.setInkMask(s.effects && q.tier !== 'low');
   setPresence(s.ghosts);
   if (key === undefined || key === 'resolution') {
     if (s.resolution === 'auto') adaptive.setMax(q.dpr);
@@ -300,7 +304,7 @@ const timer = new THREE.Timer();
 timer.connect(document);
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), camHead = new THREE.Vector3();
 function camBlocked(p: THREE.Vector3): boolean {
-  if (trees.blocks(p)) return true;
+  if (nature.blocks(p)) return true;
   if (p.y > 9) return false;
   for (const o of obstacles) if (o.r >= 1.4 && Math.hypot(p.x - o.x, p.z - o.z) < o.r + 0.6) return true;
   return false;
@@ -323,7 +327,7 @@ function frame(timestamp: number) {
   presence?.send(player.group.position.x, player.group.position.z, player.group.rotation.y, Math.min(1, player.vel.length() / 6.5), player.swimming, performance.now());
   ghosts.update(dt, t, performance.now());
   grass.update(t, camera.position, player.group.position);
-  trees.update(t, camera.position);
+  nature.update(t);
   for (const p of palms) {
     // LOD: a más de 48 m se dibuja la versión ligera (con 4 m de histéresis para que no parpadee en el límite)
     const dp = Math.hypot(camera.position.x - p.group.position.x, camera.position.z - p.group.position.z);
@@ -390,7 +394,7 @@ function frame(timestamp: number) {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, studio, post, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
+(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, studio, post, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }

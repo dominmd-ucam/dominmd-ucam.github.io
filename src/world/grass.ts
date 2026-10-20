@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { groundColor, heightAt, pathMask } from './terrain';
+import { ISLAND_R, groundColor, heightAt, pathMask } from './terrain';
 import { CLOUD_GLSL } from './toon';
 
 const NEAR_FULL = 18; // metros hasta los que se dibuja la hoja completa
@@ -91,7 +91,7 @@ export function buildGrass(count: number, liteOnly = false, receiveShadow = fals
   const q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   let n = 0, guard = 0;
   while (n < count && guard++ < count * 12) {
-    const x = (Math.random() - 0.5) * 60, z = (Math.random() - 0.5) * 60, h = heightAt(x, z);
+    const x = (Math.random() - 0.5) * ISLAND_R * 2.6, z = (Math.random() - 0.5) * ISLAND_R * 2.6, h = heightAt(x, z);
     if (h < 1.0 || h > 5.4 || pathMask(x, z) > 0.25) continue;
     const e = 0.4, ny = 1 / Math.hypot(1, (heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e), (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e));
     if (ny < 0.8) continue; // en las rocas no crece
