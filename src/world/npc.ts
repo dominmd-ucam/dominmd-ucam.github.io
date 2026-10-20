@@ -32,7 +32,7 @@ export class CatGuide {
     cfg.colors.Head = '#fbe0cf';
     await a.apply(cfg);
     const holder = new THREE.Group();
-    holder.scale.setScalar(1.05);
+    holder.scale.setScalar(1.7 / 2.19); // misma altura que el personaje (1,70 m)
     holder.add(a.root);
     this.group.add(holder);
     this.avatar = a;

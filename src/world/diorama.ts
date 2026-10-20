@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { heightAt, islandRadius } from './terrain';
 import type { Obstacle } from './props';
 import { waveHeight } from './water';
@@ -168,54 +167,7 @@ export function buildDiorama(scene: THREE.Object3D): Diorama {
     ticks.push((t) => { steel.emissiveIntensity = 0.5 + Math.sin(t * 2) * 0.3; });
   }
 
-  /* ---------- helechos y plantas tropicales ---------- */
-  {
-    const blades: THREE.BufferGeometry[] = [];
-    for (let i = 0; i < 8; i++) {
-      const b = new THREE.PlaneGeometry(0.26, 1.2, 1, 5);
-      const p = b.attributes.position as THREE.BufferAttribute;
-      const col = new Float32Array(p.count * 3), c = new THREE.Color();
-      for (let k = 0; k < p.count; k++) {
-        const u = p.getY(k) + 0.6;
-        const w = (1 - Math.abs(u / 1.2 - 0.45) * 1.4) * p.getX(k) * 2.4;
-        p.setXYZ(k, w, u * 0.7 - u * u * 0.32 + 0.02, u * 0.85);
-        c.set('#2d9e3f').lerp(c.clone().set('#8ee86a'), u / 1.2);
-        c.toArray(col, k * 3);
-      }
-      b.setAttribute('color', new THREE.BufferAttribute(col, 3));
-      b.rotateY((i / 8) * Math.PI * 2 + (i % 2) * 0.2);
-      b.rotateX(0);
-      blades.push(b);
-    }
-    const fernGeo = mergeGeometries(blades)!;
-    fernGeo.computeVertexNormals();
-    const ferns = new THREE.InstancedMesh(fernGeo, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.7, flatShading: true }), 180);
-    let n = 0, guard = 0;
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), tint = new THREE.Color();
-    const hot = [[2.15, 0.84], [1.38, 0.9]]; // cerca de la cueva y del barco
-    while (n < 180 && guard++ < 6000) {
-      let x: number, z: number;
-      if (n < 70) {
-        const [ha, hf] = hot[n % 2];
-        const aa = ha + (Math.random() - 0.5) * 0.6, rr = islandRadius(aa) * (hf + (Math.random() - 0.5) * 0.12);
-        x = Math.cos(aa) * rr; z = Math.sin(aa) * rr;
-      } else {
-        const aa = Math.random() * 6.28, rr = islandRadius(aa) * (0.7 + Math.random() * 0.22);
-        x = Math.cos(aa) * rr; z = Math.sin(aa) * rr;
-      }
-      const h = heightAt(x, z);
-      if (h < 0.7 || h > 3) continue;
-      q.setFromAxisAngle(up, Math.random() * 6.28);
-      m4.compose(new THREE.Vector3(x, h - 0.03, z), q, new THREE.Vector3().setScalar(0.42 + Math.random() * 0.45));
-      ferns.setMatrixAt(n, m4);
-      tint.setHSL(0.28 + Math.random() * 0.05, 0.6, 0.8 + Math.random() * 0.3);
-      ferns.setColorAt(n, tint);
-      n++;
-    }
-    ferns.count = n;
-    ferns.castShadow = true;
-    scene.add(ferns);
-  }
+  // los helechos de la cueva y el barco los pone nature.ts (con viento y se apartan al pasar)
 
   /* ---------- tablones flotando en la cala ---------- */
   {

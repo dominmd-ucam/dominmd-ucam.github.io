@@ -77,7 +77,7 @@ export class Input {
     canvas.addEventListener('pointercancel', up);
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      this.dist = clamp(this.dist * (1 + Math.sign(e.deltaY) * 0.08), 4, 22);
+      this.dist = clamp(this.dist * (1 + Math.sign(e.deltaY) * 0.08), 3, 20);
     }, { passive: false });
   }
 

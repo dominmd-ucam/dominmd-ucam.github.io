@@ -5,7 +5,7 @@ import type { Obstacle } from './world/props';
 import type { Input } from './input';
 import type { Avatar, Motion } from './avatar/avatar';
 
-const SPEED = 6.5;
+const SPEED = 5.5;
 const MAX_DEPTH = -3.4;  // límite de profundidad a nado
 const SWIM_FROM = -0.55; // por debajo de esto, nada en vez de andar
 const LIMIT = 70;        // borde del mundo
@@ -49,6 +49,7 @@ export class Player {
     this.armL = limb(0.075, 0.36, skin, -0.4, 1.3); this.armR = limb(0.075, 0.36, skin, 0.4, 1.3);
     this.armL.rotation.z = 0.12; this.armR.rotation.z = -0.12;
 
+    this.body.scale.setScalar(Player.AVATAR_HEIGHT / 2.05); // el muñeco de respaldo mide ~2,05 m con el sombrero
     this.group.position.set(start[0], heightAt(start[0], start[1]), start[1]);
   }
 
@@ -61,8 +62,10 @@ export class Player {
   private motion: Motion = { speed: 0, swimming: false, t: 0 };
   avatar: Avatar | null = null;
   private holder = new THREE.Group();
-  /** altura objetivo del avatar y giro para que mire a +Z del jugador (se ajusta según el modelo) */
-  static AVATAR_HEIGHT = 2.0;
+  /** altura objetivo del avatar (m) y giro para que mire a +Z del jugador (se ajusta según el modelo) */
+  static AVATAR_HEIGHT = 1.7;
+  /** altura real del avatar modular a escala 1 (medida en el juego: cabeza y pelo incluidos) */
+  static MODEL_HEIGHT = 2.19;
   static AVATAR_YAW = 0;
 
   /** Sustituye el cuerpo procedural por el avatar modular cuando termina de cargar. */
@@ -70,7 +73,7 @@ export class Player {
     this.avatar = a;
     this.body.visible = false;
     this.holder.rotation.y = Player.AVATAR_YAW;
-    this.holder.scale.setScalar(Player.AVATAR_HEIGHT / 1.8);
+    this.holder.scale.setScalar(Player.AVATAR_HEIGHT / Player.MODEL_HEIGHT);
     this.holder.add(a.root);
     this.group.add(this.holder);
   }

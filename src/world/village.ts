@@ -69,7 +69,7 @@ export function buildVillage(scene: THREE.Object3D): { obstacles: Obstacle[] } {
     add(g, new THREE.BoxGeometry(0.4, 0.26, 4.5), mat('#c25a33'), 0, 3.85, 0);
     add(g, new THREE.BoxGeometry(0.6, 1.4, 0.6), mat('#f2e6d2'), 1.4, 3.7, -1.0);
     // puerta, ventanas y macetas
-    add(g, new THREE.BoxGeometry(1.0, 1.8, 0.12), mat('#2f84c4'), -0.6, 0.95, 1.92);
+    add(g, new THREE.BoxGeometry(1.0, 2.05, 0.12), mat('#2f84c4'), -0.6, 1.075, 1.92);
     for (const wx of [0.9, 1.9]) {
       add(g, new THREE.BoxGeometry(0.7, 0.8, 0.1), mat('#9bd8f2', { emissive: '#9bd8f2', emissiveIntensity: 0.15 }), wx, 1.6, 1.93);
       for (const s of [-1, 1]) add(g, new THREE.BoxGeometry(0.3, 0.9, 0.08), mat('#2f84c4'), wx + s * 0.5, 1.6, 1.94);

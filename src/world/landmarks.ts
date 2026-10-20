@@ -45,7 +45,7 @@ export function buildLandmarks(scene: THREE.Object3D): Landmarks {
     add(g, box(0.15, 2.2, 3.2), WOOD, 1.55, 1.85, 0);
     add(g, box(1.1, 2.2, 0.15), WOOD, -1.05, 1.85, 1.55);
     add(g, box(1.1, 2.2, 0.15), WOOD, 1.05, 1.85, 1.55);
-    add(g, box(1.0, 0.6, 0.15), WOOD, 0, 2.65, 1.55);
+    add(g, box(1.0, 0.25, 0.15), WOOD, 0, 2.825, 1.55); // dintel alto: hueco de puerta de 2 m
     add(g, box(0.9, 0.9, 0.05), mat('#79d4ee', { emissive: '#79d4ee', emissiveIntensity: 0.2 }), 1.56, 2.0, 0.2, false).rotation.y = Math.PI / 2;
     // tejado a dos aguas
     const roofM = mat('#58c468');

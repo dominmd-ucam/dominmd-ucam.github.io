@@ -8,7 +8,6 @@ import { installToon } from './world/toon';
 import { buildLandmarks } from './world/landmarks';
 import { buildLife } from './world/life';
 import { buildSplash } from './world/splash';
-import { StudioLight } from './world/studio';
 import { buildDiorama } from './world/diorama';
 import { buildNature } from './world/nature';
 import { buildVillage } from './world/village';
@@ -82,7 +81,6 @@ const interactables = new Interactables(scene, obstacles, q.tier); // antes que 
 const nature = buildNature(scene, obstacles, q.tier); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
-const studio = new StudioLight(scene, dawn);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
 const grass = buildGrass(q.tier === 'high' ? 150000 : q.tier === 'med' ? 80000 : 24000, q.tier === 'low', q.shadows); // en calidad baja, solo la hoja ligera
 scene.add(grass.group);
@@ -135,7 +133,6 @@ void Avatar.create().then(async (a) => {
   await a.apply(loadConfig());
   player.attachAvatar(a);
   avatarUI = new AvatarUI(a);
-  studio.prewarm(renderer, scene, camera); // compila ya los shaders con luz de estudio: abrir el editor no da tirones
   avatarBtn.disabled = false;
 }).catch((e) => console.warn('Avatar modular no disponible, uso el de respaldo:', e)).finally(() => { avatarSettled = true; ui.setLoad(0.95, 'Todo listo'); });
 
@@ -302,6 +299,8 @@ function checkZones(p: THREE.Vector3) {
 // THREE.Timer sustituye a Clock (obsoleto): con connect() ignora el tiempo en que la pestaña está oculta y no da un salto enorme al volver
 const timer = new THREE.Timer();
 timer.connect(document);
+/** altura de la mirada de la cámara sobre los pies (el personaje mide 1,70 m) */
+const EYE = 1.15;
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), camHead = new THREE.Vector3();
 function camBlocked(p: THREE.Vector3): boolean {
   if (nature.blocks(p)) return true;
@@ -327,7 +326,7 @@ function frame(timestamp: number) {
   presence?.send(player.group.position.x, player.group.position.z, player.group.rotation.y, Math.min(1, player.vel.length() / 6.5), player.swimming, performance.now());
   ghosts.update(dt, t, performance.now());
   grass.update(t, camera.position, player.group.position);
-  nature.update(t);
+  nature.update(t, player.group.position);
   for (const p of palms) {
     // LOD: a más de 48 m se dibuja la versión ligera (con 4 m de histéresis para que no parpadee en el límite)
     const dp = Math.hypot(camera.position.x - p.group.position.x, camera.position.z - p.group.position.z);
@@ -353,19 +352,18 @@ function frame(timestamp: number) {
   wasWet = wet;
 
   // cámara en tercera persona con suavizado y sin atravesar el suelo
-  if (avatarUI?.open) { input.yaw = player.group.rotation.y; input.pitch = 0.12; input.dist = 4.2; camDistChanged = true; }
+  if (avatarUI?.open) { input.yaw = player.group.rotation.y; input.pitch = 0.12; input.dist = 3.8; camDistChanged = true; }
   else if (camDistChanged && !avatarUI?.open) { input.dist = CAMERA_DIST[settings.value.camera]; camDistChanged = false; }
   const cp = Math.cos(input.pitch);
-  camPos.set(pp.x + Math.sin(input.yaw) * cp * input.dist, pp.y + 1.5 + Math.sin(input.pitch) * input.dist, pp.z + Math.cos(input.yaw) * cp * input.dist);
+  camPos.set(pp.x + Math.sin(input.yaw) * cp * input.dist, pp.y + EYE + Math.sin(input.pitch) * input.dist, pp.z + Math.cos(input.yaw) * cp * input.dist);
   camPos.y = Math.max(camPos.y, heightAt(camPos.x, camPos.z) + 0.8, 0.6);
-  for (let k = 0; k < 14 && camBlocked(camPos); k++) camPos.lerp(camHead.set(pp.x, pp.y + 1.5, pp.z), 0.12);
-  camLook.set(pp.x, pp.y + 1.3, pp.z);
+  for (let k = 0; k < 14 && camBlocked(camPos); k++) camPos.lerp(camHead.set(pp.x, pp.y + EYE, pp.z), 0.12);
+  camLook.set(pp.x, pp.y + EYE - 0.15, pp.z);
   if (first) camera.position.copy(camPos);
   else camera.position.lerp(camPos, 1 - Math.exp(-14 * dt));
   camera.lookAt(camLook);
 
   dawn.update(pp, t);
-  studio.update(dt, pp, input.yaw, avatarUI?.open ?? false);
   terrainTime.value = t;
   landmarks.update(t, 0.35);
   diorama.update(t);
@@ -394,7 +392,7 @@ function frame(timestamp: number) {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, studio, post, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
+(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, post, scene, camera, guide, menu, dialogue, achievements, settings, adaptive };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }
