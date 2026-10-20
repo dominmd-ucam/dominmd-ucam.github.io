@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { heightAt, pathMask } from './terrain';
 import type { Obstacle } from './props';
-import { batchStatic } from './batch';
+import { placeHouse } from './houses';
 import projects from '../data/projects.json';
 
 const mat = (color: string, o: THREE.MeshStandardMaterialParameters = {}) =>
@@ -54,31 +54,11 @@ function fence(scene: THREE.Object3D, a: [number, number], b: [number, number]) 
 export function buildVillage(scene: THREE.Object3D): { obstacles: Obstacle[] } {
   const obstacles: Obstacle[] = [];
 
-  /* ---------- casita mediterránea ---------- */
+  /* ---------- casa de entramado con huerto vallado ---------- */
   {
     const [cx, cz] = [-3, -17.5];
-    const g = new THREE.Group(); g.position.set(cx, heightAt(cx, cz) - 0.1, cz); g.rotation.y = 0.35;
-    add(g, new THREE.BoxGeometry(4.6, 2.7, 3.8), mat('#f7efe2'), 0, 1.35, 0);
-    add(g, new THREE.BoxGeometry(4.8, 0.2, 4.0), mat('#e8dcc8'), 0, 0.1, 0);
-    // tejado a dos aguas de teja
-    const roofM = mat('#d96b3f');
-    for (const s of [-1, 1]) {
-      const r = add(g, new THREE.BoxGeometry(2.9, 0.22, 4.4), roofM, s * 1.15, 3.2, 0);
-      r.rotation.z = -s * 0.62;
-    }
-    add(g, new THREE.BoxGeometry(0.4, 0.26, 4.5), mat('#c25a33'), 0, 3.85, 0);
-    add(g, new THREE.BoxGeometry(0.6, 1.4, 0.6), mat('#f2e6d2'), 1.4, 3.7, -1.0);
-    // puerta, ventanas y macetas
-    add(g, new THREE.BoxGeometry(1.0, 2.05, 0.12), mat('#2f84c4'), -0.6, 1.075, 1.92);
-    for (const wx of [0.9, 1.9]) {
-      add(g, new THREE.BoxGeometry(0.7, 0.8, 0.1), mat('#9bd8f2', { emissive: '#9bd8f2', emissiveIntensity: 0.15 }), wx, 1.6, 1.93);
-      for (const s of [-1, 1]) add(g, new THREE.BoxGeometry(0.3, 0.9, 0.08), mat('#2f84c4'), wx + s * 0.5, 1.6, 1.94);
-    }
-    add(g, new THREE.BoxGeometry(2.2, 0.3, 0.4), WOOD, 1.4, 0.95, 2.15);
-    for (let i = 0; i < 5; i++) add(g, new THREE.IcosahedronGeometry(0.16, 1), mat(['#ff7a8a', '#ffd23f', '#ff9ac1'][i % 3]), 0.5 + i * 0.4, 1.2, 2.15);
-    batchStatic(g);
-    scene.add(g);
-    obstacles.push({ x: cx, z: cz, r: 2.7 });
+    // la casa se retira un poco para dejar sitio entre la puerta y la valla
+    placeHouse(scene, 'cottage', cx - Math.sin(0.35) * 0.8, cz - Math.cos(0.35) * 0.8, 0.35, [4, 6], obstacles);
     fence(scene, [cx - 5, cz + 4.5], [cx + 5, cz + 4.5]);
     fence(scene, [cx - 5, cz + 4.5], [cx - 5, cz - 3]);
     fence(scene, [cx + 5, cz + 4.5], [cx + 5, cz - 3]);

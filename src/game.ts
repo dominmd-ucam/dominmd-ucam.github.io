@@ -89,7 +89,7 @@ const grass = buildGrass(q.tier === 'high' ? 30 : q.tier === 'med' ? 18 : 6, q.t
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
-const robot = new Robot(scene, obstacles, [1.2, 1.5], 2.2); // pasea por la plaza y saluda
+const robot = new Robot(scene, obstacles, [-1.2, -0.8], 2.2); // pasea por la plaza y saluda
 void robot.load().catch((e) => console.warn('robot no disponible:', e));
 
 /* backend opcional: libro de visitas, contacto y visitantes fantasma (solo si hay API configurada) */
@@ -157,7 +157,9 @@ function creditsView(): View {
     title: 'Créditos', sub: 'Gracias', hint: 'Esc volver',
     rows: [
       { type: 'info', label: 'Avatar y modelos', value: 'Wawa Sensei' },
-      { type: 'info', label: 'Naturaleza y animaciones', value: 'Quaternius (CC0)' },
+      { type: 'info', label: 'Naturaleza, casas y animaciones', value: 'Quaternius (CC0)' },
+      { type: 'info', label: 'Misu (Casual Assassin Cat)', value: 'Sketchfab' },
+      { type: 'info', label: 'Robot Claude', value: 'Domingo, con Tripo' },
       { type: 'info', label: 'Tronco caído y tocón musgoso', value: 'neon_dust (CC-BY 4.0)' },
       { type: 'info', label: 'Tocón', value: 'metrosp (CC-BY 4.0)' },
       { type: 'info', label: 'Isla flotante', value: 'Tom Verbeeck (CC-BY 4.0)' },
