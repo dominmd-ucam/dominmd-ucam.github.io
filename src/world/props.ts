@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { heightAt, islandRadius, pathMask } from './terrain';
 import { batchStatic } from './batch';
+import { stoneGeometry, stoneMaterial } from './stone';
 
 export interface Obstacle { x: number; z: number; r: number }
 
@@ -132,21 +133,14 @@ export function buildScenery(scene: THREE.Object3D) {
   }
 
   // rocas
-  const rockMats = [std('#c9795a', { flatShading: true }), std('#b86a4f', { flatShading: true }), std('#a7adb4', { flatShading: true })];
+  const rockMats = [stoneMaterial('#c9795a'), stoneMaterial('#b86a4f'), stoneMaterial('#a7adb4')];
   for (let i = 0; i < 22; i++) {
     const a = rnd() * Math.PI * 2, f = i < 12 ? 0.9 + rnd() * 0.2 : 0.3 + rnd() * 0.55;
     const r = islandRadius(a) * f, x = Math.cos(a) * r, z = Math.sin(a) * r;
     const h = heightAt(x, z);
     if (h < -0.8 || h > 3.4) continue;
     const s = 0.35 + rnd() * 0.8;
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), rockMats[i % 3]);
-    const q = m.geometry.attributes.position as THREE.BufferAttribute;
-    for (let k = 0; k < q.count; k++) {
-      // el desplazamiento depende de la posición (no del índice) para no abrir grietas en las costuras
-      const j = 1 + Math.sin(q.getX(k) * 91.7 + q.getY(k) * 47.3 + q.getZ(k) * 63.1 + i) * 0.16;
-      q.setXYZ(k, q.getX(k) * j, q.getY(k) * j, q.getZ(k) * j);
-    }
-    m.geometry.computeVertexNormals();
+    const m = new THREE.Mesh(stoneGeometry(s, i * 7.3, 1, s > 0.7 ? 3 : 2), rockMats[i % 3]);
     m.position.set(x, Math.max(h, -0.6) + s * 0.25, z);
     m.scale.y = 0.7; m.rotation.y = rnd() * 6;
     m.castShadow = m.receiveShadow = true;
