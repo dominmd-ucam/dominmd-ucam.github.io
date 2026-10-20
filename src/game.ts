@@ -65,7 +65,7 @@ scene.fog = new THREE.FogExp2(dawn.fogColor, 0.0045);
 /* mundo: lo estático se fusiona al final para reducir llamadas de dibujo */
 const staticWorld = new THREE.Group();
 scene.add(staticWorld);
-const terrain = buildTerrain();
+const terrain = buildTerrain(q.tier !== 'low');
 scene.add(terrain);
 const terrainTime = terrain.userData.uTime as { value: number };
 const water = buildWater(dawn.sunDir);
@@ -82,7 +82,7 @@ const nature = buildNature(scene, obstacles, q.tier); // MegaKit + Sketchfab: á
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
-const grass = buildGrass(q.tier === 'high' ? 150000 : q.tier === 'med' ? 80000 : 24000, q.tier === 'low', q.shadows); // en calidad baja, solo la hoja ligera
+const grass = buildGrass(q.tier === 'high' ? 30 : q.tier === 'med' ? 18 : 6, q.tier === 'low', q.shadows); // en calidad baja, solo la hoja ligera
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));

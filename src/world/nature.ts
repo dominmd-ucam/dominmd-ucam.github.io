@@ -38,9 +38,9 @@ const FLORA: Record<Biome | 'core', {
     under: [['Rock_Medium_1', 0.9, 1.2], ['Rock_Medium_2', 1, 1.2], ['Rock_Medium_3', 0.8, 1], ['Pebble_Round_1', 1.6, 2], ['Pebble_Round_2', 1.6, 2], ['Plant_7', 1.2, 1.4], ['Bush_Common', 0.8, 0.5]], underDensity: 0.22 },
   pine: { trees: ['Pine_1', 'Pine_2', 'Pine_3', 'Pine_4', 'Pine_5'], treeScale: [0.75, 1.05], density: 0.9, gap: 3.2,
     under: [['Fern_1', 0.5, 2], ['Rock_Medium_3', 0.6, 1.2], ['Rock_Medium_2', 0.5, 1], ['Mushroom_Common', 1, 1], ['Pebble_Round_3', 1.4, 1.5]], underDensity: 0.22 },
-  meadow: { trees: ['CommonTree_5', 'CommonTree_3'], treeScale: [0.75, 0.95], density: 0.04, gap: 8,
+  meadow: { trees: ['CommonTree_5', 'CommonTree_3'], treeScale: [0.75, 0.95], density: 0.08, gap: 7,
     under: [['Flower_3_Group', 0.24, 3], ['Flower_4_Group', 0.21, 3], ['Bush_Common_Flowers', 0.9, 2], ['Clover_1', 0.45, 2], ['Plant_1', 0.6, 1]], underDensity: 0.45 },
-  core: { trees: ['CommonTree_2', 'CommonTree_5'], treeScale: [0.8, 0.95], density: 0.025, gap: 8,
+  core: { trees: ['CommonTree_2', 'CommonTree_5'], treeScale: [0.8, 0.95], density: 0.045, gap: 8,
     under: [['Flower_3_Group', 0.22, 2], ['Flower_4_Group', 0.19, 2], ['Bush_Common_Flowers', 0.8, 1], ['Bush_Common', 0.8, 1], ['Clover_1', 0.4, 1.5]], underDensity: 0.1 },
 };
 
@@ -58,6 +58,7 @@ for (const k of ['TwistedTree_1', 'TwistedTree_2', 'TwistedTree_3'] as Kit[]) CA
 
 const PATH_TILES: Kit[] = ['RockPath_Round_Small_1', 'RockPath_Round_Small_2', 'RockPath_Round_Small_3', 'RockPath_Round_Thin', 'RockPath_Round_Small_2', 'RockPath_Round_Wide'];
 
+const FAR_SMALL = 45;
 function rng(seed: number) { return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296); }
 const lerp = THREE.MathUtils.lerp;
 
@@ -93,7 +94,7 @@ function plan(obstacles: Obstacle[], tier: Tier) {
   const tStep = 2.0;
   for (let gz = -ext; gz < ext; gz += tStep) for (let gx = -ext; gx < ext; gx += tStep) {
     const x = gx + (rand() - 0.5) * tStep, z = gz + (rand() - 0.5) * tStep, h = heightAt(x, z);
-    if (h < 1.25 || h > 6.2 || open(x, z)) continue;
+    if (h < 1.25 || h > 12 || open(x, z)) continue;
     if (groundNormal(x, z, n).y < 0.82) continue;
     if (pathDist(x, z) < 2.3) continue;
     // claros: dentro, nada; en el borde, una pared de árboles
@@ -140,11 +141,11 @@ function plan(obstacles: Obstacle[], tier: Tier) {
   const uStep = 1.7;
   for (let gz = -ext; gz < ext; gz += uStep) for (let gx = -ext; gx < ext; gx += uStep) {
     const x = gx + (rand() - 0.5) * uStep, z = gz + (rand() - 0.5) * uStep, h = heightAt(x, z);
-    if (h < 1.15 || h > 6.5 || open(x, z) || pathDist(x, z) < 1.2) continue;
+    if (h < 1.15 || h > 12 || open(x, z) || pathDist(x, z) < 1.2) continue;
     const b = pickBiome(x, z), f = FLORA[b];
     // junto a los claros crece más (setas y helechos alrededor del tocón)
     const nearClear = CLEARINGS.some((c) => Math.abs(Math.hypot(x - c.x, z - c.z) - c.r) < 2.5);
-    if (rand() > f.underDensity * amount * (nearClear ? 1.8 : 1)) continue;
+    if (rand() > f.underDensity * amount * 1.3 * (nearClear ? 1.8 : 1)) continue;
     let total = 0; for (const u of f.under) total += u[2];
     let r = rand() * total, pick = f.under[0];
     for (const u of f.under) { r -= u[2]; if (r < 0) { pick = u; break; } }
@@ -377,6 +378,11 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
   const floats: { o: THREE.Object3D; y: number; ph: number }[] = [];
   /** copa real de cada modelo (de las hojas): centro en xz, radio y alturas; sustituye a CANOPY cuando llegan los modelos */
   const crowns = new Map<Kit, { x: number; z: number; r: number; y0: number; y1: number }>();
+  /** plantas pequeñas que se ocultan lejos del jugador (con la isla de 70 m serían miles de instancias diminutas) */
+  const small: { bm: THREE.BatchedMesh; id: number; x: number; z: number }[] = [];
+  const treeSet = new Set<Spot>(trees);
+  const isSmall = (sp: Spot) => !treeSet.has(sp) && !/^Rock(_|Path)/.test(sp.kit);
+  let frame = 0;
 
   const ready = (async () => {
     const gltf = await loadGLTF(`${BASE}megakit.glb`);
@@ -419,7 +425,9 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
         qy.setFromAxisAngle(up, sp.rot);
         q.copy(sp.tilt ?? q.identity()).multiply(qy);
         m4.compose(pos.set(sp.x, sp.y, sp.z), q, scl.setScalar(sp.s));
-        bm.setMatrixAt(bm.addInstance(gid), m4);
+        const id = bm.addInstance(gid);
+        bm.setMatrixAt(id, m4);
+        if (isSmall(sp)) small.push({ bm, id, x: sp.x, z: sp.z });
       }
       // las losas, guijarros y flores no proyectan sombra (no se notaría y la pasada de sombras es cara)
       bm.castShadow = tier !== 'low' && !/PathRocks|Flower/.test(name) && !(/^Leaves$/.test(name));
@@ -452,7 +460,10 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
     props,
     update: (t, player) => {
       uTime.value = t;
-      if (player) uPlayer.value.copy(player);
+      if (player) {
+        uPlayer.value.copy(player);
+        if (frame++ % 30 === 0) for (const p of small) p.bm.setVisibleAt(p.id, Math.hypot(p.x - player.x, p.z - player.z) < FAR_SMALL);
+      }
       for (const f of floats) { f.o.position.y = f.y + Math.sin(t * 0.35 + f.ph) * 0.6; f.o.rotation.y += 0.0004; }
     },
     setInkMask: (on) => { uAlpha.value = on ? 0 : 1; },

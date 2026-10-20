@@ -8,7 +8,7 @@ import type { Avatar, Motion } from './avatar/avatar';
 const SPEED = 5.5;
 const MAX_DEPTH = -3.4;  // límite de profundidad a nado
 const SWIM_FROM = -0.55; // por debajo de esto, nada en vez de andar
-const LIMIT = 70;        // borde del mundo
+const LIMIT = 125;       // borde del mundo
 const SPRINT = 1.45;     // multiplicador de velocidad al esprintar
 const CROUCH = 0.38;     // y al ir agachado
 const JUMP_V = 7.2, GRAVITY = 22; // salto de ~1,2 m

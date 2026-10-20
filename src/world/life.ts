@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { heightAt } from './terrain';
+import { heightAt, ISLAND_R } from './terrain';
 import { batchStatic } from './batch';
 import { buildFlock } from './flock';
 
@@ -41,8 +41,8 @@ export function buildLife(scene: THREE.Scene, gullCount = 60): Life {
   const eyeMat = new THREE.MeshStandardMaterial({ color: '#1a1a1a' });
   const crabs: { g: THREE.Group; vx: number; vz: number; wait: number }[] = [];
   let guard = 0;
-  while (crabs.length < 9 && guard++ < 400) {
-    const x = rnd(-30, 30), z = rnd(-30, 30), h = heightAt(x, z);
+  while (crabs.length < 14 && guard++ < 3000) {
+    const R = ISLAND_R * 1.05, x = rnd(-R, R), z = rnd(-R, R), h = heightAt(x, z);
     if (h < 0.15 || h > 0.7) continue;
     const g = new THREE.Group();
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), crabMat); body.scale.set(1.3, 0.6, 1); body.position.y = 0.12; body.castShadow = true; g.add(body);
@@ -85,7 +85,7 @@ export function buildLife(scene: THREE.Scene, gullCount = 60): Life {
   const school: { cx: number; cz: number; r: number; sp: number; ph: number; dy: number; fx: number; fz: number; scare: number; flash: number; pend: number; cool: number; px: number; pz: number }[] = [];
   guard = 0;
   while (school.length < FISH && guard++ < 3000) {
-    const cx = rnd(-34, 34), cz = rnd(-34, 34), h = heightAt(cx, cz);
+    const R = ISLAND_R * 1.15, cx = rnd(-R, R), cz = rnd(-R, R), h = heightAt(cx, cz);
     if (h > -0.9 || h < -2.4) continue;
     const k = school.length;
     school.push({ cx, cz, r: rnd(0.8, 2.6), sp: rnd(0.4, 0.9) * (k % 2 ? 1 : -1), ph: Math.random() * 6, dy: rnd(0.35, 0.8), fx: 0, fz: 0, scare: 0, flash: 0, pend: -1, cool: 0, px: 0, pz: 0 });

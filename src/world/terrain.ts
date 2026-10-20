@@ -2,8 +2,10 @@ import * as THREE from 'three';
 import { Delaunay } from 'd3-delaunay';
 import { CLOUD_GLSL } from './toon';
 
-export const WORLD_SIZE = 176;
-export const ISLAND_R = 38;
+export const WORLD_SIZE = 320;
+export const ISLAND_R = 70;
+/** la isla creció de 38 a 70 m de radio: la forma de la costa escala con ella */
+const GROW = ISLAND_R / 38;
 const HMIN = -4;
 const HMAX = 4;
 
@@ -18,7 +20,7 @@ function vnoise(x: number, y: number): number {
   const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
-function fbm(x: number, y: number): number {
+export function fbm(x: number, y: number): number {
   let amp = 0.5, f = 1, s = 0;
   for (let i = 0; i < 4; i++) { s += vnoise(x * f, y * f) * amp; f *= 2; amp *= 0.5; }
   return s;
@@ -29,16 +31,16 @@ const HEAD_A = -2.35; // promontorio rocoso con el faro
 const angDiff = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
 export function islandRadius(a: number): number {
-  let r = ISLAND_R + 3 * Math.sin(3 * a) + 2 * Math.cos(5 * a + 1);
-  r -= 11 * Math.exp(-((angDiff(a, BAY_A) / 0.34) ** 2));
-  r += 4 * Math.exp(-((angDiff(a, HEAD_A) / 0.5) ** 2));
+  let r = ISLAND_R + (3 * Math.sin(3 * a) + 2 * Math.cos(5 * a + 1)) * GROW;
+  r -= 11 * GROW * Math.exp(-((angDiff(a, BAY_A) / 0.34) ** 2));
+  r += 4 * GROW * Math.exp(-((angDiff(a, HEAD_A) / 0.5) ** 2));
   return r;
 }
 
 /** Colina del faro. */
 export const HILL: [number, number] = [-9, -9];
 /** Islote cercano, alcanzable a nado. */
-export const ISLET: [number, number] = [-48, 29];
+export const ISLET: [number, number] = [-80, 48];
 
 /** Punto a una fracción `f` del radio de la costa en el ángulo `a`. */
 export function polar(a: number, f: number): [number, number] {
@@ -75,6 +77,38 @@ export const CLEARINGS: { x: number; z: number; r: number; biome: Biome }[] = [
 ];
 function xz(p: [number, number]) { return { x: p[0], z: p[1] }; }
 
+/**
+ * Mesetas: zonas elevadas con borde de roca y una rampa que baja hacia el centro de la isla (`ramp` = ángulo de bajada).
+ * Están entre la vuelta a la isla y la playa, así los caminos principales no tienen que subirlas: ahí van los caminos secundarios.
+ * La del suroeste tiene la cueva en su cara al mar.
+ */
+export const PLATEAUS: { x: number; z: number; r: number; h: number; ramp: number }[] = [
+  { ...xz(polar(0.25, 0.79)), r: 8.5, h: 5, ramp: 0 },
+  { ...xz(polar(3.35, 0.78)), r: 8, h: 4, ramp: 0 },
+  { ...xz(polar(2.12, 0.73)), r: 7.5, h: 4.5, ramp: 0 },
+];
+for (const p of PLATEAUS) p.ramp = Math.atan2(-p.z, -p.x);
+const RAMP_W = 2.4, RAMP_L = 10;
+function plateauHeight(x: number, z: number): number {
+  let best = 0;
+  for (const p of PLATEAUS) {
+    const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz);
+    if (d > p.r + RAMP_L + 2) continue;
+    // borde irregular (ruido según el ángulo) y caída corta: parece un escalón de roca
+    const edge = p.r + (vnoise(Math.atan2(dz, dx) * 2.2 + p.x, p.z * 0.1) - 0.5) * 2.4;
+    let k = 1 - THREE.MathUtils.smoothstep(d, edge - 1.6, edge + 0.4);
+    // rampa: franja hacia el centro de la isla que baja en línea recta
+    const u = dx * Math.cos(p.ramp) + dz * Math.sin(p.ramp), v = -dx * Math.sin(p.ramp) + dz * Math.cos(p.ramp);
+    if (u > 0) {
+      const along = 1 - THREE.MathUtils.clamp((u - (edge - 2)) / RAMP_L, 0, 1);
+      const across = 1 - THREE.MathUtils.smoothstep(Math.abs(v), RAMP_W - 0.8, RAMP_W + 0.6);
+      k = Math.max(k, THREE.MathUtils.smoothstep(along, 0, 1) * across);
+    }
+    best = Math.max(best, k * p.h);
+  }
+  return best;
+}
+
 /** Caminos: polilíneas. Los de piedra se empiedran con las losas del MegaKit; debajo, la tierra se pinta de color camino. */
 const RING = 0.62;
 const ring: [number, number][] = [];
@@ -88,6 +122,8 @@ const PATHS: [number, number][][] = [
   [[0, 0], polar(-0.85, 0.35), polar(-0.85, RING), polar(-0.9, 0.86)], // plaza → prado → muelle
 ];
 export const STONE_PATHS = PATHS;
+/** Senderos de tierra, sin losas (caminos secundarios hacia las zonas reservadas): se rellenan en zones.ts. */
+export const TRAILS: [number, number][][] = [];
 function segDist(px: number, pz: number, ax: number, az: number, bx: number, bz: number) {
   const dx = bx - ax, dz = bz - az;
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz || 1)));
@@ -97,6 +133,7 @@ function segDist(px: number, pz: number, ax: number, az: number, bx: number, bz:
 export function pathDist(x: number, z: number): number {
   let d = 99;
   for (const poly of PATHS) for (let i = 0; i < poly.length - 1; i++) d = Math.min(d, segDist(x, z, poly[i][0], poly[i][1], poly[i + 1][0], poly[i + 1][1]));
+  for (const poly of TRAILS) for (let i = 0; i < poly.length - 1; i++) d = Math.min(d, segDist(x, z, poly[i][0], poly[i][1], poly[i + 1][0], poly[i + 1][1]) + 0.35); // más estrechos
   return d;
 }
 /** 1 sobre el camino, 0 fuera (con borde suave). */
@@ -125,6 +162,10 @@ export function heightAt(x: number, z: number): number {
   const hd = ((x - HILL[0]) ** 2 + (z - HILL[1]) ** 2);
   h += 7.2 * Math.exp(-hd / 44) * k;
   h += (fbm(x * 0.12, z * 0.12) - 0.5) * 1.2 * k;
+  // lomas suaves por el interior (el pueblo del centro queda llano y la playa sin tocar)
+  const hills = THREE.MathUtils.smoothstep(r, 20, 34) * THREE.MathUtils.smoothstep(t, 0.04, 0.22);
+  if (hills > 0) h += (fbm(x * 0.022 + 5.3, z * 0.022 - 3.1) - 0.42) * 5 * hills;
+  if (t > -0.05) h += plateauHeight(x, z) * THREE.MathUtils.smoothstep(t, -0.02, 0.06);
   // islote de arena
   const isd = (x - ISLET[0]) ** 2 + (z - ISLET[1]) ** 2;
   // el islote solo levanta su entorno (con un pequeño arrecife alrededor): si el max se aplicara en todo el mapa, el mar entero tendría el fondo en −0,5 m
@@ -139,7 +180,6 @@ const C_GRASS = new THREE.Color('#86d14c');
 const C_GRASS_Y = new THREE.Color('#b9dc5a');
 const C_GRASS2 = new THREE.Color('#58b448');
 const C_ROCK = new THREE.Color('#b98260');
-const C_PATH = new THREE.Color('#b99a6e');
 
 /**
  * Color del suelo en un punto (`ny` = componente vertical de la normal). Lo usa el terreno por vértice
@@ -150,14 +190,14 @@ export function groundColor(x: number, z: number, h: number, ny: number, c: THRE
   c.copy(C_WET).lerp(C_SAND, THREE.MathUtils.smoothstep(h, -0.4, 0.35));
   const patch = fbm(x * 0.07 + 11.3, z * 0.07 - 4.1); // manchas grandes de hierba más amarilla
   c.lerp(tmpC.copy(C_GRASS).lerp(C_GRASS_Y, THREE.MathUtils.smoothstep(patch, 0.45, 0.65)), THREE.MathUtils.smoothstep(h, 0.85, 1.25));
-  c.lerp(C_GRASS2, THREE.MathUtils.smoothstep(h, 1.6, 3.2) * 0.8 + n * 0.25);
-  c.lerp(C_ROCK, Math.max(THREE.MathUtils.smoothstep(1 - ny, 0.3, 0.5) * (h > 0.6 ? 1 : 0), THREE.MathUtils.smoothstep(h, 5.2, 7.2) * 0.8));
+  c.lerp(C_GRASS2, THREE.MathUtils.smoothstep(h, 1.6, 3.2) * 0.55 + n * 0.25);
+  const nearHill = 1 - THREE.MathUtils.smoothstep(Math.hypot(x - HILL[0], z - HILL[1]), 6, 9);
+  c.lerp(C_ROCK, Math.max(THREE.MathUtils.smoothstep(1 - ny, 0.3, 0.5) * (h > 0.6 ? 1 : 0), THREE.MathUtils.smoothstep(h, 5.2, 7.2) * 0.8 * nearHill));
   // tinte de cada bioma sobre la hierba
   const land = THREE.MathUtils.smoothstep(h, 0.9, 1.4);
   biomeWeights(x, z, bw);
   c.lerp(C_FOREST, bw.forest * 0.55 * land).lerp(C_MYSTIC, bw.mystic * 0.6 * land).lerp(C_DRY, bw.dry * 0.65 * land)
     .lerp(C_PINE, bw.pine * 0.5 * land).lerp(C_MEADOW, bw.meadow * 0.35 * land);
-  c.lerp(C_PATH, pathMask(x, z) * THREE.MathUtils.smoothstep(h, 0.6, 1.1) * 0.9);
   return c.multiplyScalar(0.94 + n * 0.12);
 }
 const tmpC = new THREE.Color();
@@ -178,9 +218,8 @@ function importance(x: number, z: number): number {
   const slope = Math.hypot(heightAt(x + e, z) - heightAt(x - e, z), heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e);
   const shore = 1 - THREE.MathUtils.smoothstep(Math.abs(h), 0.15, 1.3);          // orilla: espuma, arena mojada
   const grassLine = 1 - THREE.MathUtils.smoothstep(Math.abs(h - 1.05), 0.15, 0.5); // paso de arena a hierba
-  const path = THREE.MathUtils.smoothstep(pathMask(x, z), 0.02, 0.3);
-  const land = h > 0.5 ? 0.18 : 0; // el interior de la isla tiene algo de detalle para el relieve suave
-  return Math.min(1, Math.max(shore, grassLine, path, Math.min(1, slope * 3), land));
+  const land = h > 0.5 ? 0.22 : 0; // el interior de la isla tiene algo de detalle para el relieve suave (los caminos se pintan por píxel)
+  return Math.min(1, Math.max(shore, grassLine, Math.min(1, slope * 3), land));
 }
 const R_MIN = 0.7, R_MAX = 8.5;
 
@@ -260,7 +299,45 @@ function terrainGeometry(): THREE.BufferGeometry {
   return g;
 }
 
-export function buildTerrain(): THREE.Mesh {
+/* ---------- caminos pintados por píxel ----------
+   Los caminos se dibujan en un lienzo que cubre el mundo (1024 px para 320 m: 0,31 m por píxel). El shader del terreno lo lee con
+   un umbral que se mueve con ruido: el borde sale nítido e irregular, como tierra pisada, en vez de la mancha de color por vértice. */
+const PATH_PX = 1024;
+let pathCanvas: { tex: THREE.CanvasTexture; data: Uint8ClampedArray } | null = null;
+function pathLayer() {
+  if (pathCanvas) return pathCanvas;
+  const c = document.createElement('canvas'); c.width = c.height = PATH_PX;
+  const g = c.getContext('2d')!;
+  const k = PATH_PX / WORLD_SIZE, half = WORLD_SIZE / 2;
+  g.fillStyle = '#000'; g.fillRect(0, 0, PATH_PX, PATH_PX);
+  g.filter = 'blur(1.5px)'; // sin soporte (Safari antiguo) queda algo más dentado, pero el umbral con ruido lo disimula
+  g.strokeStyle = '#fff'; g.lineCap = g.lineJoin = 'round';
+  const draw = (polys: [number, number][][], w: number) => {
+    g.lineWidth = w * k;
+    for (const poly of polys) {
+      g.beginPath();
+      poly.forEach(([x, z], i) => (i ? g.lineTo : g.moveTo).call(g, (x + half) * k, (z + half) * k));
+      g.stroke();
+    }
+  };
+  draw(PATHS, 2.0);
+  draw(TRAILS, 1.3);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.NoColorSpace; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+  tex.flipY = false; // fila 0 del lienzo = z mínima, igual que pathCover
+  pathCanvas = { tex, data: g.getImageData(0, 0, PATH_PX, PATH_PX).data };
+  return pathCanvas;
+}
+/** Cuánto camino pintado hay en (x, z): 0 hierba, 1 centro del camino (lo usa la hierba para no crecer encima). */
+export function pathCover(x: number, z: number): number {
+  const { data } = pathLayer();
+  const i = Math.floor((x / WORLD_SIZE + 0.5) * PATH_PX), j = Math.floor((z / WORLD_SIZE + 0.5) * PATH_PX);
+  if (i < 0 || j < 0 || i >= PATH_PX || j >= PATH_PX) return 0;
+  return data[(j * PATH_PX + i) * 4] / 255;
+}
+
+/** `detail`: textura pintada del suelo (calidad media y alta); en baja solo los colores por vértice y los caminos. */
+export function buildTerrain(detail = true): THREE.Mesh {
   const geo = terrainGeometry();
   geo.computeVertexNormals();
   const pos = geo.attributes.position as THREE.BufferAttribute;
@@ -276,17 +353,27 @@ export function buildTerrain(): THREE.Mesh {
   mat.defines = { TOON_NO_RIM: '' }; // visto de lado, el suelo entero se encendería con la luz de borde
   const uTime = { value: 0 };
   const uCaus = { value: 0.55 };
+  if (detail) mat.defines.TERRAIN_DETAIL = '';
+  const uPath = { value: pathLayer().tex };
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = uTime;
     sh.uniforms.uCaus = uCaus;
+    sh.uniforms.uPath = uPath;
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;');
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying float vUp;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;\nvUp = normal.y;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
 varying vec3 vWPos;
+varying float vUp;
 uniform float uTime;
 uniform float uCaus;
+uniform sampler2D uPath;
+float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float gNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p), u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), u.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + 1.0), u.x), u.y);
+}
 // Ruido de Worley: distancia al punto más cercano (F1) y al segundo (F2). Donde F2 - F1 ≈ 0 estás en un borde de Voronoi.
 vec2 hash2(vec2 p) { p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
 vec2 worley(vec2 p) {
@@ -302,6 +389,34 @@ vec2 worley(vec2 p) {
 float causticNet(vec2 p) { vec2 w = worley(p); return 1.0 - smoothstep(0.0, 0.17, w.y - w.x); } // líneas finas brillantes alrededor de parches oscuros
 ${CLOUD_GLSL}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
+        float land = smoothstep(0.55, 1.05, vWPos.y);
+        #ifdef TERRAIN_DETAIL
+          // suelo pintado a mano: manchas grandes de dos tonos con borde de pincel y trazos cortos en la dirección del viento
+          vec2 sp = vWPos.xz;
+          float big = gNoise(sp * 0.18) * 0.65 + gNoise(sp * 0.55 + 7.3) * 0.35;
+          float tone = smoothstep(0.48, 0.56, big);
+          vec2 rs = mat2(0.8, -0.6, 0.6, 0.8) * sp;
+          float strokes = gNoise(vec2(rs.x * 0.9, rs.y * 3.2)) * 0.6 + gNoise(sp * 2.7) * 0.4;
+          float grassy = land * smoothstep(0.75, 0.9, vUp);
+          diffuseColor.rgb *= mix(1.0, mix(0.9, 1.07, tone) * (0.94 + 0.12 * strokes), grassy);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.06, 1.04, 0.86), tone * grassy * 0.5);
+          // arena: ondas suaves y granos
+          float sandy = (1.0 - land) * smoothstep(-0.3, 0.2, vWPos.y);
+          float ripple = sin(dot(sp, vec2(0.9, 0.45)) * 3.0 + gNoise(sp * 0.7) * 5.0);
+          diffuseColor.rgb *= 1.0 + sandy * (ripple * 0.035 + (gHash(floor(sp * 9.0)) - 0.5) * 0.06);
+          // roca de las laderas: vetas horizontales
+          float rocky = land * (1.0 - smoothstep(0.62, 0.8, vUp));
+          float strata = smoothstep(0.35, 0.5, fract(vWPos.y * 1.6 + gNoise(sp * 0.6) * 0.8));
+          diffuseColor.rgb *= 1.0 - rocky * strata * 0.14;
+        #endif
+        // camino: tierra con borde irregular y alguna piedrecita
+        float pm = texture2D(uPath, vWPos.xz / ${WORLD_SIZE.toFixed(1)} + 0.5).r;
+        float pv = pm + (gNoise(vWPos.xz * 1.4) - 0.5) * 0.28;
+        float pEdge = smoothstep(0.4, 0.47, pv);
+        vec3 dirt = mix(vec3(0.56, 0.42, 0.27), vec3(0.72, 0.58, 0.4), gNoise(vWPos.xz * 0.9));
+        dirt *= 0.92 + 0.16 * gHash(floor(vWPos.xz * 6.0));
+        dirt = mix(dirt * 0.8, dirt, smoothstep(0.47, 0.58, pv)); // borde algo más oscuro
+        diffuseColor.rgb = mix(diffuseColor.rgb, dirt, pEdge * land);
         // Cáusticas = la luz del sol enfocada por las ondas. No se simula la luz: se dibujan los bordes de Voronoi.
         // Dos redes que se deslizan una sobre otra no se repiten; se desvanecen con la profundidad y junto a la orilla.
         float depthFade = smoothstep(-0.12, -0.55, vWPos.y) * (1.0 - smoothstep(-1.4, -3.4, vWPos.y));
@@ -320,7 +435,7 @@ ${CLOUD_GLSL}`)
 }
 
 /** Mapa de alturas de 8 bits para que el shader del agua pinte espuma y profundidad. */
-export function buildHeightTexture(size = 352): THREE.DataTexture {
+export function buildHeightTexture(size = 512): THREE.DataTexture {
   const data = new Uint8Array(size * size);
   for (let j = 0; j < size; j++) {
     for (let i = 0; i < size; i++) {
