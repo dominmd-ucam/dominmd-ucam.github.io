@@ -3,12 +3,13 @@ import { DOCK, HILL, ISLET, dockStart, heightAt, islandRadius } from './terrain'
 import type { Obstacle } from './props';
 import { waveHeight } from './water';
 import { batchStatic } from './batch';
+import { roughen, stoneGeometry, stoneMaterial } from './stone';
 
 const mat = (color: string, o: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, ...o });
 
 const WOOD = mat('#d9a05b'), WOOD_D = mat('#a8703a'), WOOD_L = mat('#ecc384');
-const RED = mat('#e0533d'), WHITE = mat('#f6f1e6'), ROCK = mat('#c9795a'), ROCK_D = mat('#a95f48');
+const RED = mat('#e0533d'), WHITE = mat('#f6f1e6'), ROCK = stoneMaterial('#c9795a', 0.8), ROCK_D = stoneMaterial('#a95f48', 0.8);
 
 function add(parent: THREE.Object3D, geo: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0, cast = true): THREE.Mesh {
   const o = new THREE.Mesh(geo, m);
@@ -20,16 +21,6 @@ function add(parent: THREE.Object3D, geo: THREE.BufferGeometry, m: THREE.Materia
 const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d);
 
 /** Facetado irregular: desplaza vértices según su posición (sin abrir grietas). */
-function jitter(g: THREE.BufferGeometry, amount: number, seed = 0): THREE.BufferGeometry {
-  const p = g.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    const j = (k: number) => Math.sin(x * 12.9 + y * 78.2 + z * 37.7 + seed + k) * amount;
-    p.setXYZ(i, x + j(0), y + j(1.7), z + j(3.1));
-  }
-  g.computeVertexNormals();
-  return g;
-}
 
 const FLAME = new THREE.Color('#ffb347');
 
@@ -148,10 +139,10 @@ export function buildLandmarks(scene: THREE.Object3D): Landmarks {
   {
     const a = 0.2, r = islandRadius(a) + 7;
     const g = new THREE.Group(); g.position.set(Math.cos(a) * r, -1.6, Math.sin(a) * r); g.rotation.y = -a + Math.PI / 2 + 0.3;
-    const arch = add(g, jitter(new THREE.TorusGeometry(3.4, 1.15, 6, 9, Math.PI), 0.28, 2), ROCK);
+    const arch = add(g, roughen(new THREE.TorusGeometry(3.4, 1.15, 14, 28, Math.PI), 1.15, 0.5, 2), ROCK);
     arch.scale.set(1, 1.25, 0.9);
     for (const s of [-1, 1]) {
-      add(g, jitter(new THREE.IcosahedronGeometry(1.7, 1), 0.3, s), ROCK_D, s * 3.3, 0.2, 0.2).scale.set(1, 1.1, 0.9);
+      add(g, stoneGeometry(1.7, s + 3, 1, 3), ROCK_D, s * 3.3, 0.2, 0.2).scale.set(1, 1.1, 0.9);
     }
     batchStatic(g);
     scene.add(g);
@@ -159,7 +150,7 @@ export function buildLandmarks(scene: THREE.Object3D): Landmarks {
     const stacks: [number, number, number][] = [[a + 0.13, 11, 4.2], [a - 0.16, 9, 3.2], [-2.2, 9, 3.6], [2.4, 8, 3.0]];
     for (const [sa, sd, sh] of stacks) {
       const rr = islandRadius(sa) + sd;
-      const cone = add(scene, jitter(new THREE.ConeGeometry(0.9, sh, 5, 2), 0.18, sa), ROCK, Math.cos(sa) * rr, -1.4 + sh / 2 - 0.4, Math.sin(sa) * rr);
+      const cone = add(scene, roughen(new THREE.ConeGeometry(0.9, sh, 12, 8), 0.9, 0.45, sa), ROCK, Math.cos(sa) * rr, -1.4 + sh / 2 - 0.4, Math.sin(sa) * rr);
       cone.rotation.y = sa * 3;
     }
   }

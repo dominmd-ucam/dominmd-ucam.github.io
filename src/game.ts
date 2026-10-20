@@ -79,7 +79,7 @@ obstacles.push(...diorama.obstacles);
 const village = buildVillage(staticWorld);
 obstacles.push(...village.obstacles);
 const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
-const trees = buildTrees(scene, obstacles, q.tier === 'low' ? 8 : 15);
+const trees = buildTrees(scene, obstacles, q.tier === 'low' ? 8 : 15, q.tier !== 'low', dawn.sunDir);
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
 const studio = new StudioLight(scene, dawn);
@@ -219,6 +219,7 @@ function applySettings(key?: string) {
   renderer.shadowMap.needsUpdate = true;
   post.setEnabled(s.effects && q.tier !== 'low');
   grass.setInkMask(s.effects && q.tier !== 'low'); // la máscara de contornos solo sirve (y solo es segura) con el postprocesado
+  trees.setInkMask(s.effects && q.tier !== 'low');
   setPresence(s.ghosts);
   if (key === undefined || key === 'resolution') {
     if (s.resolution === 'auto') adaptive.setMax(q.dpr);
@@ -359,7 +360,7 @@ function frame(timestamp: number) {
   else camera.position.lerp(camPos, 1 - Math.exp(-14 * dt));
   camera.lookAt(camLook);
 
-  dawn.update(pp);
+  dawn.update(pp, t);
   studio.update(dt, pp, input.yaw, avatarUI?.open ?? false);
   terrainTime.value = t;
   landmarks.update(t, 0.35);

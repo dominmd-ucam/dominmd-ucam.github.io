@@ -4,6 +4,7 @@ import { heightAt, islandRadius } from './terrain';
 import type { Obstacle } from './props';
 import { waveHeight } from './water';
 import { batchStatic } from './batch';
+import { stoneGeometry, stoneMaterial } from './stone';
 
 const mat = (color: string, o: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness: 0.85, flatShading: true, ...o });
@@ -14,17 +15,7 @@ function add(parent: THREE.Object3D, geo: THREE.BufferGeometry, m: THREE.Materia
   parent.add(o);
   return o;
 }
-function jitter(g: THREE.BufferGeometry, amount: number, seed = 0): THREE.BufferGeometry {
-  const p = g.attributes.position as THREE.BufferAttribute;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    const j = (k: number) => Math.sin(x * 12.9 + y * 78.2 + z * 37.7 + seed + k) * amount;
-    p.setXYZ(i, x + j(0), y + j(1.7), z + j(3.1));
-  }
-  g.computeVertexNormals();
-  return g;
-}
-const rock = (r: number, seed: number, sy = 1) => { const g = jitter(new THREE.IcosahedronGeometry(r, 1), r * 0.2, seed); g.scale(1, sy, 1); return g; };
+const rock = (r: number, seed: number, sy = 1) => stoneGeometry(r, seed, sy);
 const world = (g: THREE.Object3D, lx: number, lz: number) => { g.updateMatrixWorld(true); const v = g.localToWorld(new THREE.Vector3(lx, 0, lz)); return { x: v.x, z: v.z }; };
 
 /* ---------- casco del barco varado ---------- */
@@ -59,7 +50,7 @@ export function buildDiorama(scene: THREE.Object3D): Diorama {
   const obstacles: Obstacle[] = [];
   const ticks: ((t: number) => void)[] = [];
   const WOOD = mat('#d08c5a'), WOOD_D = mat('#7d3d26'), WOOD_L = mat('#e0a572');
-  const GREY = mat('#a59384'), GREY_D = mat('#7f6e62'), MOSS = mat('#5fbf5a');
+  const GREY = stoneMaterial('#b3a08c'), GREY_D = stoneMaterial('#8f7d6e');
 
   /* ---------- barco varado ---------- */
   {
@@ -126,10 +117,6 @@ export function buildDiorama(scene: THREE.Object3D): Diorama {
     add(g, rock(1.5, 17, 1.5), GREY, 1.2, 5.6, -2.4);
     add(g, rock(1.0, 3, 0.9), GREY, 3.2, 0.5, 1.4);
     add(g, rock(0.8, 8, 0.9), GREY_D, -3.6, 0.4, 1.9);
-    // musgo sobre las rocas
-    for (const [mx, my, mz, ms] of [[-1.2, 6.2, -2.0, 1.1], [1.2, 6.6, -2.4, 0.9], [0, 5.0, -1.3, 1.6], [-2.7, 3.7, 0, 1.0]] as number[][]) {
-      add(g, rock(ms, mx + my, 0.35), MOSS, mx, my, mz);
-    }
     // nido con huevos en lo alto
     add(g, new THREE.TorusGeometry(0.42, 0.12, 5, 9), mat('#8a5a35'), 1.2, 7.1, -2.4).rotation.x = Math.PI / 2;
     for (let i = 0; i < 3; i++) add(g, new THREE.SphereGeometry(0.17, 8, 6), mat('#f4ecd4'), 1.2 + (i - 1) * 0.2, 7.12, -2.4 + (i % 2) * 0.12);

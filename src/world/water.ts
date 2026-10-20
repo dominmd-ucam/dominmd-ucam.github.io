@@ -57,15 +57,20 @@ void main() {
   if (fn.y < 0.0) fn = -fn;
   vec3 N = normalize(mix(vNormal, fn, 0.55));
   vec3 V = normalize(cameraPosition - vWorld);
-  vec3 col = mix(uShallow, uDeep, smoothstep(0.0, 4.5, depth));
+  // estilo BotW: el color va por bandas de profundidad (con el borde ondulado) en vez de un degradado continuo
+  float dq = smoothstep(0.0, 4.5, depth + sin(vWorld.x * 0.9 + uTime * 0.4) * sin(vWorld.z * 0.8 - uTime * 0.3) * 0.35);
+  vec3 col = mix(uShallow, uDeep, mix(floor(dq * 3.0 + 0.5) / 3.0, dq, 0.25));
 
   col *= uLight;
   vec3 R = reflect(-V, N);
   vec3 skyRef = mix(uHorizon, uZenith, pow(clamp(R.y, 0.0, 1.0), 0.45));
   float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
   col = mix(col, skyRef, 0.12 + fres * 0.6);
-  float spec = pow(max(dot(reflect(-uSunDir, N), V), 0.0), 60.0);
-  col += uSunColor * spec * 0.7;
+  float sunR = max(dot(reflect(-uSunDir, N), V), 0.0);
+  col += uSunColor * smoothstep(0.3, 0.45, pow(sunR, 60.0)) * 0.7; // brillo del sol recortado, como pintado
+  // destellos: puntos que se encienden y apagan sobre el agua profunda, más hacia el sol
+  float glint = step(0.9, sin(vWorld.x * 3.1 + uTime * 1.7 + sin(vWorld.z * 2.3)) * sin(vWorld.z * 3.7 - uTime * 1.3 + sin(vWorld.x * 1.9)));
+  col += uSunColor * glint * (0.25 + pow(sunR, 4.0)) * smoothstep(1.0, 3.0, depth) * (1.0 - smoothstep(40.0, 120.0, dist0));
 
   float n = sin(vWorld.x * 1.7 + uTime * 1.2) * sin(vWorld.z * 1.9 - uTime);
   float edge = 1.0 - smoothstep(0.0, 0.5 + 0.14 * n + 0.12 * sin(uTime * 1.3 + depth * 6.0), depth);
@@ -82,7 +87,8 @@ void main() {
       foam = max(foam, ring * (1.0 - age / 2.6) * uRipple[i].w);
     }
   }
-  col = mix(col, vec3(0.2 + 0.8 * uLight), foam * 0.85);
+  foam = smoothstep(0.4, 0.55, foam); // espuma de borde nítido
+  col = mix(col, vec3(0.2 + 0.8 * uLight), foam * 0.9);
 
   float alpha = max(mix(0.72, 0.97, smoothstep(0.0, 2.2, depth)), foam);
   float dist = length(cameraPosition - vWorld);
