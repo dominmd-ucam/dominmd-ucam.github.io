@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Delaunay } from 'd3-delaunay';
 import projects from '../data/projects.json';
+import { CLOUD_GLSL } from './toon';
 
 export const WORLD_SIZE = 128;
 const ISLAND_R = 26;
@@ -94,6 +95,22 @@ const C_GRASS_Y = new THREE.Color('#b9dc5a');
 const C_GRASS2 = new THREE.Color('#58b448');
 const C_ROCK = new THREE.Color('#b98260');
 const C_PATH = new THREE.Color('#dfb98a');
+
+/**
+ * Color del suelo en un punto (`ny` = componente vertical de la normal). Lo usa el terreno por vértice
+ * y la hierba para que cada hoja tenga el color del suelo donde crece y se funda con él (como en BotW).
+ */
+export function groundColor(x: number, z: number, h: number, ny: number, c: THREE.Color): THREE.Color {
+  const n = fbm(x * 0.5, z * 0.5);
+  c.copy(C_WET).lerp(C_SAND, THREE.MathUtils.smoothstep(h, -0.4, 0.35));
+  const patch = fbm(x * 0.07 + 11.3, z * 0.07 - 4.1); // manchas grandes de hierba más amarilla
+  c.lerp(tmpC.copy(C_GRASS).lerp(C_GRASS_Y, THREE.MathUtils.smoothstep(patch, 0.45, 0.65)), THREE.MathUtils.smoothstep(h, 0.85, 1.25));
+  c.lerp(C_GRASS2, THREE.MathUtils.smoothstep(h, 1.6, 3.2) * 0.8 + n * 0.25);
+  c.lerp(C_ROCK, Math.max(THREE.MathUtils.smoothstep(1 - ny, 0.3, 0.5) * (h > 0.6 ? 1 : 0), THREE.MathUtils.smoothstep(h, 5.2, 7.2) * 0.8));
+  c.lerp(C_PATH, pathMask(x, z) * THREE.MathUtils.smoothstep(h, 0.6, 1.1) * 0.9);
+  return c.multiplyScalar(0.94 + n * 0.12);
+}
+const tmpC = new THREE.Color();
 
 /**
  * Cuánto detalle necesita cada punto del mapa (0 = llano y sin interés, 1 = máximo).
@@ -195,19 +212,12 @@ export function buildTerrain(): THREE.Mesh {
   const col = new Float32Array(pos.count * 3);
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
-    const h = pos.getY(i), x = pos.getX(i), z = pos.getZ(i);
-    const n = fbm(x * 0.5, z * 0.5);
-    c.copy(C_WET).lerp(C_SAND, THREE.MathUtils.smoothstep(h, -0.4, 0.35));
-    const patch = fbm(x * 0.07 + 11.3, z * 0.07 - 4.1); // manchas grandes de hierba más amarilla
-    c.lerp(C_GRASS.clone().lerp(C_GRASS_Y, THREE.MathUtils.smoothstep(patch, 0.45, 0.65)), THREE.MathUtils.smoothstep(h, 0.85, 1.25));
-    c.lerp(C_GRASS2, THREE.MathUtils.smoothstep(h, 1.6, 3.2) * 0.8 + n * 0.25);
-    c.lerp(C_ROCK, Math.max(THREE.MathUtils.smoothstep(1 - nor.getY(i), 0.3, 0.5) * (h > 0.6 ? 1 : 0), THREE.MathUtils.smoothstep(h, 5.2, 7.2) * 0.8));
-    c.lerp(C_PATH, pathMask(x, z) * THREE.MathUtils.smoothstep(h, 0.6, 1.1) * 0.9);
-    c.multiplyScalar(0.94 + n * 0.12);
+    groundColor(pos.getX(i), pos.getZ(i), pos.getY(i), nor.getY(i), c);
     col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  mat.defines = { TOON_NO_RIM: '' }; // visto de lado, el suelo entero se encendería con la luz de borde
   const uTime = { value: 0 };
   const uCaus = { value: 0.55 };
   mat.onBeforeCompile = (sh) => {
@@ -233,7 +243,8 @@ vec2 worley(vec2 p) {
   }
   return vec2(d1, d2);
 }
-float causticNet(vec2 p) { vec2 w = worley(p); return 1.0 - smoothstep(0.0, 0.17, w.y - w.x); } // líneas finas brillantes alrededor de parches oscuros`)
+float causticNet(vec2 p) { vec2 w = worley(p); return 1.0 - smoothstep(0.0, 0.17, w.y - w.x); } // líneas finas brillantes alrededor de parches oscuros
+${CLOUD_GLSL}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         // Cáusticas = la luz del sol enfocada por las ondas. No se simula la luz: se dibujan los bordes de Voronoi.
         // Dos redes que se deslizan una sobre otra no se repiten; se desvanecen con la profundidad y junto a la orilla.
@@ -241,7 +252,9 @@ float causticNet(vec2 p) { vec2 w = worley(p); return 1.0 - smoothstep(0.0, 0.17
         float net1 = causticNet(vWPos.xz * 0.42 + vec2(uTime * 0.05, 0.0));
         float net2 = causticNet(vWPos.xz * 0.63 + vec2(7.3, -uTime * 0.045));
         float caus = (net1 + net2) * 0.5 * (0.55 + 0.9 * net1 * net2);
-        diffuseColor.rgb += vec3(0.50, 0.85, 0.80) * caus * depthFade * uCaus;`);
+        diffuseColor.rgb += vec3(0.50, 0.85, 0.80) * caus * depthFade * uCaus;
+        // sombras de nubes en tierra firme (bajo el agua no se notarían)
+        diffuseColor.rgb *= 1.0 - 0.2 * cloudShadow(vWPos.xz, uTime) * smoothstep(-0.2, 0.3, vWPos.y);`);
   };
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;

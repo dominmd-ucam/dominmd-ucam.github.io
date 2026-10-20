@@ -33,6 +33,7 @@ export async function openTune(t: TuneTargets): Promise<void> {
     nieblaDensidad: fog.density, nieblaColor: '#' + fog.color.getHexString(),
     saturacion: fx?.hue.saturation ?? 0, contraste: fx?.contrast.contrast ?? 0, brillo: fx?.contrast.brightness ?? 0,
     bloomIntensidad: fx?.bloom.intensity ?? 0, bloomUmbral: fx?.bloom.luminanceMaterial.threshold ?? 0,
+    contornos: (fx?.ink.uniforms.get('strength')?.value as number | undefined) ?? 0,
     vinetaOscuridad: fx?.vignette.darkness ?? 0, vinetaRadio: fx?.vignette.offset ?? 0,
     caustica: caus.value,
     aguaSomera: '#' + (t.water.uniformSets[0].uShallow.value as THREE.Color).getHexString(),
@@ -63,6 +64,7 @@ export async function openTune(t: TuneTargets): Promise<void> {
     pp.add(p, 'brillo', -0.3, 0.3, 0.01).onChange((v: number) => { fx.contrast.brightness = v; });
     pp.add(p, 'bloomIntensidad', 0, 2, 0.01).name('bloom').onChange((v: number) => { fx.bloom.intensity = v; });
     pp.add(p, 'bloomUmbral', 0.3, 2, 0.01).name('bloom: umbral').onChange((v: number) => { fx.bloom.luminanceMaterial.threshold = v; });
+    pp.add(p, 'contornos', 0, 1, 0.01).name('contornos').onChange((v: number) => { fx.ink.uniforms.get('strength')!.value = v; });
     pp.add(p, 'vinetaOscuridad', 0, 1, 0.01).name('viñeta').onChange((v: number) => { fx.vignette.darkness = v; });
     pp.add(p, 'vinetaRadio', 0, 1, 0.01).name('viñeta: radio').onChange((v: number) => { fx.vignette.offset = v; });
   }

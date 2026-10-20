@@ -4,6 +4,7 @@ import { buildTerrain, heightAt, islandRadius, HILL, ISLET, DOCK, dockStart, onD
 import { buildWater } from './world/water';
 import { buildScenery } from './world/props';
 import { buildGrass } from './world/grass';
+import { installToon } from './world/toon';
 import { buildLandmarks } from './world/landmarks';
 import { buildLife } from './world/life';
 import { buildSplash } from './world/splash';
@@ -38,6 +39,7 @@ import { Avatar } from './avatar/avatar';
 import { loadConfig } from './avatar/config';
 import { AvatarUI } from './avatar/ui';
 
+installToon(); // antes de compilar ningún material
 const q = detectQuality();
 const canvas = document.getElementById('gl') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: q.tier === 'low', powerPreference: 'high-performance' });
@@ -82,7 +84,7 @@ batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zon
 const splash = buildSplash(scene);
 const studio = new StudioLight(scene, dawn);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
-const grass = buildGrass(q.tier === 'high' ? 60000 : q.tier === 'med' ? 30000 : 10000, q.tier === 'low'); // en calidad baja, solo la hoja ligera
+const grass = buildGrass(q.tier === 'high' ? 90000 : q.tier === 'med' ? 48000 : 14000, q.tier === 'low', q.shadows); // en calidad baja, solo la hoja ligera
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
@@ -216,6 +218,7 @@ function applySettings(key?: string) {
   dawn.sun.castShadow = s.shadows && q.shadows;
   renderer.shadowMap.needsUpdate = true;
   post.setEnabled(s.effects && q.tier !== 'low');
+  grass.setInkMask(s.effects && q.tier !== 'low'); // la máscara de contornos solo sirve (y solo es segura) con el postprocesado
   setPresence(s.ghosts);
   if (key === undefined || key === 'resolution') {
     if (s.resolution === 'auto') adaptive.setMax(q.dpr);
@@ -318,7 +321,7 @@ function frame(timestamp: number) {
   infoPoint?.update(t, player.group.position);
   presence?.send(player.group.position.x, player.group.position.z, player.group.rotation.y, Math.min(1, player.vel.length() / 6.5), player.swimming, performance.now());
   ghosts.update(dt, t, performance.now());
-  grass.update(t, camera.position);
+  grass.update(t, camera.position, player.group.position);
   trees.update(t, camera.position);
   for (const p of palms) {
     // LOD: a más de 48 m se dibuja la versión ligera (con 4 m de histéresis para que no parpadee en el límite)
