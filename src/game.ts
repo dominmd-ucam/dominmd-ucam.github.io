@@ -37,8 +37,9 @@ import { createPost } from './post';
 import { AdaptiveRes, DebugOverlay } from './perf';
 import { initAssets } from './assets/loader';
 import { Avatar } from './avatar/avatar';
-import { loadConfig } from './avatar/config';
+import { hasSavedConfig, loadConfig, saveConfig } from './avatar/config';
 import { AvatarUI } from './avatar/ui';
+import { CharacterSelect } from './avatar/select';
 
 installToon(); // antes de compilar ningún material
 const q = detectQuality();
@@ -119,7 +120,7 @@ if (new URLSearchParams(location.search).has('tune')) {
   void import('./tune').then((m) => m.openTune({ dawn, scene, terrain, water, post }));
 }
 
-let avatarUI: AvatarUI | null = null;
+let avatarUI: AvatarUI | null = null, charSelect: CharacterSelect | null = null;
 const avatarBtn = document.getElementById('avatarBtn') as HTMLButtonElement;
 avatarBtn.disabled = true;
 /* pantalla de carga: se mantiene hasta que el avatar esté puesto (o falle) y pasen al menos 2 s, para que no se vea al personaje de respaldo cambiar de golpe */
@@ -132,13 +133,19 @@ function checkReveal() {
   if (!avatarSettled && elapsed < MAX_LOAD_MS) return;
   revealed = true;
   ui.setLoad(1, 'Todo listo');
-  setTimeout(() => ui.ready(), Math.max(350, MIN_LOAD_MS - elapsed)); // 350 ms: se ve la barra llena antes del fundido
+  setTimeout(() => {
+    ui.ready();
+    if (charSelect && !hasSavedConfig()) charSelect.toggle(true, false); // primera visita: elegir personaje antes de jugar
+  }, Math.max(350, MIN_LOAD_MS - elapsed)); // 350 ms: se ve la barra llena antes del fundido
 }
 void Avatar.create().then(async (a) => {
   await a.apply(loadConfig());
   player.attachAvatar(a);
   avatarUI = new AvatarUI(a);
   avatarBtn.disabled = false;
+  charSelect = new CharacterSelect(renderer);
+  charSelect.onPick = (cfg) => void a.apply(cfg);
+  charSelect.onCustom = () => { saveConfig(a.getConfig()); avatarUI?.toggle(true); }; // se guarda ya: así no vuelve a salir el selector
 }).catch((e) => console.warn('Avatar modular no disponible, uso el de respaldo:', e)).finally(() => { avatarSettled = true; ui.setLoad(0.95, 'Todo listo'); });
 
 /* ---------- menú ---------- */
@@ -192,6 +199,7 @@ function mainView(): View {
     rows: [
       { type: 'action', label: 'Continuar', run: () => menu.close() },
       { type: 'action', label: 'Mi avatar', run: () => { menu.close(); avatarUI?.toggle(true); } },
+      ...(charSelect ? [{ type: 'action' as const, label: 'Cambiar de personaje', run: () => { menu.close(); charSelect?.toggle(true); } }] : []),
       { type: 'action', label: 'Ajustes', run: () => menu.push(settingsView()) },
       { type: 'action', label: 'Logros', run: () => menu.push(achievementsView()) },
       { type: 'action', label: 'Créditos', run: () => menu.push(creditsView()) },
@@ -239,7 +247,7 @@ function applySettings(key?: string) {
 settings.onChange((_, key) => applySettings(key));
 
 /* ---------- interacción ---------- */
-const blocked = () => menu.open || dialogue.open || ui.isOpen || (guestbook?.open ?? false) || (avatarUI?.open ?? false);
+const blocked = () => menu.open || dialogue.open || ui.isOpen || (guestbook?.open ?? false) || (avatarUI?.open ?? false) || (charSelect?.open ?? false);
 type Target = { kind: 'station'; project: Project } | { kind: 'npc' } | { kind: 'guestbook' } | null;
 const NPC_TARGET: Target = { kind: 'npc' }, GUESTBOOK_TARGET: Target = { kind: 'guestbook' };
 const stationTargets = new Map<Project, Target>(); // se llama cada fotograma: no se crean objetos nuevos
@@ -274,7 +282,7 @@ function interact() {
 input.onInteract = interact;
 input.onEscape = () => { if (!blocked()) menu.show(); };
 ui.onPromptClick = interact;
-ui.onAvatar = () => { if (!menu.open && !dialogue.open && !ui.isOpen) avatarUI?.toggle(); };
+ui.onAvatar = () => { if (!menu.open && !dialogue.open && !ui.isOpen && !charSelect?.open) avatarUI?.toggle(); };
 dialogue.onStart = () => { achievements.unlock('friend'); guide.talking = true; };
 dialogue.onClose = () => { guide.talking = false; };
 dialogue.onAction = (a) => { if (a === 'showPaths') interactables.pulse(4.5, timer.getElapsed()); };
@@ -405,7 +413,7 @@ function frame(timestamp: number) {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, post, scene, camera, guide, robot, menu, dialogue, achievements, settings, adaptive };
+(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, post, scene, camera, guide, robot, menu, dialogue, achievements, settings, adaptive, charSelect: () => charSelect };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }
