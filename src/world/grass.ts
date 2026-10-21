@@ -43,7 +43,7 @@ function bladeLite(): THREE.BufferGeometry {
  * Con `setInkMask(true)` el fragment shader escribe alfa 0: el postprocesado lo usa para no dibujar contornos en la hierba.
  * Solo debe activarse cuando se dibuja a través del postprocesado: directo al lienzo, el alfa 0 dejaría ver el fondo de la página en algunos navegadores.
  */
-export function buildGrass(density: number, liteOnly = false, receiveShadow = false): { group: THREE.Group; update(t: number, cam?: THREE.Vector3, player?: THREE.Vector3): void; setInkMask(on: boolean): void } {
+export function buildGrass(density: number, liteOnly = false, receiveShadow = false, opts: { maxRing?: number; nearFull?: number } = {}): { group: THREE.Group; update(t: number, cam?: THREE.Vector3, player?: THREE.Vector3): void; setInkMask(on: boolean): void } {
   const geoFull = liteOnly ? null : bladeFull(), geoLite = bladeLite();
 
   const uTime = { value: 0 }, uPlayer = { value: new THREE.Vector3(0, -99, 0) }, uAlpha = { value: 1 };
@@ -91,7 +91,8 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
   const CELL = 16;
   /** fracción de la densidad según el anillo de bloques (distancia de Chebyshev al bloque del jugador): 0–1, 2, 3 */
   const RING_FRAC = [1, 1, 0.5, 0.22];
-  const MAX_RING = liteOnly ? 2 : 3;
+  const MAX_RING = opts.maxRing ?? (liteOnly ? 2 : 3);
+  const nearFull = opts.nearFull ?? NEAR_FULL;
   const group = new THREE.Group();
   interface Cell { cx: number; cz: number; gen: number; full: number; far: THREE.InstancedMesh; near: THREE.InstancedMesh | null; center: THREE.Vector3 }
   const cells = new Map<string, Cell>();
@@ -207,7 +208,7 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
       for (const c of cells.values()) {
         const ring = Math.max(Math.abs(c.cx - cx), Math.abs(c.cz - cz));
         const k = ring > MAX_RING ? 0 : Math.round(c.full * Math.min(1, RING_FRAC[ring] / RING_FRAC[c.gen]));
-        const useNear = c.near !== null && Math.hypot(c.center.x - cam.x, c.center.z - cam.z) < NEAR_FULL;
+        const useNear = c.near !== null && Math.hypot(c.center.x - cam.x, c.center.z - cam.z) < nearFull;
         if (c.near) { c.near.count = k; c.near.visible = k > 0 && useNear; }
         c.far.count = k; c.far.visible = k > 0 && !useNear;
       }

@@ -17,6 +17,8 @@ export interface Motion {
 /** Clips de Moves.glb (Universal Animation Library de Quaternius, CC0, pasados al esqueleto Mixamo con scripts/retarget-ual.mjs). */
 type Clip = 'Idle' | 'Walk' | 'Run' | 'Sprint' | 'JumpStart' | 'JumpLoop' | 'JumpLand' | 'CrouchIdle' | 'CrouchWalk' | 'Roll' | 'SwimIdle' | 'Swim' | 'Interact' | 'Dance';
 const ONCE: Clip[] = ['JumpStart', 'JumpLand', 'Roll', 'Interact'];
+/** piezas pequeñas que no proyectan sombra */
+const NO_SHADOW = new Set(['Eyes', 'EyeBrow', 'Nose', 'Earring', 'Face', 'Glasses', 'FacialHair']);
 
 /**
  * Avatar modular: un esqueleto Mixamo compartido y piezas SkinnedMesh intercambiables.
@@ -138,7 +140,8 @@ export class Avatar {
         sm.skeleton = this.skeleton;
         sm.morphTargetDictionary = m.morphTargetDictionary;
         sm.morphTargetInfluences = m.morphTargetInfluences;
-        sm.castShadow = sm.receiveShadow = true;
+        sm.castShadow = !NO_SHADOW.has(c.name); // ojos, cejas, nariz… no cambian la sombra y cada pieza es otra llamada en la pasada de sombras
+        sm.receiveShadow = true;
         sm.frustumCulled = false;
         group.add(sm);
       });

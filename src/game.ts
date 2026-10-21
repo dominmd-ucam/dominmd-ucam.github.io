@@ -82,11 +82,14 @@ const village = buildVillage(staticWorld);
 obstacles.push(...village.obstacles);
 obstacles.push(...buildZones(scene, q.tier).obstacles); // parcelas, cofre, vallas y el interior de la cueva
 const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
-const nature = buildNature(scene, obstacles, q.tier); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
+const nature = buildNature(scene, obstacles, q.tier, q.mobile); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
-const grass = buildGrass(q.tier === 'high' ? 30 : q.tier === 'med' ? 18 : 6, q.tier === 'low', q.shadows); // en calidad baja, solo la hoja ligera
+// en calidad baja, solo la hoja ligera; en móvil, menos hojas, un anillo de bloques menos y la hoja completa solo muy cerca
+const grass = q.mobile && q.tier === 'med'
+  ? buildGrass(10, false, q.shadows, { maxRing: 2, nearFull: 12 })
+  : buildGrass(q.tier === 'high' ? 30 : q.tier === 'med' ? 18 : 6, q.tier === 'low', q.shadows);
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
@@ -402,7 +405,9 @@ function frame(timestamp: number) {
   frameNo++;
   const idle = menu.open || ui.isOpen;
   if (!idle || (frameNo & 1) === 0) {
-    renderer.shadowMap.needsUpdate = (frameNo & 1) === 0;
+    // en móvil la sombra se recalcula a 30 Hz solo mientras el personaje se mueve; quieto basta con 15 Hz (los NPC se mueven despacio)
+    const moving = player.vel.lengthSq() > 0.01;
+    renderer.shadowMap.needsUpdate = q.mobile && !moving ? (frameNo & 3) === 0 : (frameNo & 1) === 0;
     renderer.info.reset();
     post.render(dt);
     debug.update(raw * 1000, renderer, adaptive.dpr);

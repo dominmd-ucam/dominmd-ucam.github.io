@@ -68,7 +68,8 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const contrast = new BrightnessContrastEffect({ contrast: 0.08 });
   const vignette = new VignetteEffect({ offset: 0.35, darkness: 0.28 });
   composer.addPass(new EffectPass(camera, ink, exposure, bloom, tone, hue, contrast, vignette));
-  composer.addPass(new EffectPass(camera, new SMAAEffect()));
+  // en móvil la densidad de píxeles ya disimula los dientes de sierra: el SMAA es un pase de pantalla completa más (tres, con sus texturas de búsqueda)
+  if (!q.mobile) composer.addPass(new EffectPass(camera, new SMAAEffect()));
   let enabled = true, expo = 0.5;
   return {
     render: (dt) => {

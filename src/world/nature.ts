@@ -372,7 +372,7 @@ export interface Nature {
   props: readonly Prop[];
 }
 
-export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tier): Nature {
+export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tier, mobile = false): Nature {
   // los modelos de Sketchfab van antes que los árboles (así no se plantan encima) y fuera de los caminos
   const props = placeProps(obstacles);
   const { spots, trees } = plan(obstacles, tier);
@@ -433,7 +433,8 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
         if (isSmall(sp)) small.push({ bm, id, x: sp.x, z: sp.z });
       }
       // las losas, guijarros y flores no proyectan sombra (no se notaría y la pasada de sombras es cara)
-      bm.castShadow = tier !== 'low' && !/PathRocks|Flower/.test(name) && !(/^Leaves$/.test(name));
+      // en móvil solo los árboles y arbustos (corteza y copas): setas y rocas sueltas apenas se notan y cada material es otra llamada en la pasada de sombras
+      bm.castShadow = tier !== 'low' && !/PathRocks|Flower/.test(name) && !(/^Leaves$/.test(name)) && (!mobile || /^(Bark|Leaves)_/.test(name));
       bm.receiveShadow = true;
       bm.name = `nature:${name}`;
       scene.add(bm);
