@@ -53,6 +53,7 @@ export default defineConfig({
     // three y postprocessing van en sus propios archivos: casi nunca cambian entre despliegues, así que quien ya visitó la web
     // los revalida con una petición condicional (304) en vez de bajarlos otra vez cada vez que se toca el código del juego
     rolldownOptions: {
+      input: { main: 'index.html', mando: 'mando.html' }, // mando.html: el móvil como mando (src/coop)
       output: {
         codeSplitting: {
           groups: [
