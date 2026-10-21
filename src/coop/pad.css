@@ -1,4 +1,5 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; background: #0f3440; color: #fbf7ee; font-family: "Nunito", ui-rounded, system-ui, sans-serif; overscroll-behavior: none; touch-action: none; user-select: none; -webkit-user-select: none; }
 #pad { height: 100dvh; padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
 #join { margin: auto 0; display: grid; gap: 14px; text-align: center; }

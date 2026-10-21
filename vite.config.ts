@@ -34,7 +34,7 @@ function preloadFonts(): Plugin {
     transformIndexHtml: {
       order: 'post',
       handler(_html, ctx) {
-        if (!ctx.bundle) return;
+        if (!ctx.bundle || ctx.path.includes('mando')) return; // el mando no usa estas fuentes
         return Object.keys(ctx.bundle).filter((f) => wanted.test(f)).map((f) => ({
           tag: 'link', injectTo: 'head' as const, attrs: { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: './' + f },
         }));
