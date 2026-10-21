@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { loadGLTF } from '../assets/loader';
+import { afterReveal, loadGLTF } from '../assets/loader';
 import type { Tier } from '../quality';
 import { BIOMES, CAVE, CLEARINGS, ISLAND_R, RESERVED, STONE_PATHS, biomeWeights, caveLocal, heightAt, islandRadius, pathDist, polar, type Biome } from './terrain';
 import type { Obstacle } from './props';
@@ -440,7 +440,8 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
       scene.add(bm);
     }
 
-    // Sketchfab
+    // Sketchfab: después de la pantalla de carga (sus obstáculos ya existen desde el principio)
+    await afterReveal;
     for (const pr of props) {
       const g = await sketchfab(pr.name, pr.size, tier);
       if (!g) continue;

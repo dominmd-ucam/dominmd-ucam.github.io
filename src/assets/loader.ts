@@ -11,6 +11,14 @@ const HQ_BASE: string = (import.meta.env.VITE_HQ_ASSETS_URL as string | undefine
 let loader: GLTFLoader | null = null;
 
 /**
+ * Carga progresiva: lo que no hace falta para empezar a jugar (modelos de Sketchfab, isla flotante y el robot) espera a que se quite
+ * la pantalla de carga. Así el avatar y el MegaKit no comparten la conexión con ellos.
+ */
+let reveal!: () => void;
+export const afterReveal = new Promise<void>((ok) => { reveal = ok; });
+export function markRevealed() { reveal(); }
+
+/**
  * Decodificadores: Draco (geometría del avatar) y meshopt (animaciones). El decodificador Draco es el que Vite ya empaqueta desde three
  * (con hash en el nombre, así se cachea para siempre); antes se copiaba además a public/draco y se desplegaba dos veces. Las texturas de los modelos son WebP/PNG, que el navegador lee solo.
  * No hay soporte KTX2: ningún modelo lo usa y el transcodificador pesaba 585 KB en cada despliegue. Si un día hace falta (p. ej. modelos HQ de tu servidor con texturas KTX2),

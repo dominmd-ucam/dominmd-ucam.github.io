@@ -35,7 +35,7 @@ import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL } from './settings
 import { detectQuality } from './quality';
 import { createPost } from './post';
 import { AdaptiveRes, DebugOverlay } from './perf';
-import { initAssets } from './assets/loader';
+import { afterReveal, initAssets, markRevealed } from './assets/loader';
 import { Avatar } from './avatar/avatar';
 import { hasSavedConfig, loadConfig, saveConfig } from './avatar/config';
 import { AvatarUI } from './avatar/ui';
@@ -94,7 +94,7 @@ scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
 const robot = new Robot(scene, obstacles, [-1.2, -0.8], 2.2); // pasea por la plaza y saluda
-void robot.load().catch((e) => console.warn('robot no disponible:', e));
+void afterReveal.then(() => robot.load()).catch((e) => console.warn('robot no disponible:', e));
 
 /* backend opcional: libro de visitas, contacto y visitantes fantasma (solo si hay API configurada) */
 const infoPoint = apiConfigured ? new InfoPoint(scene, obstacles, 3.2, 12.2) : null;
@@ -135,6 +135,7 @@ function checkReveal() {
   const elapsed = performance.now() - loadStart;
   if (!avatarSettled && elapsed < MAX_LOAD_MS) return;
   revealed = true;
+  markRevealed();
   ui.setLoad(1, 'Todo listo');
   setTimeout(() => {
     ui.ready();
