@@ -1,0 +1,24 @@
+#coopBtn { position: relative; }
+#coopBtn.on { background: var(--sea-hi); }
+.coop-n { position: absolute; top: 4px; right: 6px; min-width: 18px; height: 18px; border-radius: 9px; background: var(--coral); color: var(--foam); font: 700 12px/18px var(--disp); }
+#coopPanel { position: fixed; top: calc(max(14px, env(safe-area-inset-top)) + 64px); right: 16px; z-index: 25; width: min(340px, calc(100vw - 32px)); }
+.coop-card { position: relative; background: var(--paper); color: var(--ink); border-radius: 18px; padding: 18px; box-shadow: 0 8px 0 var(--shadow); font-family: var(--body); max-height: calc(100vh - 110px); overflow: auto; }
+.coop-card h2 { font: 700 22px var(--disp); margin: 0 0 4px; color: var(--deep); }
+.coop-sub, .coop-foot { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.coop-foot { margin: 10px 0 0; }
+.coop-x { position: absolute; top: 10px; right: 10px; border: 0; background: none; font-size: 18px; cursor: pointer; color: var(--ink); }
+.coop-qr { background: #fff; border-radius: 12px; aspect-ratio: 1; display: grid; place-items: center; padding: 6px; }
+.coop-qr svg { width: 100%; height: 100%; }
+.coop-qr span { color: var(--muted); font-size: 14px; }
+.coop-code { text-align: center; margin: 8px 0; font: 600 15px var(--disp); }
+.coop-code b { letter-spacing: .18em; color: var(--coral-d); font-size: 20px; }
+.coop-row { display: flex; gap: 6px; }
+.coop-url { flex: 1; min-width: 0; border: 1px solid var(--paper-2); border-radius: 8px; padding: 6px 8px; font-size: 12px; background: var(--foam); color: var(--ink); }
+.coop-row button, .coop-list button { border: 0; border-radius: 8px; padding: 6px 10px; background: var(--deep); color: var(--foam); font: 600 13px var(--body); cursor: pointer; }
+.coop-status { min-height: 1.2em; font-size: 13px; margin: 8px 0 4px; color: var(--deep); }
+.coop-status.err { color: var(--coral-d); }
+.coop-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.coop-list li { display: flex; align-items: center; gap: 8px; background: var(--foam); border-radius: 10px; padding: 6px 8px; font-weight: 700; }
+.coop-list li i { width: 14px; height: 14px; border-radius: 50%; }
+.coop-list li span { flex: 1; }
+.coop-list li button { background: var(--coral-d); }

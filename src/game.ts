@@ -40,6 +40,7 @@ import { Avatar } from './avatar/avatar';
 import { hasSavedConfig, loadConfig, saveConfig } from './avatar/config';
 import { AvatarUI } from './avatar/ui';
 import { CharacterSelect } from './avatar/select';
+import { Coop } from './coop/host';
 
 installToon(); // antes de compilar ningún material
 const q = detectQuality();
@@ -117,6 +118,7 @@ ui.setCounter(achievements.opened.size);
 ui.setTotal(interactables.stations.length);
 const player = new Player(obstacles, [6, 12]);
 scene.add(player.group);
+const coop = new Coop(scene, obstacles, player.group); // invitados con el móvil como mando (QR)
 const post = createPost(renderer, scene, camera, q);
 const debug = new DebugOverlay();
 if (new URLSearchParams(location.search).has('tune')) {
@@ -342,6 +344,7 @@ function frame(timestamp: number) {
   input.enabled = !blocked();
   input.update();
   player.update(dt, input, t);
+  coop.update(dt, t, input.yaw);
   interactables.update(t, player.group.position);
   guide.update(dt, t, player.group.position);
   robot.update(dt, t, player.group.position);
@@ -377,13 +380,14 @@ function frame(timestamp: number) {
   // cámara en tercera persona con suavizado y sin atravesar el suelo
   if (avatarUI?.open) { input.yaw = player.group.rotation.y; input.pitch = 0.12; input.dist = 3.8; camDistChanged = true; }
   else if (camDistChanged && !avatarUI?.open) { input.dist = CAMERA_DIST[settings.value.camera]; camDistChanged = false; }
-  const camDist = player.inCave ? Math.min(input.dist, 4.5) : input.dist, camPitch = player.inCave ? Math.min(input.pitch, 0.3) : input.pitch;
+  const fp = coop.focus(pp); // con invitados, la cámara se aleja para que quepan todos
+  const camDist = player.inCave ? Math.min(input.dist, 4.5) : input.dist + coop.spread, camPitch = player.inCave ? Math.min(input.pitch, 0.3) : input.pitch;
   const cp = Math.cos(camPitch);
-  camPos.set(pp.x + Math.sin(input.yaw) * cp * camDist, pp.y + EYE + Math.sin(camPitch) * camDist, pp.z + Math.cos(input.yaw) * cp * camDist);
+  camPos.set(fp.x + Math.sin(input.yaw) * cp * camDist, fp.y + EYE + Math.sin(camPitch) * camDist, fp.z + Math.cos(input.yaw) * cp * camDist);
   if (player.inCave) camPos.y = THREE.MathUtils.clamp(camPos.y, pp.y + 0.6, pp.y + 2.3); // bajo el techo
   else camPos.y = Math.max(camPos.y, heightAt(camPos.x, camPos.z) + 0.8, 0.6);
-  for (let k = 0; k < 14 && camBlocked(camPos); k++) camPos.lerp(camHead.set(pp.x, pp.y + EYE, pp.z), 0.12);
-  camLook.set(pp.x, pp.y + EYE - 0.15, pp.z);
+  for (let k = 0; k < 14 && camBlocked(camPos); k++) camPos.lerp(camHead.set(fp.x, fp.y + EYE, fp.z), 0.12);
+  camLook.set(fp.x, fp.y + EYE - 0.15, fp.z);
   if (first) camera.position.copy(camPos);
   else camera.position.lerp(camPos, 1 - Math.exp(-14 * dt));
   camera.lookAt(camLook);
@@ -421,7 +425,7 @@ function frame(timestamp: number) {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, post, scene, camera, guide, robot, menu, dialogue, achievements, settings, adaptive, charSelect: () => charSelect };
+(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, post, scene, camera, guide, robot, coop, menu, dialogue, achievements, settings, adaptive, charSelect: () => charSelect };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }

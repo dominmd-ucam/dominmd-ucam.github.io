@@ -34,7 +34,7 @@ function preloadFonts(): Plugin {
     transformIndexHtml: {
       order: 'post',
       handler(_html, ctx) {
-        if (!ctx.bundle) return;
+        if (!ctx.bundle || ctx.path.includes('mando')) return; // el mando no usa estas fuentes
         return Object.keys(ctx.bundle).filter((f) => wanted.test(f)).map((f) => ({
           tag: 'link', injectTo: 'head' as const, attrs: { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: './' + f },
         }));
@@ -53,6 +53,7 @@ export default defineConfig({
     // three y postprocessing van en sus propios archivos: casi nunca cambian entre despliegues, así que quien ya visitó la web
     // los revalida con una petición condicional (304) en vez de bajarlos otra vez cada vez que se toca el código del juego
     rolldownOptions: {
+      input: { main: 'index.html', mando: 'mando.html' }, // mando.html: el móvil como mando (src/coop)
       output: {
         codeSplitting: {
           groups: [

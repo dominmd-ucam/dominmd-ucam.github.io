@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0f3440" />
+  <title>Mando · Playa del Desarrollador</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+</head>
+<body>
+  <main id="pad">
+    <section id="join">
+      <h1>Mando de la <span>isla</span></h1>
+      <p>Tu personaje aparecerá en la pantalla del PC.</p>
+      <label>Tu nombre <input id="name" maxlength="16" autocomplete="nickname" placeholder="Invitado"></label>
+      <div id="colors" role="radiogroup" aria-label="Color"></div>
+      <button id="go">Entrar a jugar</button>
+      <p id="msg" role="status"></p>
+    </section>
+    <section id="ctrl" hidden>
+      <header><i id="dot"></i><b id="who">J2</b><span id="state">Conectado</span><button id="look" title="Otro look">🎲</button><button id="exit" title="Salir">✕</button></header>
+      <div id="stick" aria-label="Joystick"><div id="base"><i id="knob"></i></div><small>Arrastra para moverte · al borde corre</small></div>
+      <div id="btns">
+        <button id="run" class="b">Correr</button>
+        <button id="crouch" class="b">Agachar</button>
+        <button id="jump" class="b big">Saltar</button>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/src/coop/pad.ts"></script>
+</body>
+</html>

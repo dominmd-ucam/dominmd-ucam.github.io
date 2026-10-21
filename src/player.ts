@@ -5,6 +5,9 @@ import type { Obstacle } from './world/props';
 import type { Input } from './input';
 import type { Avatar, Motion } from './avatar/avatar';
 
+/** Lo que el jugador lee de la entrada: el teclado del PC o un mando remoto (src/coop). */
+export type Controls = Pick<Input, 'move' | 'yaw' | 'crouch' | 'sprint' | 'roll' | 'jump'>;
+
 const SPEED = 5.5;
 const MAX_DEPTH = -3.4;  // límite de profundidad a nado
 const SWIM_FROM = -0.55; // por debajo de esto, nada en vez de andar
@@ -80,7 +83,7 @@ export class Player {
     this.group.add(this.holder);
   }
 
-  update(dt: number, input: Input, t: number) {
+  update(dt: number, input: Controls, t: number) {
     const sy = Math.sin(input.yaw), cy = Math.cos(input.yaw);
     // dirección relativa a la cámara
     const wx = input.move.x * cy - input.move.y * sy;
