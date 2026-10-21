@@ -100,9 +100,9 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   const col = new THREE.Color();
 
-  /** Rejilla de 9×9 puntos por bloque (cada 2 m): color del suelo, y si puede crecer hierba alta (lejos de los caminos). Las hojas interpolan. */
+  /** Rejilla de 9×9 puntos por bloque (cada 2 m): color del suelo, inclinación y si puede crecer hierba alta (lejos de los caminos). Las hojas interpolan. */
   const G = 9;
-  const gridCol = new Float32Array(G * G * 3), gridTall = new Float32Array(G * G);
+  const gridCol = new Float32Array(G * G * 3), gridTall = new Float32Array(G * G), gridNy = new Float32Array(G * G);
   function fillGrid(x0: number, z0: number) {
     const c = new THREE.Color(), e = 0.4;
     for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
@@ -111,9 +111,12 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
       groundColor(x, z, h, ny, c);
       const k = j * G + i;
       gridCol[k * 3] = c.r; gridCol[k * 3 + 1] = c.g; gridCol[k * 3 + 2] = c.b;
+      gridNy[k] = ny;
       gridTall[k] = THREE.MathUtils.smoothstep(pathDist(x, z), 2.2, 4) * THREE.MathUtils.smoothstep(fbm(x * 0.045 + 20, z * 0.045 - 11), 0.56, 0.64);
     }
   }
+  let sampledNy = 1;
+  /** Interpola la rejilla en (u, v): devuelve la "altura" de hierba, deja el color en `out` y la inclinación del suelo en `sampledNy`. */
   function sampleGrid(u: number, v: number, out: THREE.Color): number {
     const fx = u * (G - 1), fz = v * (G - 1), i = Math.min(G - 2, Math.floor(fx)), j = Math.min(G - 2, Math.floor(fz)), a = fx - i, b = fz - j;
     const k00 = j * G + i, k10 = k00 + 1, k01 = k00 + G, k11 = k01 + 1;
@@ -122,13 +125,17 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
       gridCol[k00 * 3] * w00 + gridCol[k10 * 3] * w10 + gridCol[k01 * 3] * w01 + gridCol[k11 * 3] * w11,
       gridCol[k00 * 3 + 1] * w00 + gridCol[k10 * 3 + 1] * w10 + gridCol[k01 * 3 + 1] * w01 + gridCol[k11 * 3 + 1] * w11,
       gridCol[k00 * 3 + 2] * w00 + gridCol[k10 * 3 + 2] * w10 + gridCol[k01 * 3 + 2] * w01 + gridCol[k11 * 3 + 2] * w11);
+    sampledNy = gridNy[k00] * w00 + gridNy[k10] * w10 + gridNy[k01] * w01 + gridNy[k11] * w11;
     return gridTall[k00] * w00 + gridTall[k10] * w10 + gridTall[k01] * w01 + gridTall[k11] * w11;
   }
 
-  /** Crea (o rehace con más hojas) el bloque (cx, cz) para el anillo `ring`. Determinista: el mismo bloque sale siempre igual. */
-  function build(cx: number, cz: number, ring: number) {
-    const old = cells.get(key(cx, cz));
-    if (old) dispose(old);
+  /**
+   * Crea (o rehace con más hojas) el bloque (cx, cz) para el anillo `ring`. Determinista: el mismo bloque sale siempre igual.
+   * Es un generador: se pausa cada 400 hojas para repartir el trabajo entre fotogramas (antes un bloque entero podía tardar más
+   * que el presupuesto y dar un tirón al cruzar de bloque, sobre todo en móvil). La inclinación del suelo sale de la rejilla:
+   * una llamada a heightAt por hoja en vez de cinco.
+   */
+  function* build(cx: number, cz: number, ring: number): Generator<void, void, void> {
     let seed = (cx * 73856093) ^ (cz * 19349663) ^ 0x5bd1e995;
     const rnd = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
     const x0 = cx * CELL, z0 = cz * CELL;
@@ -136,11 +143,12 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
     const tries = Math.round(density * CELL * CELL * RING_FRAC[ring]);
     const mats: number[] = [], cols: number[] = [];
     for (let n = 0; n < tries; n++) {
+      if (n % 400 === 399) yield;
       const u = rnd(), v = rnd(), x = x0 + u * CELL, z = z0 + v * CELL, h = heightAt(x, z);
       if (h < 1.0 || pathCover(x, z) > 0.32) continue;
-      const e = 0.4, ny = 1 / Math.hypot(1, (heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e), (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e));
-      if (ny < 0.8) continue; // en las rocas no crece
-      const tall = sampleGrid(u, v, col) > rnd() * 0.6 + 0.3;
+      const tallness = sampleGrid(u, v, col);
+      if (sampledNy < 0.8) continue; // en las rocas no crece
+      const tall = tallness > rnd() * 0.6 + 0.3;
       const hh = tall ? 0.9 + rnd() * 0.35 : 0.25 + rnd() * 0.35;
       p.set(x, h - 0.02, z);
       q.setFromAxisAngle(up, rnd() * Math.PI * 2);
@@ -151,6 +159,8 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
       cols.push(col.r, col.g, col.b);
     }
     const count = cols.length / 3;
+    const old = cells.get(key(cx, cz));
+    if (old) dispose(old); // el bloque anterior se quita al final: así no hay huecos mientras se rehace
     const far = new THREE.InstancedMesh(geoLite, mat, Math.max(1, count));
     far.instanceMatrix.array.set(mats);
     far.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(3, cols.length)).fill(1), 3);
@@ -177,6 +187,7 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
   }
 
   let pcx = 1e9, pcz = 1e9;
+  let job: Generator<void, void, void> | null = null, jobRing = 0;
   const queue: [number, number, number][] = [];
   /** Bloques que faltan o que necesitan más hojas, ordenados del más cercano al más lejano. */
   function plan(cx: number, cz: number) {
@@ -201,7 +212,16 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
       if (cx !== pcx || cz !== pcz) { pcx = cx; pcz = cz; plan(cx, cz); }
       // los bloques se generan poco a poco (unos 6 ms por fotograma) para no dar tirones; el primero de cada vez siempre
       const t0 = performance.now();
-      while (queue.length && (performance.now() - t0 < 6 || queue[0][2] <= 1 && cells.size < 9)) { const [x, z, r] = queue.shift()!; build(x, z, r); }
+      // al empezar, los 9 bloques de alrededor se generan de golpe (detrás de la pantalla de carga); después, 4 ms por fotograma como mucho
+      for (;;) {
+        if (!job) {
+          if (!queue.length) break;
+          const [x, z, r] = queue.shift()!;
+          job = build(x, z, r); jobRing = r;
+        }
+        if (performance.now() - t0 >= 4 && !(jobRing <= 1 && cells.size < 9)) break;
+        if (job.next().done) job = null;
+      }
       if (!cam) return;
       // LOD: hasta 18 m (centro del bloque) la hoja completa y desde ahí la ligera; los bloques lejanos dibujan solo parte de sus hojas
       // (están en orden aleatorio, así que dibujar las N primeras adelgaza el césped de forma uniforme)
