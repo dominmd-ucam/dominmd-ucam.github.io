@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { DRACOLoader, DRACO_GLTF_CONFIG } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import type { Tier } from '../quality';
 
@@ -11,12 +11,13 @@ const HQ_BASE: string = (import.meta.env.VITE_HQ_ASSETS_URL as string | undefine
 let loader: GLTFLoader | null = null;
 
 /**
- * Decodificadores: Draco (geometría del avatar, en public/draco) y meshopt (animaciones). Las texturas de los modelos son WebP/PNG, que el navegador lee solo.
+ * Decodificadores: Draco (geometría del avatar) y meshopt (animaciones). El decodificador Draco es el que Vite ya empaqueta desde three
+ * (con hash en el nombre, así se cachea para siempre); antes se copiaba además a public/draco y se desplegaba dos veces. Las texturas de los modelos son WebP/PNG, que el navegador lee solo.
  * No hay soporte KTX2: ningún modelo lo usa y el transcodificador pesaba 585 KB en cada despliegue. Si un día hace falta (p. ej. modelos HQ de tu servidor con texturas KTX2),
  * hay que importar KTX2Loader, llamar a setTranscoderPath(`${BASE}basis/`) y detectSupport(renderer) y copiar basis_transcoder.{js,wasm} de three/examples/jsm/libs/basis a public/basis.
  */
 export function initAssets() {
-  const draco = new DRACOLoader().setDecoderPath(`${BASE}draco/`);
+  const draco = new DRACOLoader().setDecoderPath(DRACO_GLTF_CONFIG);
   loader = new GLTFLoader().setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
 }
 

@@ -407,7 +407,9 @@ function frame(timestamp: number) {
   if (!idle || (frameNo & 1) === 0) {
     // en móvil la sombra se recalcula a 30 Hz solo mientras el personaje se mueve; quieto basta con 15 Hz (los NPC se mueven despacio)
     const moving = player.vel.lengthSq() > 0.01;
-    renderer.shadowMap.needsUpdate = q.mobile && !moving ? (frameNo & 3) === 0 : (frameNo & 1) === 0;
+    // solo se activa, nunca se apaga aquí: three lo pone a false tras dibujar la sombra. Antes se asignaba y en el primer fotograma
+    // borraba la petición inicial, así que se dibujaba sin mapa de sombra (WebGL: "Mismatch between texture format and sampler type")
+    if (q.mobile && !moving ? (frameNo & 3) === 0 : (frameNo & 1) === 0) renderer.shadowMap.needsUpdate = true;
     renderer.info.reset();
     post.render(dt);
     debug.update(raw * 1000, renderer, adaptive.dpr);
