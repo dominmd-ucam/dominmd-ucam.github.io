@@ -1,10 +1,24 @@
 import * as THREE from 'three';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { loadGLTF } from '../assets/loader';
 import { CATEGORIES, LOCKS, SKIN_COLORS, type AvatarConfig, defaultConfig } from './config';
 
 const BASE = `${import.meta.env.BASE_URL}models/avatar/`;
 
 const AXIS_X = new THREE.Vector3(1, 0, 0);
+
+/** Caché compartida por todos los avatares (el del juego y el de las miniaturas del selector): cada .glb se descarga y se procesa una sola vez. */
+const files = new Map<string, Promise<GLTF>>();
+function file(name: string): Promise<GLTF> {
+  let p = files.get(name);
+  if (!p) {
+    p = loadGLTF(`${BASE}${name}.glb`);
+    p.catch(() => files.delete(name)); // si falla, el siguiente intento vuelve a pedirlo
+    files.set(name, p);
+  }
+  return p;
+}
 export interface Motion {
   speed: number; swimming: boolean; t: number;
   /** 0–1: saluda con el brazo derecho */ wave?: number;
@@ -17,6 +31,8 @@ export interface Motion {
 /** Clips de Moves.glb (Universal Animation Library de Quaternius, CC0, pasados al esqueleto Mixamo con scripts/retarget-ual.mjs). */
 type Clip = 'Idle' | 'Walk' | 'Run' | 'Sprint' | 'JumpStart' | 'JumpLoop' | 'JumpLand' | 'CrouchIdle' | 'CrouchWalk' | 'Roll' | 'SwimIdle' | 'Swim' | 'Interact' | 'Dance';
 const ONCE: Clip[] = ['JumpStart', 'JumpLand', 'Roll', 'Interact'];
+/** piezas pequeñas que no proyectan sombra */
+const NO_SHADOW = new Set(['Eyes', 'EyeBrow', 'Nose', 'Earring', 'Face', 'Glasses', 'FacialHair']);
 
 /**
  * Avatar modular: un esqueleto Mixamo compartido y piezas SkinnedMesh intercambiables.
@@ -53,12 +69,15 @@ export class Avatar {
   }
 
   private async init() {
-    const [arm, poses, moves] = await Promise.all([
-      loadGLTF(`${BASE}Armature.glb`), loadGLTF(`${BASE}Poses.glb`),
-      loadGLTF(`${BASE}Moves.glb`).catch((e) => { console.warn('avatar: sin Moves.glb, uso el balanceo procedural', e); return null; }),
+    const [armGltf, moves] = await Promise.all([
+      file('Armature'),
+      file('Moves').catch((e) => { console.warn('avatar: sin Moves.glb, uso la pose de Poses.glb', e); return null; }),
     ]);
-    const hips = arm.scene.getObjectByName('mixamorigHips');
-    const plane = arm.scene.getObjectByName('Plane') as THREE.SkinnedMesh | undefined;
+    // Poses.glb (211 KB) solo hace falta si no llegaron las animaciones
+    const poses = moves ? null : await file('Poses').catch(() => null);
+    const arm = cloneSkinned(armGltf.scene); // copia propia: los huesos se mueven a este avatar
+    const hips = arm.getObjectByName('mixamorigHips');
+    const plane = arm.getObjectByName('Plane') as THREE.SkinnedMesh | undefined;
     if (!hips || !plane) throw new Error('Armature.glb sin Hips o Plane');
     this.skeleton = plane.skeleton;
     this.armature.rotation.x = Math.PI / 2; // el rig viene de Blender (Z arriba), en centímetros
@@ -78,7 +97,7 @@ export class Avatar {
       this.acts.set(c.name as Clip, a);
     }
     this.mixer.addEventListener('finished', (e) => { if (this.once && e.action === this.acts.get(this.once)) this.once = null; });
-    const idle = poses.animations.find((c) => c.name === 'Idle') ?? poses.animations[0];
+    const idle = poses ? poses.animations.find((c) => c.name === 'Idle') ?? poses.animations[0] : undefined;
     if (this.acts.size) this.play('Idle', 0);
     else if (idle) {
       const tracks = idle.tracks.filter((t) => this.root.getObjectByName(t.name.split('.')[0]));
@@ -87,11 +106,11 @@ export class Avatar {
   }
 
   /** Carga (con caché) la pieza `file` y devuelve su escena. */
-  private part(file: string): Promise<THREE.Group> {
-    let p = this.cache.get(file);
+  private part(name: string): Promise<THREE.Group> {
+    let p = this.cache.get(name);
     if (!p) {
-      p = loadGLTF(`${BASE}${file}.glb`).then((g) => g.scene);
-      this.cache.set(file, p);
+      p = file(name).then((g) => g.scene);
+      this.cache.set(name, p);
     }
     return p;
   }
@@ -138,7 +157,8 @@ export class Avatar {
         sm.skeleton = this.skeleton;
         sm.morphTargetDictionary = m.morphTargetDictionary;
         sm.morphTargetInfluences = m.morphTargetInfluences;
-        sm.castShadow = sm.receiveShadow = true;
+        sm.castShadow = !NO_SHADOW.has(c.name); // ojos, cejas, nariz… no cambian la sombra y cada pieza es otra llamada en la pasada de sombras
+        sm.receiveShadow = true;
         sm.frustumCulled = false;
         group.add(sm);
       });

@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "postinstall": "node scripts/copy-decoders.mjs",
     "models:optimize": "node scripts/optimize-models.mjs",
     "avatar:optimize": "node scripts/optimize-avatar.mjs"
   },

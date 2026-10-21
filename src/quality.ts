@@ -1,6 +1,7 @@
 export type Tier = 'low' | 'med' | 'high';
 
-export interface Quality { tier: Tier; dpr: number; shadowMap: number; shadows: boolean }
+/** `mobile`: pantalla táctil o estrecha. Ajusta la calidad media al presupuesto de un móvil (sombra, hierba y postprocesado más ligeros). */
+export interface Quality { tier: Tier; dpr: number; shadowMap: number; shadows: boolean; mobile: boolean }
 
 /** ?q=low|med|high fuerza un nivel; si no, se estima por dispositivo. */
 export function detectQuality(): Quality {
@@ -9,5 +10,6 @@ export function detectQuality(): Quality {
   const cores = navigator.hardwareConcurrency ?? 4;
   const tier: Tier = forced && ['low', 'med', 'high'].includes(forced) ? forced : mobile ? 'med' : cores >= 8 ? 'high' : 'med';
   const dpr = Math.min(devicePixelRatio || 1, tier === 'high' ? 2 : tier === 'med' ? 1.5 : 1);
-  return { tier, dpr, shadowMap: tier === 'high' ? 4096 : tier === 'med' ? 2048 : 1024, shadows: tier !== 'low' };
+  const shadowMap = tier === 'high' ? 4096 : tier === 'med' && !mobile ? 2048 : 1024;
+  return { tier, dpr, shadowMap, shadows: tier !== 'low', mobile };
 }

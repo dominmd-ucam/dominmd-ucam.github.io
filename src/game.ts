@@ -35,7 +35,7 @@ import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL } from './settings
 import { detectQuality } from './quality';
 import { createPost } from './post';
 import { AdaptiveRes, DebugOverlay } from './perf';
-import { initAssets } from './assets/loader';
+import { afterReveal, initAssets, markRevealed } from './assets/loader';
 import { Avatar } from './avatar/avatar';
 import { hasSavedConfig, loadConfig, saveConfig } from './avatar/config';
 import { AvatarUI } from './avatar/ui';
@@ -82,16 +82,19 @@ const village = buildVillage(staticWorld);
 obstacles.push(...village.obstacles);
 obstacles.push(...buildZones(scene, q.tier).obstacles); // parcelas, cofre, vallas y el interior de la cueva
 const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
-const nature = buildNature(scene, obstacles, q.tier); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
+const nature = buildNature(scene, obstacles, q.tier, q.mobile); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
-const grass = buildGrass(q.tier === 'high' ? 30 : q.tier === 'med' ? 18 : 6, q.tier === 'low', q.shadows); // en calidad baja, solo la hoja ligera
+// en calidad baja, solo la hoja ligera; en móvil, menos hojas, un anillo de bloques menos y la hoja completa solo muy cerca
+const grass = q.mobile && q.tier === 'med'
+  ? buildGrass(10, false, q.shadows, { maxRing: 2, nearFull: 12 })
+  : buildGrass(q.tier === 'high' ? 30 : q.tier === 'med' ? 18 : 6, q.tier === 'low', q.shadows);
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
 const robot = new Robot(scene, obstacles, [-1.2, -0.8], 2.2); // pasea por la plaza y saluda
-void robot.load().catch((e) => console.warn('robot no disponible:', e));
+void afterReveal.then(() => robot.load()).catch((e) => console.warn('robot no disponible:', e));
 
 /* backend opcional: libro de visitas, contacto y visitantes fantasma (solo si hay API configurada) */
 const infoPoint = apiConfigured ? new InfoPoint(scene, obstacles, 3.2, 12.2) : null;
@@ -132,6 +135,7 @@ function checkReveal() {
   const elapsed = performance.now() - loadStart;
   if (!avatarSettled && elapsed < MAX_LOAD_MS) return;
   revealed = true;
+  markRevealed();
   ui.setLoad(1, 'Todo listo');
   setTimeout(() => {
     ui.ready();
@@ -402,7 +406,11 @@ function frame(timestamp: number) {
   frameNo++;
   const idle = menu.open || ui.isOpen;
   if (!idle || (frameNo & 1) === 0) {
-    renderer.shadowMap.needsUpdate = (frameNo & 1) === 0;
+    // en móvil la sombra se recalcula a 30 Hz solo mientras el personaje se mueve; quieto basta con 15 Hz (los NPC se mueven despacio)
+    const moving = player.vel.lengthSq() > 0.01;
+    // solo se activa, nunca se apaga aquí: three lo pone a false tras dibujar la sombra. Antes se asignaba y en el primer fotograma
+    // borraba la petición inicial, así que se dibujaba sin mapa de sombra (WebGL: "Mismatch between texture format and sampler type")
+    if (q.mobile && !moving ? (frameNo & 3) === 0 : (frameNo & 1) === 0) renderer.shadowMap.needsUpdate = true;
     renderer.info.reset();
     post.render(dt);
     debug.update(raw * 1000, renderer, adaptive.dpr);

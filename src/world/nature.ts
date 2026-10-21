@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { loadGLTF } from '../assets/loader';
+import { afterReveal, loadGLTF } from '../assets/loader';
 import type { Tier } from '../quality';
 import { BIOMES, CAVE, CLEARINGS, ISLAND_R, RESERVED, STONE_PATHS, biomeWeights, caveLocal, heightAt, islandRadius, pathDist, polar, type Biome } from './terrain';
 import type { Obstacle } from './props';
@@ -59,6 +59,8 @@ for (const k of ['TwistedTree_1', 'TwistedTree_2', 'TwistedTree_3'] as Kit[]) CA
 const PATH_TILES: Kit[] = ['RockPath_Round_Small_1', 'RockPath_Round_Small_2', 'RockPath_Round_Small_3', 'RockPath_Round_Thin', 'RockPath_Round_Small_2', 'RockPath_Round_Wide'];
 
 const FAR_SMALL = 45;
+/** a partir de aquí la corteza de los árboles usa su versión simplificada (nodos _LOD de megakit.glb, ver scripts/megakit-lod.mjs) */
+const LOD_DIST = 32;
 function rng(seed: number) { return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296); }
 const lerp = THREE.MathUtils.lerp;
 
@@ -372,7 +374,7 @@ export interface Nature {
   props: readonly Prop[];
 }
 
-export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tier): Nature {
+export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tier, mobile = false): Nature {
   // los modelos de Sketchfab van antes que los árboles (así no se plantan encima) y fuera de los caminos
   const props = placeProps(obstacles);
   const { spots, trees } = plan(obstacles, tier);
@@ -383,6 +385,8 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
   const crowns = new Map<Kit, { x: number; z: number; r: number; y0: number; y1: number }>();
   /** plantas pequeñas que se ocultan lejos del jugador (con la isla de 70 m serían miles de instancias diminutas) */
   const small: { bm: THREE.BatchedMesh; id: number; x: number; z: number }[] = [];
+  /** instancias con versión lejana: geometría cercana y lejana dentro del mismo BatchedMesh */
+  const lodded: { bm: THREE.BatchedMesh; id: number; near: number; far: number; x: number; z: number; isFar: boolean }[] = [];
   const treeSet = new Set<Spot>(trees);
   const isSmall = (sp: Spot) => !treeSet.has(sp) && !/^Rock(_|Path)/.test(sp.kit);
   let frame = 0;
@@ -390,9 +394,10 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
   const ready = (async () => {
     const gltf = await loadGLTF(`${BASE}megakit.glb`);
     // geometrías por modelo y material
-    const parts = new Map<Kit, Map<string, THREE.BufferGeometry>>();
+    const parts = new Map<Kit, Map<string, THREE.BufferGeometry>>(), lodParts = new Map<Kit, Map<string, THREE.BufferGeometry>>();
     const mats = new Map<string, THREE.MeshStandardMaterial>();
     for (const node of gltf.scene.children) {
+      if (node.name.endsWith('_LOD')) { lodParts.set(node.name.slice(0, -4) as Kit, kitParts(node)); continue; }
       const kp = kitParts(node);
       parts.set(node.name as Kit, kp);
       for (const [mn, g] of kp) if (/Lea/.test(mn) && CANOPY[node.name as Kit]) {
@@ -403,12 +408,16 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
       node.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) { const mt = m.material as THREE.MeshStandardMaterial; mats.set(mt.name, mt); } });
     }
     // un BatchedMesh por material
-    const byMat = new Map<string, { verts: number; idx: number; count: number; geos: Map<Kit, number> }>();
+    const byMat = new Map<string, { verts: number; idx: number; count: number; geos: Map<Kit, number>; lods: Map<Kit, number> }>();
     for (const sp of spots) for (const [mat, g] of parts.get(sp.kit) ?? []) {
       let e = byMat.get(mat);
-      if (!e) { e = { verts: 0, idx: 0, count: 0, geos: new Map() }; byMat.set(mat, e); }
+      if (!e) { e = { verts: 0, idx: 0, count: 0, geos: new Map(), lods: new Map() }; byMat.set(mat, e); }
       e.count++;
-      if (!e.geos.has(sp.kit)) { e.geos.set(sp.kit, -1); e.verts += g.attributes.position.count; e.idx += g.index!.count; }
+      if (!e.geos.has(sp.kit)) {
+        e.geos.set(sp.kit, -1); e.verts += g.attributes.position.count; e.idx += g.index!.count;
+        const lg = lodParts.get(sp.kit)?.get(mat);
+        if (lg) { e.lods.set(sp.kit, -1); e.verts += lg.attributes.position.count; e.idx += lg.index!.count; }
+      }
     }
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), qy = new THREE.Quaternion(), pos = new THREE.Vector3(), scl = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     for (const [name, e] of byMat) {
@@ -422,6 +431,7 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
       if (foliage) { mat.side = THREE.DoubleSide; mat.alphaTest = Math.max(mat.alphaTest, 0.45); patchFoliage(mat, uTime, uAlpha, uPlayer, /Flower/.test(name) ? 0.05 : /Pine/.test(name) ? 0.012 : 0.02, /Twisted/.test(name) ? new THREE.Color('#2f8a55') : undefined); }
       const bm = new THREE.BatchedMesh(e.count, e.verts, e.idx, mat);
       for (const kit of e.geos.keys()) e.geos.set(kit, bm.addGeometry(parts.get(kit)!.get(name)!));
+      for (const kit of e.lods.keys()) e.lods.set(kit, bm.addGeometry(lodParts.get(kit)!.get(name)!));
       for (const sp of spots) {
         const gid = e.geos.get(sp.kit);
         if (gid === undefined) continue;
@@ -431,15 +441,28 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
         const id = bm.addInstance(gid);
         bm.setMatrixAt(id, m4);
         if (isSmall(sp)) small.push({ bm, id, x: sp.x, z: sp.z });
+        const far = e.lods.get(sp.kit);
+        if (far !== undefined) lodded.push({ bm, id, near: gid, far, x: sp.x, z: sp.z, isFar: false });
       }
       // las losas, guijarros y flores no proyectan sombra (no se notaría y la pasada de sombras es cara)
-      bm.castShadow = tier !== 'low' && !/PathRocks|Flower/.test(name) && !(/^Leaves$/.test(name));
+      // en móvil solo los árboles y arbustos (corteza y copas): setas y rocas sueltas apenas se notan y cada material es otra llamada en la pasada de sombras
+      bm.castShadow = tier !== 'low' && !/PathRocks|Flower/.test(name) && !(/^Leaves$/.test(name)) && (!mobile || /^(Bark|Leaves)_/.test(name));
       bm.receiveShadow = true;
       bm.name = `nature:${name}`;
+      // la corteza es la mitad de los triángulos de la pasada de sombras: ahí siempre va la versión simplificada (en la sombra no se nota)
+      const mine = lodded.filter((p) => p.bm === bm);
+      if (mine.length) {
+        bm.onBeforeShadow = (...args) => {
+          for (const p of mine) bm.setGeometryIdAt(p.id, p.far);
+          THREE.BatchedMesh.prototype.onBeforeShadow.apply(bm, args); // aquí se calculan las listas de dibujo de la sombra
+          for (const p of mine) bm.setGeometryIdAt(p.id, p.isFar ? p.far : p.near);
+        };
+      }
       scene.add(bm);
     }
 
-    // Sketchfab
+    // Sketchfab: después de la pantalla de carga (sus obstáculos ya existen desde el principio)
+    await afterReveal;
     for (const pr of props) {
       const g = await sketchfab(pr.name, pr.size, tier);
       if (!g) continue;
@@ -465,7 +488,13 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
       uTime.value = t;
       if (player) {
         uPlayer.value.copy(player);
-        if (frame++ % 30 === 0) for (const p of small) p.bm.setVisibleAt(p.id, Math.hypot(p.x - player.x, p.z - player.z) < FAR_SMALL);
+        if (frame++ % 30 === 0) {
+          for (const p of small) p.bm.setVisibleAt(p.id, Math.hypot(p.x - player.x, p.z - player.z) < FAR_SMALL);
+          for (const p of lodded) {
+            const d = Math.hypot(p.x - player.x, p.z - player.z);
+            if (p.isFar ? d < LOD_DIST - 3 : d > LOD_DIST) { p.isFar = !p.isFar; p.bm.setGeometryIdAt(p.id, p.isFar ? p.far : p.near); } // 3 m de histéresis
+          }
+        }
       }
       for (const f of floats) { f.o.position.y = f.y + Math.sin(t * 0.35 + f.ph) * 0.6; f.o.rotation.y += 0.0004; }
     },
