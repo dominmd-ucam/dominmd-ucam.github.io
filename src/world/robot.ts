@@ -4,7 +4,7 @@ import { heightAt } from './terrain';
 import type { Obstacle } from './props';
 
 /*
- * Robot "Claude": cubo blanco con pantalla por cara (ojos y sonrisa naranjas de píxeles), CLAUDE en el costado y botones.
+ * Robot "Claude" (Claudito): cubo blanco con pantalla por cara (la pantalla "Usage" del cubo de referencia, con el bicho naranja), CLAUDE en el costado y botones.
  * El modelo sale del .glb de Tripo que pasó Domingo (scripts/blender/robot.py: uno de los cuatro, reducido, con
  * esqueleto rígido e Idle/Walk/Wave). La cara se pinta encima en un lienzo para que parpadee y cambie de gesto.
  * Pasea cerca de su sitio y saluda cuando te acercas.
@@ -17,17 +17,42 @@ const SPEED = 0.9;
 
 type Face = 'calm' | 'blink' | 'happy';
 
-/** Cara de píxeles: 32 × 24 sobre negro, en naranja. */
+const SW = 320, SH = 300;
+const ORANGE = '#e8763f';
+/** Bicho de píxeles de Claude (11 × 6); los huecos de la fila 1 son los ojos. */
+const CRAB = ['..#######..', '..#.###.#..', '###########', '###########', '..#######..', '..#.#.#.#..'];
+
+function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  g.beginPath(); g.roundRect(x, y, w, h, r); g.fill();
+}
+
+/** Pantalla "Usage" como la del cubo de referencia: bicho naranja, dos barras de uso y una línea de estado. */
 function drawFace(g: CanvasRenderingContext2D, face: Face) {
-  g.fillStyle = '#0b0b0d'; g.fillRect(0, 0, 32, 24);
-  g.fillStyle = '#ff8a2a';
-  if (face === 'calm') { g.fillRect(8, 7, 4, 6); g.fillRect(20, 7, 4, 6); }
-  else if (face === 'blink') { g.fillRect(7, 11, 6, 2); g.fillRect(19, 11, 6, 2); }
-  else { // ojos en ^
-    for (const ox of [7, 19]) { g.fillRect(ox, 10, 2, 2); g.fillRect(ox + 2, 8, 2, 2); g.fillRect(ox + 4, 10, 2, 2); }
-  }
-  // sonrisa
-  g.fillRect(12, 16, 8, 2); g.fillRect(10, 14, 2, 2); g.fillRect(20, 14, 2, 2);
+  g.clearRect(0, 0, SW, SH); g.fillStyle = '#060607'; roundRect(g, 0, 0, SW, SH, 34); // esquinas redondas como el cristal
+  // bicho (parpadea tapando los ojos)
+  const px = 5;
+  CRAB.forEach((row, y) => [...row].forEach((c, x) => {
+    const eye = c === '.' && y === 1 && (x === 3 || x === 7);
+    if (c === '#' || (eye && face === 'blink')) { g.fillStyle = ORANGE; g.fillRect(14 + x * px, 18 + y * px, px, px); }
+  }));
+  g.fillStyle = '#f4f1ea'; g.font = 'bold 34px Georgia, "Times New Roman", serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('Usage', SW / 2, 34);
+  // batería
+  g.strokeStyle = '#f4f1ea'; g.lineWidth = 2.5; g.strokeRect(266, 25, 32, 18); g.fillStyle = '#f4f1ea'; g.fillRect(299, 30, 3, 8);
+  for (let i = 0; i < 3; i++) g.fillRect(270 + i * 9.5, 29, 7, 10);
+  const card = (y: number, pct: number, tag: string, color: string, reset: string) => {
+    g.fillStyle = '#1d1c21'; roundRect(g, 10, y, SW - 20, 92, 12);
+    g.textAlign = 'left'; g.fillStyle = '#f4f1ea'; g.font = 'bold 28px Nunito, sans-serif'; g.fillText(`${pct}%`, 20, y + 24);
+    g.fillStyle = '#4a4555'; roundRect(g, SW - 112, y + 11, 92, 26, 13);
+    g.fillStyle = '#e9e4f0'; g.font = 'bold 17px Nunito, sans-serif'; g.textAlign = 'center'; g.fillText(tag, SW - 66, y + 25);
+    g.fillStyle = '#3a3640'; roundRect(g, 20, y + 47, SW - 40, 12, 6);
+    g.fillStyle = color; roundRect(g, 20, y + 47, Math.max(12, (SW - 40) * pct / 100), 12, 6);
+    g.fillStyle = '#d8d4dc'; g.font = 'bold 15px Nunito, sans-serif'; g.textAlign = 'left'; g.fillText(reset, 20, y + 76);
+  };
+  card(70, 50, 'Current', ORANGE, 'Resets in 1h 22m');
+  card(174, 11, 'Weekly', '#b9d65c', 'Resets in 6d 8h');
+  g.fillStyle = ORANGE; g.font = 'bold 19px "Courier New", monospace'; g.textAlign = 'center';
+  g.fillText(face === 'happy' ? '✱ ¡Hola!' : '✱ Musing…', SW / 2, 284);
 }
 
 export class Robot {
@@ -71,14 +96,14 @@ export class Robot {
 
   /** Pantalla con cara animada y el rótulo CLAUDE en el costado derecho (medidas del modelo, en metros sin escalar). */
   private decorate(root: THREE.Object3D, body: THREE.Object3D) {
-    const c = document.createElement('canvas'); c.width = 32; c.height = 24;
+    const c = document.createElement('canvas'); c.width = SW; c.height = SH;
     this.faceCtx = c.getContext('2d')!;
     drawFace(this.faceCtx, 'calm');
     this.faceTex = new THREE.CanvasTexture(c);
-    this.faceTex.magFilter = THREE.NearestFilter; this.faceTex.minFilter = THREE.NearestFilter; this.faceTex.colorSpace = THREE.SRGBColorSpace;
+    this.faceTex.colorSpace = THREE.SRGBColorSpace; this.faceTex.anisotropy = 4;
     // un poco por encima de 1: con bloom, la pantalla brilla
-    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.115), new THREE.MeshBasicMaterial({ map: this.faceTex, color: new THREE.Color(1.35, 1.35, 1.35), toneMapped: false }));
-    screen.position.set(0, 0.178, 0.0495);
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.152, 0.1425), new THREE.MeshBasicMaterial({ map: this.faceTex, color: new THREE.Color(1.15, 1.15, 1.15), toneMapped: false, transparent: true }));
+    screen.position.set(0, 0.18, 0.058);
     const lc = document.createElement('canvas'); lc.width = 256; lc.height = 64;
     const g = lc.getContext('2d')!;
     g.fillStyle = '#5b5e66'; g.font = 'bold 46px Fredoka, Nunito, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';

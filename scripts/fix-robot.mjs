@@ -2,11 +2,14 @@
 // 1) cierra las grietas que dejó el decimado (bordes abiertos casi pegados): junta cada vértice de borde con el más cercano de
 //    enfrente, sin añadir caras, así no aparecen líneas de textura;
 // 2) suaviza los pesos del esqueleto en hombros y caderas (eran rígidos, 0 o 1) para que Walk y Wave doblen sin estirar caras.
+// 3) carcasa blanca y limpia como el cubo de referencia: los grises pasan a blanco roto (conserva un poco de sombreado), el negro
+//    de la pantalla se queda negro y la boca naranja horneada se borra (la cara la pinta robot.ts encima).
 // Uso: node scripts/fix-robot.mjs entrada.glb salida.glb
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dequantize, meshopt } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
+import sharp from 'sharp';
 
 const [src, out] = process.argv.slice(2);
 if (!src || !out) { console.error('Uso: node scripts/fix-robot.mjs entrada.glb salida.glb'); process.exit(1); }
@@ -83,6 +86,21 @@ for (let i = 0; i < n; i++) {
   if (top.length > 1) blended++;
   JNT.setElement(i, j); WGT.setElement(i, w); POS.setElement(i, pos[i]);
 }
+const tex = doc.getRoot().listTextures()[0];
+const { data, info } = await sharp(tex.getImage()).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+for (let i = 0; i < data.length; i += 4) {
+  const [r, gg, b] = [data[i], data[i + 1], data[i + 2]].map((x) => x / 255);
+  const l = 0.3 * r + 0.59 * gg + 0.11 * b, sat = Math.max(r, gg, b) - Math.min(r, gg, b);
+  // de negro (pantalla) a blanco (carcasa) con una transición corta para no dejar halos grises en los bordes
+  const k = sat > 0.25 ? 0 : smooth(0.13, 0.3, l);
+  const white = 0.84 + 0.13 * smooth(0.25, 0.85, l);
+  const black = 0.045;
+  const v = black + (white - black) * k;
+  data[i] = Math.round(255 * v); data[i + 1] = Math.round(255 * v * 0.995); data[i + 2] = Math.round(255 * v * 0.985);
+}
+tex.setImage(await sharp(data, { raw: info }).webp({ quality: 90 }).toBuffer()).setMimeType('image/webp');
+const mat = doc.getRoot().listMaterials()[0]; mat.setRoughnessFactor(0.45);
 console.log(`aristas abiertas ${before} -> ${after}; vértices con pesos mezclados ${blended}/${n}`);
 await doc.transform(meshopt({ encoder: MeshoptEncoder, level: 'high' }));
 await io.write(out, doc);
