@@ -2,8 +2,9 @@
 // 1) cierra las grietas que dejó el decimado (bordes abiertos casi pegados): junta cada vértice de borde con el más cercano de
 //    enfrente, sin añadir caras, así no aparecen líneas de textura;
 // 2) suaviza los pesos del esqueleto en hombros y caderas (eran rígidos, 0 o 1) para que Walk y Wave doblen sin estirar caras.
-// 3) carcasa blanca y limpia como el cubo de referencia: los grises pasan a blanco roto (conserva un poco de sombreado), el negro
-//    de la pantalla se queda negro y la boca naranja horneada se borra (la cara la pinta robot.ts encima).
+// 3) frontal plano como una pantalla OLED: la cara del modelo (abombada y con relieves de ojos) se aplasta a ras del marco;
+// 4) textura repintada según la forma, no por color: la pantalla negra uniforme y el resto blanco roto limpio, sin las manchas grises
+//    del horneado en botones y bordes (la cara de píxeles la pinta robot.ts encima).
 // Uso: node scripts/fix-robot.mjs entrada.glb salida.glb
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
@@ -65,6 +66,28 @@ for (let pass = 0; pass < 3; pass++) {
 }
 const after = edgesOpen(g).length;
 
+// 3) frontal plano. Ejes de la malla: +Z es el frente (el esqueleto la gira). El marco blanco llega a z≈0.40; todo lo que
+//    sobresale (cristal abombado y relieves) se lleva a ese plano y mira de frente.
+const FRONT_Z = 0.405;
+const NRM = prim.getAttribute('NORMAL');
+const flat = pos.map((p) => p[2] > FRONT_Z);
+let nFlat = 0; const sx = [], sy = [];
+for (let i = 0; i < n; i++) if (flat[i]) { pos[i] = [pos[i][0], pos[i][1], FRONT_Z]; NRM.setElement(i, [0, 0, 1]); nFlat++; sx.push(pos[i][0]); sy.push(pos[i][1]); }
+// medidas de la pantalla en metros del modelo (lo que usa robot.ts), con la matriz de enlace del hueso raíz
+const ibm = doc.getRoot().listSkins()[0].getInverseBindMatrices().getElement(0, []);
+const toModel = (x, y, z) => [0, 1, 2].map((r) => ibm[r] * x + ibm[4 + r] * y + ibm[8 + r] * z + ibm[12 + r]);
+const [SX0, SX1, SY0, SY1] = [Math.min(...sx), Math.max(...sx), Math.min(...sy), Math.max(...sy)];
+// cristal: rectángulo redondeado un poco hacia dentro del borde aplanado; lo que hay dentro (abolladuras incluidas) queda plano
+const R = 0.14, IN = 0.02;
+const inGlass = (x, y, z) => {
+  if (z < FRONT_Z - 0.03) return false;
+  const dx = Math.max(SX0 + IN + R - x, 0, x - (SX1 - IN - R)), dy = Math.max(SY0 + IN + R - y, 0, y - (SY1 - IN - R));
+  return Math.hypot(dx, dy) <= R;
+};
+for (let i = 0; i < n; i++) if (!flat[i] && inGlass(...pos[i])) { pos[i] = [pos[i][0], pos[i][1], FRONT_Z]; NRM.setElement(i, [0, 0, 1]); flat[i] = true; nFlat++; }
+const lo = toModel(Math.min(...sx), Math.min(...sy), FRONT_Z), hi = toModel(Math.max(...sx), Math.max(...sy), FRONT_Z);
+console.log(`frontal: ${nFlat} vértices aplanados; pantalla en el modelo x ${lo[0].toFixed(4)}..${hi[0].toFixed(4)} y ${lo[1].toFixed(4)}..${hi[1].toFixed(4)} z ${lo[2].toFixed(4)}`);
+
 // 2) pesos: promedio con los vecinos de la malla, solo cerca de donde se tocan dos huesos
 const W = [...Array(n)].map((_, i) => { const j = JNT.getElement(i, []), w = WGT.getElement(i, []), m = new Map(); j.forEach((b, s) => { if (w[s] > 0) m.set(b, (m.get(b) || 0) + w[s]); }); return m; });
 const ng = Math.max(...g) + 1; let GW = [...Array(ng)].map(() => new Map());
@@ -86,17 +109,42 @@ for (let i = 0; i < n; i++) {
   if (top.length > 1) blended++;
   JNT.setElement(i, j); WGT.setElement(i, w); POS.setElement(i, pos[i]);
 }
+// 4) textura por caras: se pinta cada triángulo en su sitio de la UV (2 = pantalla, 1 = carcasa) y luego se colorea
 const tex = doc.getRoot().listTextures()[0];
 const { data, info } = await sharp(tex.getImage()).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+const TW = info.width, TH = info.height;
+const UV = prim.getAttribute('TEXCOORD_0');
+const mask = new Uint8Array(TW * TH);
+for (let t = 0; t < idx.length; t += 3) {
+  const v = [idx[t], idx[t + 1], idx[t + 2]];
+  // pantalla: caras aplanadas o con el centro dentro del cristal (así no quedan motas blancas sueltas en el negro)
+  const ctr = [0, 1, 2].map((ax) => (pos[v[0]][ax] + pos[v[1]][ax] + pos[v[2]][ax]) / 3);
+  const kind = v.every((i) => flat[i]) || inGlass(...ctr) ? 2 : 1;
+  const q = v.map((i) => { const u = UV.getElement(i, []); return [u[0] * TW - 0.5, u[1] * TH - 0.5]; });
+  const x0 = Math.max(0, Math.floor(Math.min(...q.map((a) => a[0])))), x1 = Math.min(TW - 1, Math.ceil(Math.max(...q.map((a) => a[0]))));
+  const y0 = Math.max(0, Math.floor(Math.min(...q.map((a) => a[1])))), y1 = Math.min(TH - 1, Math.ceil(Math.max(...q.map((a) => a[1]))));
+  const [a, b, c] = q; const den = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+  if (Math.abs(den) < 1e-9) continue;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / den, l2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / den;
+    if (l1 >= -0.02 && l2 >= -0.02 && 1 - l1 - l2 >= -0.02) {
+      const k = y * TW + x; if (mask[k] !== 2) mask[k] = kind;
+    }
+  }
+}
+// margen: los píxeles sin cara toman el valor del vecino, para que el filtrado no traiga colores de fuera
+for (let pass = 0; pass < 6; pass++) {
+  const prev = mask.slice();
+  for (let y = 0; y < TH; y++) for (let x = 0; x < TW; x++) {
+    const k = y * TW + x; if (prev[k]) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < TW && yy < TH && prev[yy * TW + xx]) { mask[k] = prev[yy * TW + xx]; break; } }
+  }
+}
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-for (let i = 0; i < data.length; i += 4) {
-  const [r, gg, b] = [data[i], data[i + 1], data[i + 2]].map((x) => x / 255);
-  const l = 0.3 * r + 0.59 * gg + 0.11 * b, sat = Math.max(r, gg, b) - Math.min(r, gg, b);
-  // de negro (pantalla) a blanco (carcasa) con una transición corta para no dejar halos grises en los bordes
-  const k = sat > 0.25 ? 0 : smooth(0.13, 0.3, l);
-  const white = 0.84 + 0.13 * smooth(0.25, 0.85, l);
-  const black = 0.045;
-  const v = black + (white - black) * k;
+for (let i = 0, k = 0; i < data.length; i += 4, k++) {
+  const l = (0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2]) / 255;
+  // carcasa: blanco roto con un pelín del sombreado horneado (sin bajar de 0.93, así no quedan manchas); pantalla: negro OLED
+  const v = mask[k] === 2 ? 0.03 : 0.93 + 0.035 * smooth(0.35, 0.9, l);
   data[i] = Math.round(255 * v); data[i + 1] = Math.round(255 * v * 0.995); data[i + 2] = Math.round(255 * v * 0.985);
 }
 tex.setImage(await sharp(data, { raw: info }).webp({ quality: 90 }).toBuffer()).setMimeType('image/webp');
