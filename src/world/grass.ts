@@ -5,27 +5,38 @@ import { tagTsl } from '../gfx/tag';
 
 const NEAR_FULL = 18; // metros hasta los que se dibuja la hoja completa
 // degradado por altura: la raíz más oscura (oclusión entre hojas) y la punta más clara y amarilla, como en BotW
-const ROOT = new THREE.Color(0.62, 0.66, 0.6), MID = new THREE.Color(0.95, 0.98, 0.9), TIP = new THREE.Color(1.28, 1.24, 0.92);
+const ROOT = new THREE.Color(0.5, 0.56, 0.5), MID = new THREE.Color(0.92, 0.97, 0.86), TIP = new THREE.Color(1.36, 1.3, 0.9);
 
 /**
- * Hoja de 5 vértices (3 triángulos) como la de three-grass-demo de James Smyth: base ancha, cintura a media altura
- * y una punta desplazada hacia delante, así cada hoja ya nace doblada. `position.y` va de 0 (raíz) a 1 (punta).
+ * Hoja fina de 7 vértices (5 triángulos), como las de three-grass-demo (James Smyth) y stylized-components (Cortiz):
+ * tres tramos que se estrechan con un perfil cóncavo hasta una punta, y que ya nacen curvados hacia delante.
+ * Con tres tramos el viento la dobla en curva, no en una sola arista. `position.y` va de 0 (raíz) a 1 (punta).
  */
 function bladeFull(): THREE.BufferGeometry {
-  const pos = [-0.5, 0, 0, 0.5, 0, 0, 0.27, 0.5, 0.04, -0.27, 0.5, 0.04, 0, 1, 0.22];
-  const col = [ROOT, ROOT, MID, MID, TIP].flatMap((c) => [c.r, c.g, c.b]);
+  const SEG = 3, pos: number[] = [], col: number[] = [], c = new THREE.Color();
+  const shade = (t: number) => (t < 0.5 ? c.lerpColors(ROOT, MID, t * 2) : c.lerpColors(MID, TIP, (t - 0.5) * 2));
+  for (let i = 0; i < SEG; i++) {
+    const t = i / SEG, w = 0.5 * Math.pow(1 - t, 1.25), z = 0.24 * t * t;
+    pos.push(-w, t, z, w, t, z);
+    shade(t); col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+  }
+  pos.push(0, 1, 0.24);
+  shade(1); col.push(c.r, c.g, c.b);
+  const idx: number[] = [];
+  for (let i = 0; i < SEG - 1; i++) { const l = i * 2; idx.push(l, l + 1, l + 2, l + 1, l + 3, l + 2); }
+  idx.push((SEG - 1) * 2, (SEG - 1) * 2 + 1, SEG * 2);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  geo.setIndex([0, 1, 2, 2, 4, 3, 3, 0, 2]);
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(15).fill(0).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(pos.length).fill(0).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+  geo.setIndex(idx);
   return geo;
 }
 
-/** Hoja ligera: un solo triángulo. A distancia no se distingue de la completa y cuesta 3 veces menos triángulos. */
+/** Hoja ligera: un solo triángulo. A distancia no se distingue de la completa y cuesta 5 veces menos triángulos. */
 function bladeLite(): THREE.BufferGeometry {
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute([-0.42, 0, 0, 0.42, 0, 0, 0, 1, 0.22], 3));
+  geo.setAttribute('position', new THREE.Float32BufferAttribute([-0.4, 0, 0, 0.4, 0, 0, 0, 1, 0.24], 3));
   geo.setAttribute('color', new THREE.Float32BufferAttribute([ROOT, ROOT, TIP].flatMap((c) => [c.r, c.g, c.b]), 3));
   geo.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
   return geo;
@@ -40,27 +51,39 @@ function bladeLite(): THREE.BufferGeometry {
  *  - la hierba se aparta al paso del personaje;
  *  - se genera por bloques alrededor del jugador (la isla es grande): `density` hojas por m² en los bloques cercanos, la mitad
  *    a media distancia y una cuarta parte lejos; los bloques que quedan atrás se liberan;
- *  - hay manchas de hierba alta (0,9–1,25 m) lejos de los caminos, que tapan lo que hay detrás.
+ *  - hay manchas de hierba alta (0,9–1,25 m) lejos de los caminos, que tapan lo que hay detrás;
+ *  - todas las hojas se iluminan con la normal +Y por las dos caras: antes la cara trasera recibía la normal al revés y salía
+ *    oscura, y eso daba el aspecto de polígonos sueltos; ahora el campo se lee como una alfombra continua;
+ *  - a contraluz las hojas transmiten luz del sol (más en la punta y en las que miran de canto), como en la demo de Cortiz;
+ *  - la sombra se mira una vez por hoja (en su centro): la hoja entera queda a la sombra o al sol y el borde de la sombra
+ *    es la propia silueta de la hierba, sin una línea recta que corte las hojas.
  * Con `setInkMask(true)` el fragment shader escribe alfa 0: el postprocesado lo usa para no dibujar contornos en la hierba.
  * Solo debe activarse cuando se dibuja a través del postprocesado: directo al lienzo, el alfa 0 dejaría ver el fondo de la página en algunos navegadores.
  */
-export function buildGrass(density: number, liteOnly = false, receiveShadow = false, opts: { maxRing?: number; nearFull?: number } = {}): { group: THREE.Group; update(t: number, cam?: THREE.Vector3, player?: THREE.Vector3): void; setInkMask(on: boolean): void } {
+export function buildGrass(density: number, liteOnly = false, receiveShadow = false, opts: { maxRing?: number; nearFull?: number; sunDir?: THREE.Vector3; widthMul?: number } = {}): { group: THREE.Group; update(t: number, cam?: THREE.Vector3, player?: THREE.Vector3): void; setInkMask(on: boolean): void } {
   const geoFull = liteOnly ? null : bladeFull(), geoLite = bladeLite();
 
   const uTime = { value: 0 }, uPlayer = { value: new THREE.Vector3(0, -99, 0) }, uAlpha = { value: 1 };
+  // el vector del sol se comparte con dawn.ts (cambia con la hora); el color de la luz que atraviesa la hoja va en lineal
+  const uSunDir = { value: opts.sunDir ?? new THREE.Vector3(0.5, 0.25, -0.7).normalize() }, uTrans = { value: new THREE.Color('#d8f06a') };
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1 });
   mat.defines = { TOON_NO_RIM: '' };
-  tagTsl(mat, 'grass', { uTime, uPlayer, uAlpha });
+  tagTsl(mat, 'grass', { uTime, uPlayer, uAlpha, uSunDir, uTrans });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = uTime;
     sh.uniforms.uPlayer = uPlayer;
     sh.uniforms.uAlpha = uAlpha;
+    sh.uniforms.uSunDir = uSunDir;
+    sh.uniforms.uTrans = uTrans;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
         uniform float uTime;
         uniform vec3 uPlayer;
         varying float vGust;
         varying float vCloud;
+        varying float vBH;
+        varying vec3 vBladeN;
+        varying vec3 vWorld;
         ${CLOUD_GLSL}`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         // el desplazamiento se calcula en el mundo y se pasa al espacio de la hoja: así sombras y niebla usan la hoja ya doblada
@@ -81,13 +104,41 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
         vec3 w = vec3(off.x, -dot(off, off) * 0.45, off.y) * bend * bladeH; // al inclinarse, la punta baja
         transformed += vec3(dot(bm[0], w) / dot(bm[0], bm[0]), dot(bm[1], w) / dot(bm[1], bm[1]), dot(bm[2], w) / dot(bm[2], bm[2]));
         vGust = gust * wave * position.y * (1.0 - push);
-        vCloud = cloudShadow(ip, uTime);`);
+        vCloud = cloudShadow(ip, uTime);
+        vBH = position.y;
+        vBladeN = normalize(bm[2]); // hacia dónde mira la hoja (su cara), solo para la luz a contraluz
+        vWorld = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;`)
+      // sombra: un solo punto por hoja (a media altura), así la hoja no queda medio al sol y medio a la sombra
+      .replace('#include <shadowmap_vertex>', `{
+        vec4 worldPosition = modelMatrix * instanceMatrix * vec4(0.0, 0.5, 0.0, 1.0);
+        #include <shadowmap_vertex>
+      }`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uAlpha;\nvarying float vGust;\nvarying float vCloud;')
+      .replace('#include <common>', `#include <common>
+        uniform float uAlpha;
+        uniform vec3 uSunDir;
+        uniform vec3 uTrans;
+        varying float vGust;
+        varying float vCloud;
+        varying float vBH;
+        varying vec3 vBladeN;
+        varying vec3 vWorld;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         diffuseColor.rgb += vec3(0.07, 0.08, 0.025) * vGust;
         diffuseColor.rgb *= 1.0 - 0.2 * vCloud;`)
-      .replace('#include <opaque_fragment>', '#include <opaque_fragment>\ngl_FragColor.a = uAlpha;');
+      // la misma normal (+Y) por las dos caras: three la da la vuelta en la cara trasera y la hoja salía oscura
+      .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
+        normal = normalize(mat3(viewMatrix) * vec3(0.0, 1.0, 0.0));
+        nonPerturbedNormal = normal;`)
+      // contraluz: mirando hacia el sol a través de la hoja; más en la punta (más fina) y en las hojas de canto al sol
+      .replace('#include <opaque_fragment>', `#include <opaque_fragment>
+        {
+          vec3 V = normalize(cameraPosition - vWorld);
+          float back = pow(max(dot(V, -uSunDir), 0.0), 3.0);
+          float edge = 1.0 - abs(dot(vBladeN, uSunDir));
+          gl_FragColor.rgb += uTrans * back * vBH * vBH * (0.35 + 0.65 * edge) * (1.0 - 0.7 * vCloud) * 0.55;
+        }
+        gl_FragColor.a = uAlpha;`);
   };
 
   const CELL = 16;
@@ -95,6 +146,7 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
   const RING_FRAC = [1, 1, 0.5, 0.22];
   const MAX_RING = opts.maxRing ?? (liteOnly ? 2 : 3);
   const nearFull = opts.nearFull ?? NEAR_FULL;
+  const widthMul = opts.widthMul ?? 1;
   const group = new THREE.Group();
   interface Cell { cx: number; cz: number; gen: number; full: number; far: THREE.InstancedMesh; near: THREE.InstancedMesh | null; center: THREE.Vector3 }
   const cells = new Map<string, Cell>();
@@ -104,7 +156,7 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
 
   /** Rejilla de 9×9 puntos por bloque (cada 2 m): color del suelo, inclinación y si puede crecer hierba alta (lejos de los caminos). Las hojas interpolan. */
   const G = 9;
-  const gridCol = new Float32Array(G * G * 3), gridTall = new Float32Array(G * G), gridNy = new Float32Array(G * G);
+  const gridCol = new Float32Array(G * G * 3), gridTall = new Float32Array(G * G), gridNy = new Float32Array(G * G), gridPatch = new Float32Array(G * G);
   function fillGrid(x0: number, z0: number) {
     const c = new THREE.Color(), e = 0.4;
     for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
@@ -114,10 +166,11 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
       const k = j * G + i;
       gridCol[k * 3] = c.r; gridCol[k * 3 + 1] = c.g; gridCol[k * 3 + 2] = c.b;
       gridNy[k] = ny;
+      gridPatch[k] = fbm(x * 0.07 - 7, z * 0.07 + 3); // manchas grandes de hierba más jugosa o más seca
       gridTall[k] = THREE.MathUtils.smoothstep(pathDist(x, z), 2.2, 4) * THREE.MathUtils.smoothstep(fbm(x * 0.045 + 20, z * 0.045 - 11), 0.56, 0.64);
     }
   }
-  let sampledNy = 1;
+  let sampledNy = 1, sampledPatch = 0.5;
   /** Interpola la rejilla en (u, v): devuelve la "altura" de hierba, deja el color en `out` y la inclinación del suelo en `sampledNy`. */
   function sampleGrid(u: number, v: number, out: THREE.Color): number {
     const fx = u * (G - 1), fz = v * (G - 1), i = Math.min(G - 2, Math.floor(fx)), j = Math.min(G - 2, Math.floor(fz)), a = fx - i, b = fz - j;
@@ -128,6 +181,7 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
       gridCol[k00 * 3 + 1] * w00 + gridCol[k10 * 3 + 1] * w10 + gridCol[k01 * 3 + 1] * w01 + gridCol[k11 * 3 + 1] * w11,
       gridCol[k00 * 3 + 2] * w00 + gridCol[k10 * 3 + 2] * w10 + gridCol[k01 * 3 + 2] * w01 + gridCol[k11 * 3 + 2] * w11);
     sampledNy = gridNy[k00] * w00 + gridNy[k10] * w10 + gridNy[k01] * w01 + gridNy[k11] * w11;
+    sampledPatch = gridPatch[k00] * w00 + gridPatch[k10] * w10 + gridPatch[k01] * w01 + gridPatch[k11] * w11;
     return gridTall[k00] * w00 + gridTall[k10] * w10 + gridTall[k01] * w01 + gridTall[k11] * w11;
   }
 
@@ -151,13 +205,15 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
       const tallness = sampleGrid(u, v, col);
       if (sampledNy < 0.8) continue; // en las rocas no crece
       const tall = tallness > rnd() * 0.6 + 0.3;
-      const hh = tall ? 0.9 + rnd() * 0.35 : 0.25 + rnd() * 0.35;
+      const hh = tall ? 0.9 + rnd() * 0.35 : 0.34 + rnd() * 0.36;
       p.set(x, h - 0.02, z);
       q.setFromAxisAngle(up, rnd() * Math.PI * 2);
-      sc.set(tall ? 0.12 + rnd() * 0.05 : 0.09 + rnd() * 0.05, hh, 1);
+      sc.set((tall ? 0.075 + rnd() * 0.03 : 0.05 + rnd() * 0.025) * widthMul, hh, 1); // hojas finas: 7–10 veces más altas que anchas
       m4.compose(p, q, sc);
       mats.push(...m4.elements);
-      col.offsetHSL((rnd() - 0.5) * 0.03, 0.02, (rnd() - 0.5) * 0.06 + (tall ? -0.02 : 0));
+      // cada hoja algo distinta de sus vecinas (lo que en la demo de Smyth da la textura) y manchas secas/jugosas a lo grande
+      const dry = THREE.MathUtils.smoothstep(sampledPatch, 0.42, 0.62);
+      col.offsetHSL((rnd() - 0.5) * 0.035 - dry * 0.025, 0.03 - dry * 0.05, (rnd() - 0.5) * 0.11 + dry * 0.03 + (tall ? -0.03 : 0));
       cols.push(col.r, col.g, col.b);
     }
     const count = cols.length / 3;
