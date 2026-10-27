@@ -87,9 +87,11 @@ batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zon
 const splash = buildSplash(scene);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
 // en calidad baja, solo la hoja ligera; en móvil, menos hojas, un anillo de bloques menos y la hoja completa solo muy cerca
+// (las hojas son finas, como en la demo de Smyth: casi el doble de hojas por m² cubren lo mismo que antes;
+// en móvil algo más anchas, porque se dibuja a menos resolución y una hoja muy fina se queda en un hilo de píxeles)
 const grass = q.mobile && q.tier === 'med'
-  ? buildGrass(10, false, q.shadows, { maxRing: 2, nearFull: 12 })
-  : buildGrass(q.tier === 'high' ? 30 : q.tier === 'med' ? 18 : 6, q.tier === 'low', q.shadows);
+  ? buildGrass(18, false, q.shadows, { maxRing: 2, nearFull: 12, sunDir: dawn.sunDir, widthMul: 1.3 })
+  : buildGrass(q.tier === 'high' ? 55 : q.tier === 'med' ? 34 : 10, q.tier === 'low', q.shadows, { sunDir: dawn.sunDir });
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
@@ -119,6 +121,7 @@ const player = new Player(obstacles, [6, 12]);
 scene.add(player.group);
 const coop = new Coop(scene, obstacles, player.group); // invitados con el móvil como mando (QR)
 const post = gfx.createPost(scene, camera, q);
+post.setSun(dawn.sunDir);
 const debug = new DebugOverlay();
 if (new URLSearchParams(location.search).has('tune')) {
   void import('./tune').then((m) => m.openTune({ dawn, scene, terrain, water, post }));

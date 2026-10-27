@@ -7,11 +7,14 @@ import type { Gfx } from './index';
 import type { Post } from '../post';
 import type { Quality } from '../quality';
 import { ENV_SKY } from '../world/dawn';
-import { installIslandMaterials } from './tsl';
+import { installIslandMaterials, noise2 } from './tsl';
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- ver tsl.ts: la aritmética de nodos va sin tipar */
 type N = any;
-const { Fn, pass, uniform, uv, vec2, vec3, vec4, float, mix, max, smoothstep, select, distance, perspectiveDepthToViewZ, toneMapping, renderOutput } = TSL as any;
+const {
+  Fn, If, Loop, pass, rtt, step, uniform, uv, vec2, vec3, vec4, float, mix, max, clamp, pow, length, dot, atan, fract, smoothstep, select, distance,
+  screenCoordinate, perspectiveDepthToViewZ, toneMapping, renderOutput,
+} = TSL as any;
 
 /**
  * Motor WebGPU (experimental, se activa en Ajustes → Motor). Mismo aspecto que el de WebGL:
@@ -82,6 +85,7 @@ function createPostGPU(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camer
       setSize: () => {},
       setExposure: (v) => { renderer.toneMappingExposure = v; },
       setEnabled: () => {},
+      setSun: () => {},
     };
   }
   const pipeline = new THREE.RenderPipeline(renderer);
@@ -105,10 +109,42 @@ function createPostGPU(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camer
     const skip = d.greaterThanEqual(1).or(c.a.lessThan(0.5));
     return select(skip, c.rgb, mix(c.rgb, c.rgb.mul(vec3(0.3, 0.28, 0.38)), edge.mul(uInk)));
   })();
-  const exposed = inked.mul(uExposure);
+  // rayos de sol (godrays.ts): máscara del cielo brillante a media resolución y marcha de cada píxel hacia el sol
+  const uSunUv = uniform(new THREE.Vector2(0.5, 0.5)), uVisible = uniform(0), uAspect = uniform(1.78), uTime = uniform(0);
+  const SAMPLES = q.tier === 'high' ? 40 : 28;
+  const mask = rtt(Fn(() => {
+    const c = color.sample(uv()).rgb;
+    const lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    return vec4(c.mul(smoothstep(0.9, 1.3, lum)).mul(step(0.99999, depth.sample(uv()).r)), 1);
+  })(), null, null, { resolutionScale: 0.5 });
+  const rays = Fn(() => {
+    const out = vec3(0).toVar();
+    If(uVisible.greaterThan(0), () => {
+      const d = uv().sub(uSunUv), da = d.mul(vec2(uAspect, 1)), dist = length(da);
+      const reach = pow(clamp(float(1).sub(dist.div(1.4)), 0, 1), 1.4);
+      const stepUv = d.mul(0.85 / SAMPLES);
+      const h = fract(screenCoordinate.xy.dot(vec2(0.06711056, 0.00583715)).fract().mul(52.9829189));
+      const p = uv().sub(stepUv.mul(h)).toVar(), acc = vec3(0).toVar(), w = float(1).toVar(), wsum = float(0).toVar();
+      Loop(SAMPLES, () => {
+        p.subAssign(stepUv);
+        const e = smoothstep(vec2(0), vec2(0.03), p).mul(smoothstep(vec2(1), vec2(0.97), p));
+        acc.addAssign(mask.sample(clamp(p, 0, 1)).rgb.mul(w.mul(e.x).mul(e.y)));
+        wsum.addAssign(w);
+        w.mulAssign(0.965);
+      });
+      acc.divAssign(wsum);
+      const n = noise2(vec2(atan(da.y, da.x.add(1e-6)).mul(6), dist.mul(3).add(uTime.mul(0.05))));
+      const strands = mix(1, smoothstep(0.25, 0.75, n).mul(1.4).add(0.3), 0.35);
+      const shaft = mix(acc, vec3(1, 0.886, 0.722).mul(max(max(acc.r, acc.g), acc.b)), 0.35);
+      out.assign(shaft.mul(reach.mul(strands).mul(uVisible).mul(0.55)));
+    });
+    return out;
+  })();
+  const lit = q.mobile ? inked : inked.add(rays);
+  const exposed = lit.mul(uExposure);
   // como en postprocessing: el bloom mide el umbral sobre la escena sin exposición y se suma al color ya expuesto.
   // La intensidad de BloomNode no equivale a la de postprocessing: 0,18 da el mismo halo que 0,4 allí (comparado en capturas)
-  const glow = bloom(vec4(inked, 1), 0.18, 0.7, 1.15) as N;
+  const glow = bloom(vec4(lit, 1), 0.18, 0.7, 1.15) as N;
   glow.smoothWidth.value = 0.25;
   const graded = Fn(() => {
     let c: N = toneMapping(THREE.ACESFilmicToneMapping, float(1), exposed.add(glow.rgb)).rgb;
@@ -123,18 +159,34 @@ function createPostGPU(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camer
   // en móvil la densidad de píxeles ya disimula los dientes de sierra (igual que en WebGL)
   pipeline.outputNode = q.mobile ? graded : smaa(graded);
 
-  let enabled = true, expo = 0.5;
-  const size = new THREE.Vector2();
+  let enabled = true, expo = 0.5, sunDir: THREE.Vector3 | null = null;
+  const size = new THREE.Vector2(), clip = new THREE.Vector4(), vp = new THREE.Matrix4();
+  /** dónde cae el sol en pantalla y cuánto se ve: igual que GodRaysEffect.sunOnScreen */
+  const sunOnScreen = () => {
+    if (!sunDir) return 0;
+    vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    clip.set(camera.position.x + sunDir.x * 100, camera.position.y + sunDir.y * 100, camera.position.z + sunDir.z * 100, 1).applyMatrix4(vp);
+    if (clip.w <= 0) return 0;
+    const sx = (clip.x / clip.w) * 0.5 + 0.5, sy = (clip.y / clip.w) * 0.5 + 0.5;
+    uSunUv.value.set(sx, 1 - sy); // en WebGPU la v de las texturas crece hacia abajo
+    return THREE.MathUtils.clamp(Math.min((Math.min(sx, 1 - sx) + 0.25) / 0.35, (Math.min(sy, 1 - sy) + 0.25) / 0.35), 0, 1);
+  };
   return {
-    render: () => {
-      if (enabled) { renderer.toneMapping = THREE.NoToneMapping; pipeline.render(); }
+    render: (dt) => {
+      if (enabled) {
+        uVisible.value = sunOnScreen(); uTime.value += dt;
+        mask.autoUpdate = !q.mobile && uVisible.value > 0; // sin sol en pantalla no hace falta la máscara
+        renderer.toneMapping = THREE.NoToneMapping; pipeline.render();
+      }
       else { renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = expo * 1.1; renderer.render(scene, camera); }
     },
     setSize: () => {
       renderer.getDrawingBufferSize(size);
       uTexel.value.set(1 / Math.max(1, size.x), 1 / Math.max(1, size.y));
+      uAspect.value = size.x / Math.max(1, size.y);
     },
     setExposure: (v) => { expo = v; uExposure.value = v; },
     setEnabled: (on) => { enabled = on; },
+    setSun: (dir) => { sunDir = dir; },
   };
 }

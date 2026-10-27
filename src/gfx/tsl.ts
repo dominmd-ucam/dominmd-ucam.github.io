@@ -119,13 +119,28 @@ const HOOKS: Record<TslTag['kind'], Hooks> = {
         .add(vec2(windDir.y.negate(), windDir.x).mul(sin(uTime.mul(1.7).add(ip.x.mul(1.3)).add(ip.y.mul(0.7))).mul(0.06)))
         .add(dp.div(max(dist, 0.001)).mul(push.mul(0.75)));
       positionLocal.addAssign(vec3(off.x, dot(off, off).mul(-0.45), off.y).mul(bend.mul(bladeH)));
-      m.vars = { vGust: varying(gust.mul(wave).mul(y).mul(float(1).sub(push)), 'vGust'), vCloud: varying(cloudShadow(ip, uTime), 'vCloud') };
+      m.vars = {
+        vGust: varying(gust.mul(wave).mul(y).mul(float(1).sub(push)), 'vGust'), vCloud: varying(cloudShadow(ip, uTime), 'vCloud'),
+        vBH: varying(y, 'vBH'), vBladeN: varying(normalize(im.element(2).xyz), 'vBladeN'),
+      };
     },
     color({ m }) {
       diffuseColor.rgb.addAssign(vec3(0.07, 0.08, 0.025).mul(m.vars!.vGust));
       diffuseColor.rgb.mulAssign(float(1).sub(m.vars!.vCloud.mul(0.2)));
     },
-    setup: alphaMask,
+    setup({ m, t }) {
+      // la misma normal (+Y) por las dos caras, sin la vuelta de la cara trasera
+      m.normalNode = normalize(cameraViewMatrix.mul(vec4(0, 1, 0, 0)).xyz);
+      // contraluz (grass.ts): mirando al sol a través de la hoja, más en la punta y en las hojas de canto
+      // m.vars los deja el gancho de vértice, que se construye después de setup: se leen dentro del Fn (al compilar)
+      const trans = Fn(() => {
+        const v = m.vars!, L = un(t.u.uSunDir), V = normalize(cameraPosition.sub(positionWorld));
+        const back = pow(max(dot(V, L.negate()), 0), 3);
+        const edge = float(1).sub(abs(dot(v.vBladeN, L)));
+        return un(t.u.uTrans).mul(back).mul(v.vBH.mul(v.vBH)).mul(edge.mul(0.65).add(0.35)).mul(float(1).sub(v.vCloud.mul(0.7))).mul(0.55);
+      });
+      m.outputNode = vec4(output.rgb.add(trans()), un(t.u.uAlpha));
+    },
   },
 
   foliage: {
