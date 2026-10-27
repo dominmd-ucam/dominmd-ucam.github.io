@@ -1,4 +1,4 @@
-import type * as THREE from 'three';
+import type { Gfx } from './gfx';
 
 /**
  * Resolución adaptativa: si los fotogramas tardan demasiado baja el factor de píxeles (poco a poco y con histéresis)
@@ -46,11 +46,11 @@ export class DebugOverlay {
 
   get visible() { return !this.el.hidden; }
 
-  update(dtMs: number, renderer: THREE.WebGLRenderer, dpr: number) {
+  update(dtMs: number, gfx: Gfx, dpr: number) {
     this.n++; this.acc += dtMs;
     if (this.acc < 500 || this.el.hidden) return;
-    const i = renderer.info;
-    this.el.textContent = `${(1000 / (this.acc / this.n)).toFixed(0)} fps\n${i.render.calls} llamadas · ${(i.render.triangles / 1000).toFixed(0)}k tris\n${i.memory.geometries} geom · ${i.memory.textures} tex\ndpr ${dpr.toFixed(2)}`;
+    const i = gfx.stats();
+    this.el.textContent = `${(1000 / (this.acc / this.n)).toFixed(0)} fps · ${gfx.kind === 'webgpu' ? 'WebGPU' : 'WebGL'}\n${i.calls} llamadas · ${(i.triangles / 1000).toFixed(0)}k tris\n${i.geometries} geom · ${i.textures} tex\ndpr ${dpr.toFixed(2)}`;
     this.n = 0; this.acc = 0;
   }
 }

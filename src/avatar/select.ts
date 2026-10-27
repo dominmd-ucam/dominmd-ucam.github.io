@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Gfx } from '../gfx';
 import { Avatar } from './avatar';
 import { defaultConfig, saveConfig, CLOTH_COLORS, HAIR_COLORS, SKIN_COLORS, type AvatarConfig } from './config';
 
@@ -57,7 +58,7 @@ export class CharacterSelect {
   private justOpened = false;
   private thumbs: Promise<void> | null = null;
 
-  constructor(private renderer: THREE.WebGLRenderer) {
+  constructor(private gfx: Gfx) {
     this.root.hidden = true;
     this.root.setAttribute('role', 'dialog');
     this.root.setAttribute('aria-modal', 'true');
@@ -162,30 +163,15 @@ export class CharacterSelect {
     const cam = new THREE.PerspectiveCamera(30, TW / TH, 0.1, 20);
     cam.position.set(0, 1.05, 4.3);
     cam.lookAt(0, 0.86, 0);
-    // render target en sRGB: el propio hardware convierte el color lineal al escribirlo
-    const rt = new THREE.WebGLRenderTarget(TW, TH, { samples: 4, colorSpace: THREE.SRGBColorSpace });
-    const px = new Uint8Array(TW * TH * 4);
-    const clear = new THREE.Color();
     for (let i = 0; i < PRESETS.length; i++) {
       await avatar.apply(PRESETS[i].cfg);
       avatar.update(1 / 60, { speed: 0, swimming: false, t: 0 }); // pose de reposo
-      const r = this.renderer, prev = r.getRenderTarget(), alpha = r.getClearAlpha();
-      r.getClearColor(clear);
-      r.setRenderTarget(rt);
-      r.setClearColor(0x000000, 0);
-      r.clear();
-      r.render(scene, cam);
-      r.readRenderTargetPixels(rt, 0, 0, TW, TH, px);
-      r.setRenderTarget(prev);
-      r.setClearColor(clear, alpha);
-      // WebGL lee de abajo arriba: se da la vuelta a las filas
       const img = new ImageData(TW, TH);
-      for (let y = 0; y < TH; y++) img.data.set(px.subarray((TH - 1 - y) * TW * 4, (TH - y) * TW * 4), y * TW * 4);
+      img.data.set(await this.gfx.snapshot(scene, cam, TW, TH));
       const cv = this.items[i].querySelector('canvas') as HTMLCanvasElement;
       cv.getContext('2d')?.putImageData(img, 0, 0);
       cv.classList.add('on');
       await new Promise((ok) => setTimeout(ok, 0)); // deja respirar al bucle del juego entre miniatura y miniatura
     }
-    rt.dispose();
   }
 }

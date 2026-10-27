@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tagTsl } from '../gfx/tag';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { NOISE3_GLSL } from './toon';
 
@@ -62,6 +63,7 @@ export function stoneMaterial(color: string, moss = 1, mossColor = '#6aa63f'): T
   if (m) return m;
   m = new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
   const uMoss = { value: new THREE.Color(mossColor) }, uMossAmt = { value: moss };
+  tagTsl(m, 'stone', { uMoss, uMossAmt });
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uMoss = uMoss; sh.uniforms.uMossAmt = uMossAmt;
     sh.vertexShader = sh.vertexShader

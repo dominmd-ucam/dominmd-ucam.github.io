@@ -31,9 +31,9 @@ import { Menu, type View } from './ui/menu';
 import { Dialogue } from './ui/dialogue';
 import { Toasts } from './ui/toasts';
 import { Achievements, ACHIEVEMENTS } from './achievements';
-import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL } from './settings';
+import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL, BACKENDS } from './settings';
 import { detectQuality } from './quality';
-import { createPost } from './post';
+import { createGfx } from './gfx';
 import { AdaptiveRes, DebugOverlay } from './perf';
 import { afterReveal, initAssets, markRevealed } from './assets/loader';
 import { Avatar } from './avatar/avatar';
@@ -44,26 +44,25 @@ import { Coop } from './coop/host';
 
 installToon(); // antes de compilar ningún material
 const q = detectQuality();
-const canvas = document.getElementById('gl') as HTMLCanvasElement;
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: q.tier === 'low', powerPreference: 'high-performance' });
+// WebGL o WebGPU según los ajustes (WebGPU es experimental y se descarga aparte; sin soporte se usa WebGL)
+const gfx = await createGfx(document.getElementById('gl') as HTMLCanvasElement, q);
+const { renderer, canvas } = gfx;
 renderer.setPixelRatio(q.dpr);
 renderer.shadowMap.enabled = q.shadows;
 renderer.shadowMap.type = THREE.PCFShadowMap;
-renderer.shadowMap.autoUpdate = false; // la sombra se recalcula a 30 Hz (ver el bucle)
-renderer.info.autoReset = false;
 initAssets();
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 6000);
 
 /* luz fija de amanecer */
-const dawn = new Dawn(scene, renderer);
+const dawn = new Dawn(scene, gfx.envFactory());
 dawn.sun.castShadow = q.shadows;
 dawn.sun.shadow.mapSize.set(q.shadowMap, q.shadowMap);
 const sc = dawn.sun.shadow.camera;
 sc.left = -30; sc.right = 30; sc.top = 30; sc.bottom = -30; sc.near = 1; sc.far = 150;
 dawn.sun.shadow.bias = -0.0004; dawn.sun.shadow.normalBias = 0.04;
-renderer.shadowMap.needsUpdate = true; // con autoUpdate apagado, el primer fotograma necesita generar el mapa o el sampler de sombra queda sin textura válida
+gfx.initShadows(dawn.sun); // la sombra se recalcula a ritmo propio (ver el bucle)
 scene.fog = new THREE.FogExp2(dawn.fogColor, 0.0045);
 
 /* mundo: lo estático se fusiona al final para reducir llamadas de dibujo */
@@ -119,7 +118,7 @@ ui.setTotal(interactables.stations.length);
 const player = new Player(obstacles, [6, 12]);
 scene.add(player.group);
 const coop = new Coop(scene, obstacles, player.group); // invitados con el móvil como mando (QR)
-const post = createPost(renderer, scene, camera, q);
+const post = gfx.createPost(scene, camera, q);
 const debug = new DebugOverlay();
 if (new URLSearchParams(location.search).has('tune')) {
   void import('./tune').then((m) => m.openTune({ dawn, scene, terrain, water, post }));
@@ -149,7 +148,7 @@ void Avatar.create().then(async (a) => {
   player.attachAvatar(a);
   avatarUI = new AvatarUI(a);
   avatarBtn.disabled = false;
-  charSelect = new CharacterSelect(renderer);
+  charSelect = new CharacterSelect(gfx);
   charSelect.onPick = (cfg) => void a.apply(cfg);
   charSelect.onCustom = () => { saveConfig(a.getConfig()); avatarUI?.toggle(true); }; // se guarda ya: así no vuelve a salir el selector
 }).catch((e) => console.warn('Avatar modular no disponible, uso el de respaldo:', e)).finally(() => { avatarSettled = true; ui.setLoad(0.95, 'Todo listo'); });
@@ -195,6 +194,10 @@ function settingsView(): View {
       ...(apiConfigured ? [{ type: 'toggle' as const, label: 'VISITANTES', get: () => settings.value.ghosts, set: (v: boolean) => settings.set('ghosts', v) }] : []),
       { type: 'select', label: 'RESOLUCIÓN', options: RESOLUTIONS.map((r) => RESOLUTION_LABEL[r]), get: () => RESOLUTIONS.indexOf(s.resolution), set: (i) => settings.set('resolution', RESOLUTIONS[i]) },
       { type: 'select', label: 'CÁMARA', options: ['CERCA', 'MEDIA', 'LEJOS'], get: () => settings.value.camera, set: (i) => settings.set('camera', i) },
+      // cambiar de motor gráfico obliga a recargar: el renderer no se puede sustituir en caliente
+      'gpu' in navigator
+        ? { type: 'select' as const, label: 'MOTOR', options: ['WEBGL', 'WEBGPU β'], get: () => BACKENDS.indexOf(settings.value.backend), set: (i: number) => { settings.set('backend', BACKENDS[i]); location.reload(); } }
+        : { type: 'info' as const, label: 'MOTOR', value: 'WEBGL' },
       { type: 'action', label: 'Atrás', run: () => menu.back() },
     ],
   };
@@ -238,7 +241,7 @@ function applySettings(key?: string) {
   audio.setVolume(s.volume);
   ui.setMuted(!s.sound);
   dawn.sun.castShadow = s.shadows && q.shadows;
-  renderer.shadowMap.needsUpdate = true;
+  gfx.requestShadow(dawn.sun);
   post.setEnabled(s.effects && q.tier !== 'low');
   grass.setInkMask(s.effects && q.tier !== 'low'); // la máscara de contornos solo sirve (y solo es segura) con el postprocesado
   nature.setInkMask(s.effects && q.tier !== 'low');
@@ -412,12 +415,12 @@ function frame(timestamp: number) {
   if (!idle || (frameNo & 1) === 0) {
     // en móvil la sombra se recalcula a 30 Hz solo mientras el personaje se mueve; quieto basta con 15 Hz (los NPC se mueven despacio)
     const moving = player.vel.lengthSq() > 0.01;
-    // solo se activa, nunca se apaga aquí: three lo pone a false tras dibujar la sombra. Antes se asignaba y en el primer fotograma
+    // solo se pide, nunca se cancela aquí: three la marca como hecha tras dibujarla. Antes se asignaba y en el primer fotograma
     // borraba la petición inicial, así que se dibujaba sin mapa de sombra (WebGL: "Mismatch between texture format and sampler type")
-    if (q.mobile && !moving ? (frameNo & 3) === 0 : (frameNo & 1) === 0) renderer.shadowMap.needsUpdate = true;
-    renderer.info.reset();
+    if (q.mobile && !moving ? (frameNo & 3) === 0 : (frameNo & 1) === 0) gfx.requestShadow(dawn.sun);
+    gfx.resetStats();
     post.render(dt);
-    debug.update(raw * 1000, renderer, adaptive.dpr);
+    debug.update(raw * 1000, gfx, adaptive.dpr);
   }
   if (first) { first = false; ui.setLoad(avatarSettled ? 0.95 : 0.6, avatarSettled ? 'Todo listo' : 'Vistiendo al personaje…'); }
   checkReveal();
@@ -425,7 +428,7 @@ function frame(timestamp: number) {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, q, dawn, splash, post, scene, camera, guide, robot, coop, menu, dialogue, achievements, settings, adaptive, charSelect: () => charSelect };
+(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, gfx, q, dawn, splash, post, scene, camera, guide, robot, coop, menu, dialogue, achievements, settings, adaptive, charSelect: () => charSelect };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }

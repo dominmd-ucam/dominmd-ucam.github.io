@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tagTsl } from '../gfx/tag';
 import { heightAt, islandRadius, CAVE } from './terrain';
 import type { Obstacle } from './props';
 import { waveHeight } from './water';
@@ -199,6 +200,7 @@ export function buildDiorama(scene: THREE.Object3D): Diorama {
     }
     const uTime = { value: 0 };
     const vm = new THREE.MeshStandardMaterial({ color: '#4fbf4a', roughness: 0.8, flatShading: true });
+    tagTsl(vm, 'vines', { uTime });
     vm.onBeforeCompile = (sh) => {
       sh.uniforms.uTime = uTime;
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime;')

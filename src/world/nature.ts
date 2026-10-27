@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tagTsl } from '../gfx/tag';
 import { afterReveal, loadGLTF } from '../assets/loader';
 import type { Tier } from '../quality';
 import { BIOMES, CAVE, CLEARINGS, ISLAND_R, RESERVED, STONE_PATHS, biomeWeights, caveLocal, heightAt, islandRadius, pathDist, polar, type Biome } from './terrain';
@@ -241,8 +242,10 @@ function roundNormals(g: THREE.BufferGeometry) {
  * y las plantas bajas (lo que queda por debajo de 1,6 m sobre su base: arbustos, helechos, flores) se apartan al paso del personaje, como la hierba.
  */
 function patchFoliage(m: THREE.MeshStandardMaterial, uTime: { value: number }, uAlpha: { value: number }, uPlayer: { value: THREE.Vector3 }, amp: number, tint?: THREE.Color) {
+  const uTint = { value: tint ?? new THREE.Color(1, 1, 1) };
+  tagTsl(m, 'foliage', { uTime, uAlpha, uPlayer, uTint }, { amp, tint: !!tint });
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uTime = uTime; sh.uniforms.uAlpha = uAlpha; sh.uniforms.uPlayer = uPlayer; sh.uniforms.uTint = { value: tint ?? new THREE.Color(1, 1, 1) };
+    sh.uniforms.uTime = uTime; sh.uniforms.uAlpha = uAlpha; sh.uniforms.uPlayer = uPlayer; sh.uniforms.uTint = uTint;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform vec3 uPlayer;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>

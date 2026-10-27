@@ -1,4 +1,6 @@
 export type Resolution = 'auto' | 'high' | 'medium' | 'low';
+/** Motor gráfico del modo 3D. WebGPU es experimental: si el navegador no lo admite se usa WebGL. */
+export type Backend = 'webgl' | 'webgpu';
 
 export interface Settings {
   sound: boolean;
@@ -11,14 +13,17 @@ export interface Settings {
   resolution: Resolution;
   /** 0 cerca, 1 media, 2 lejos */
   camera: number;
+  /** se aplica al recargar la página */
+  backend: Backend;
 }
 
 export const CAMERA_DIST = [5.5, 8.5, 13];
+export const BACKENDS: Backend[] = ['webgl', 'webgpu'];
 export const RESOLUTIONS: Resolution[] = ['auto', 'high', 'medium', 'low'];
 export const RESOLUTION_LABEL: Record<Resolution, string> = { auto: 'AUTO', high: 'ALTA', medium: 'MEDIA', low: 'BAJA' };
 
 const KEY = 'portfolio-settings-v1';
-const defaults: Settings = { sound: true, volume: 6, shadows: true, effects: true, ghosts: true, resolution: 'auto', camera: 1 };
+const defaults: Settings = { sound: true, volume: 6, shadows: true, effects: true, ghosts: true, resolution: 'auto', camera: 1, backend: 'webgl' };
 
 type Listener = (s: Settings, key: keyof Settings) => void;
 
