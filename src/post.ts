@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BloomEffect, BrightnessContrastEffect, Effect, EffectAttribute, HueSaturationEffect, EffectComposer, EffectPass, RenderPass, SMAAEffect, ToneMappingEffect, ToneMappingMode, VignetteEffect } from 'postprocessing';
 import type { Quality } from './quality';
+import { GodRaysEffect } from './godrays';
 
 /** Multiplica el color por una exposición ajustable (el ciclo día/noche la mueve). */
 class ExposureEffect extends Effect {
@@ -43,6 +44,8 @@ export interface Post {
   setExposure(v: number): void;
   /** activa o desactiva bloom, viñeta y antialiasing (a nivel bajo siempre está desactivado) */
   setEnabled(on: boolean): void;
+  /** dirección hacia el sol para los rayos de luz (se guarda la referencia: basta llamarlo una vez) */
+  setSun(dir: THREE.Vector3): void;
   /** efectos ajustables en vivo (solo niveles medio/alto) */
   fx?: { bloom: BloomEffect; hue: HueSaturationEffect; contrast: BrightnessContrastEffect; vignette: VignetteEffect; ink: Effect };
 }
@@ -56,6 +59,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
       setSize: () => {},
       setExposure: (v) => { renderer.toneMappingExposure = v; },
       setEnabled: () => {},
+      setSun: () => {},
     };
   }
   const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
@@ -67,7 +71,9 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const hue = new HueSaturationEffect({ saturation: 0.16 }); // paleta suave tipo acuarela: menos saturada que antes (0,34)
   const contrast = new BrightnessContrastEffect({ contrast: 0.08 });
   const vignette = new VignetteEffect({ offset: 0.35, darkness: 0.28 });
-  composer.addPass(new EffectPass(camera, ink, exposure, bloom, tone, hue, contrast, vignette));
+  // rayos de sol entre los árboles: solo en escritorio (en móvil es otra máscara y 32 lecturas de textura por píxel)
+  const rays = q.mobile ? null : new GodRaysEffect(camera, q.tier === 'high' ? 40 : 28);
+  composer.addPass(new EffectPass(camera, ink, ...(rays ? [rays] : []), exposure, bloom, tone, hue, contrast, vignette));
   // en móvil la densidad de píxeles ya disimula los dientes de sierra: el SMAA es un pase de pantalla completa más (tres, con sus texturas de búsqueda)
   if (!q.mobile) composer.addPass(new EffectPass(camera, new SMAAEffect()));
   let enabled = true, expo = 0.5;
@@ -79,6 +85,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
     setSize: (w, h) => composer.setSize(w, h, false),
     setExposure: (v) => { expo = v; exposure.exposure = v; },
     setEnabled: (on) => { enabled = on; },
+    setSun: (dir) => { if (rays) rays.sunDir = dir; },
     fx: { bloom, hue, contrast, vignette, ink },
   };
 }

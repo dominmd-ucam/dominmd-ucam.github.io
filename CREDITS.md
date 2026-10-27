@@ -11,5 +11,7 @@
   - "[Mossy stump](https://sketchfab.com/3d-models/mossy-stump-0b49ee049edd4927bbd9445f0e646bc1)" de [neon_dust](https://sketchfab.com/h_miller).
   - "[[Stylized] Tree stump](https://sketchfab.com/3d-models/stylized-tree-stump-00c944f33e1046fdb16506ece49a3914)" de [metrosp](https://sketchfab.com/metrosp).
   - "[Stylized Mini Floating Island](https://sketchfab.com/3d-models/stylized-mini-floating-island-48ef6c69479541d3b4aed13ff7290ff8)" de [Tom Verbeeck](https://sketchfab.com/VerbeeckTom).
+- **Hierba**: hoja fina y curvada inspirada en [three-grass-demo](https://github.com/James-Smyth/three-grass-demo) de James Smyth (MIT); normal +Y por las dos caras, contraluz y sombra por hoja tomados de `GrassField` en [stylized-components](https://github.com/cortiz2894/stylized-components) de Christian Ortiz (MIT).
+- **Rayos de sol** (`src/godrays.ts`): adaptación de `VolumetricLightPass` de [stylized-components](https://github.com/cortiz2894/stylized-components) de Christian Ortiz (MIT).
 - **Dirección de arte**: inspirada en el estilo de *Petit Island* (Xelo Games): colores saturados y soleados, copas de árbol redondas, geometría sencilla.
 - **three.js**, **postprocessing** (pmndrs), **gltf-transform**, **Draco**.

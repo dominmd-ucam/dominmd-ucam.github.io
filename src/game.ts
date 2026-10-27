@@ -121,6 +121,7 @@ const player = new Player(obstacles, [6, 12]);
 scene.add(player.group);
 const coop = new Coop(scene, obstacles, player.group); // invitados con el móvil como mando (QR)
 const post = gfx.createPost(scene, camera, q);
+post.setSun(dawn.sunDir);
 const debug = new DebugOverlay();
 if (new URLSearchParams(location.search).has('tune')) {
   void import('./tune').then((m) => m.openTune({ dawn, scene, terrain, water, post }));
