@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { fbm, groundColor, heightAt, pathCover, pathDist } from './terrain';
 import { CLOUD_GLSL } from './toon';
+import { tagTsl } from '../gfx/tag';
 
 const NEAR_FULL = 18; // metros hasta los que se dibuja la hoja completa
 // degradado por altura: la raíz más oscura (oclusión entre hojas) y la punta más clara y amarilla, como en BotW
@@ -49,6 +50,7 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
   const uTime = { value: 0 }, uPlayer = { value: new THREE.Vector3(0, -99, 0) }, uAlpha = { value: 1 };
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1 });
   mat.defines = { TOON_NO_RIM: '' };
+  tagTsl(mat, 'grass', { uTime, uPlayer, uAlpha });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = uTime;
     sh.uniforms.uPlayer = uPlayer;

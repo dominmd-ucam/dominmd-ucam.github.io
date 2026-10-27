@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tagTsl } from '../gfx/tag';
 import { Sky } from 'three/addons/objects/Sky.js';
 import type { WaterEnv } from './water';
 import { NOISE3_GLSL } from './toon';
@@ -50,11 +51,32 @@ function paintedSky(sunDir: THREE.Vector3): THREE.Mesh {
         #include <colorspace_fragment>
       }`,
   });
+  tagTsl(mat, 'sky', uniforms);
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), mat);
   mesh.scale.setScalar(4000);
   mesh.frustumCulled = false;
   mesh.renderOrder = -1;
   return mesh;
+}
+
+/** Parámetros del cielo físico de los reflejos (comunes a WebGL y WebGPU). */
+export const ENV_SKY = { turbidity: 7, rayleigh: 3.1, mieCoefficient: 0.006, mieDirectionalG: 0.82 };
+
+/** Entorno de los reflejos con WebGL: el cielo físico pasado por PMREM. */
+export function skyEnvWebGL(renderer: THREE.WebGLRenderer) {
+  return (sunDir: THREE.Vector3): THREE.Texture => {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envScene = new THREE.Scene();
+    const envSky = new Sky();
+    envSky.scale.setScalar(4000);
+    const u = envSky.material.uniforms;
+    u.turbidity.value = ENV_SKY.turbidity; u.rayleigh.value = ENV_SKY.rayleigh; u.mieCoefficient.value = ENV_SKY.mieCoefficient; u.mieDirectionalG.value = ENV_SKY.mieDirectionalG;
+    u.sunPosition.value.copy(sunDir);
+    envScene.add(envSky);
+    const tex = pmrem.fromScene(envScene, 0, 1, 10000).texture;
+    pmrem.dispose();
+    return tex;
+  };
 }
 
 /**
@@ -71,7 +93,8 @@ export class Dawn {
   /** exposición que aplica el postprocesado */
   exposure = 0.5;
 
-  constructor(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
+  /** `makeEnv` genera el entorno de los reflejos PBR; depende del motor (ver `skyEnvWebGL` y gfx/webgpu.ts). */
+  constructor(scene: THREE.Scene, makeEnv: (sunDir: THREE.Vector3) => THREE.Texture | null) {
     // sol a ~14° sobre el horizonte, saliendo por el sureste
     this.sunDir.setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 14), THREE.MathUtils.degToRad(145));
     this.sky = paintedSky(this.sunDir);
@@ -81,16 +104,7 @@ export class Dawn {
     this.waterEnv = { sunDir: this.sunDir.clone(), sunColor: C('#ffc99a'), zenith: C('#5f9be0'), horizon: C('#ffd2ae'), light: 1 };
 
     // entorno para los reflejos de los materiales PBR: se genera una sola vez
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const envScene = new THREE.Scene();
-    const envSky = new Sky();
-    envSky.scale.setScalar(4000);
-    const u = envSky.material.uniforms;
-    u.turbidity.value = 7; u.rayleigh.value = 3.1; u.mieCoefficient.value = 0.006; u.mieDirectionalG.value = 0.82;
-    u.sunPosition.value.copy(this.sunDir);
-    envScene.add(envSky);
-    scene.environment = pmrem.fromScene(envScene, 0, 1, 10000).texture;
-    pmrem.dispose();
+    scene.environment = makeEnv(this.sunDir);
   }
 
   /** Reorienta el sol (grados sobre el horizonte y acimut): luz, cielo y reflejos del agua. */

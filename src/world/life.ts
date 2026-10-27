@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tagTsl } from '../gfx/tag';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { heightAt, ISLAND_R } from './terrain';
 import { batchStatic } from './batch';
@@ -65,6 +66,7 @@ export function buildLife(scene: THREE.Scene, gullCount = 60): Life {
   fishGeo.setAttribute('aFlash', flashAttr);
   // se dibujan después del agua y con opacidad parcial: el agua es casi opaca a esta profundidad y, si no, ni los peces ni su destello se verían
   const fishMat = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.62, depthWrite: false });
+  tagTsl(fishMat, 'fish');
   fishMat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aFlash; varying float vFlash;')

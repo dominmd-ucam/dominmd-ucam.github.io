@@ -57,7 +57,10 @@ export default defineConfig({
       output: {
         codeSplitting: {
           groups: [
-            { name: 'three', test: /node_modules[\\/]three[\\/]/, priority: 20 },
+            // el motor WebGPU (experimental) va en su propio archivo y solo se descarga si se activa en los ajustes. El resto de three
+            // tiene más prioridad: si no, el grupo de WebGPU se llevaría el núcleo como dependencia y lo descargarían todos
+            { name: 'three', test: /node_modules[\\/]three[\\/](?!build[\\/]three\.(webgpu|tsl)\.js|examples[\\/]jsm[\\/](tsl|objects[\\/]SkyMesh))/, priority: 30 },
+            { name: 'three-webgpu', test: /node_modules[\\/]three[\\/]/, priority: 20 },
             { name: 'postprocessing', test: /node_modules[\\/]postprocessing[\\/]/, priority: 10 },
           ],
         },

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tagTsl } from '../gfx/tag';
 import { Delaunay } from 'd3-delaunay';
 import { HEIGHT_RANGE, WORLD_SIZE, buildHeightTexture } from './terrain';
 
@@ -170,6 +171,7 @@ export function buildWater(sunDir: THREE.Vector3): Water {
     uSunColor: { value: new THREE.Color('#fff2cf') },
   };
   const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: vert, fragmentShader: frag, transparent: true, depthWrite: false });
+  tagTsl(mat, 'water', uniforms);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   // anillo exterior grueso hasta el horizonte (mismo shader, sin descartar la zona cercana)
@@ -177,6 +179,7 @@ export function buildWater(sunDir: THREE.Vector3): Water {
   outerGeo.rotateX(-Math.PI / 2);
   const outerMat = mat.clone();
   outerMat.uniforms.uOuter.value = 1;
+  tagTsl(outerMat, 'water', outerMat.uniforms); // clone() no copia la etiqueta
   const outer = new THREE.Mesh(outerGeo, outerMat);
   outer.position.y = -0.06;
   outer.frustumCulled = false;

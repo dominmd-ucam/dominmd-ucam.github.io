@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tagTsl } from '../gfx/tag';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -51,6 +52,7 @@ export function buildFlock(scene: THREE.Scene, count: number): Flock {
   geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phase, 1));
   const uTime = { value: 0 };
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.7, side: THREE.DoubleSide });
+  tagTsl(mat, 'flock', { uTime });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = uTime;
     sh.vertexShader = sh.vertexShader

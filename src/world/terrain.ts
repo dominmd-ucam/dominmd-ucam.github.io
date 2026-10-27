@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tagTsl } from '../gfx/tag';
 import { Delaunay } from 'd3-delaunay';
 import { CLOUD_GLSL } from './toon';
 import zones from '../data/zones.json';
@@ -425,13 +426,17 @@ export function buildTerrain(detail = true): THREE.Mesh {
   const uCaus = { value: 0.55 };
   if (detail) mat.defines.TERRAIN_DETAIL = '';
   const uPath = { value: pathLayer().tex };
+  const uCaveA = { value: new THREE.Vector4(CAVE.x, CAVE.z, CAVE.dx, CAVE.dz) };
+  const uCaveB = { value: new THREE.Vector4(CAVE.f0, CAVE.w + 0.35, CAVE.h, CAVE.s0) };
+  const uCaveC = { value: new THREE.Vector2(CAVE.room.s, CAVE.room.r + 0.4) };
+  tagTsl(mat, 'terrain', { uTime, uCaus, uPath, uCaveA, uCaveB, uCaveC }, { detail, world: WORLD_SIZE });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = uTime;
     sh.uniforms.uCaus = uCaus;
     sh.uniforms.uPath = uPath;
-    sh.uniforms.uCaveA = { value: new THREE.Vector4(CAVE.x, CAVE.z, CAVE.dx, CAVE.dz) };
-    sh.uniforms.uCaveB = { value: new THREE.Vector4(CAVE.f0, CAVE.w + 0.35, CAVE.h, CAVE.s0) };
-    sh.uniforms.uCaveC = { value: new THREE.Vector2(CAVE.room.s, CAVE.room.r + 0.4) };
+    sh.uniforms.uCaveA = uCaveA;
+    sh.uniforms.uCaveB = uCaveB;
+    sh.uniforms.uCaveC = uCaveC;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying float vUp;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWPos = (modelMatrix * vec4(position, 1.0)).xyz;\nvUp = normal.y;');
