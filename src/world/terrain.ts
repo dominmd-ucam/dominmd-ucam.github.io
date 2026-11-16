@@ -4,9 +4,9 @@ import { Delaunay } from 'd3-delaunay';
 import { CLOUD_GLSL } from './toon';
 import zones from '../data/zones.json';
 
-export const WORLD_SIZE = 320;
-export const ISLAND_R = 70;
-/** la isla creció de 38 a 70 m de radio: la forma de la costa escala con ella */
+export const WORLD_SIZE = 470;
+export const ISLAND_R = 105;
+/** la isla creció de 38 a 70 y luego a 105 m de radio: la forma de la costa escala con ella (todo lo colocado en polares, también) */
 const GROW = ISLAND_R / 38;
 const HMIN = -4;
 const HMAX = 4;
@@ -42,7 +42,7 @@ export function islandRadius(a: number): number {
 /** Colina del faro. */
 export const HILL: [number, number] = [-9, -9];
 /** Islote cercano, alcanzable a nado. */
-export const ISLET: [number, number] = [-80, 48];
+export const ISLET: [number, number] = [-80 * GROW / (70 / 38), 48 * GROW / (70 / 38)];
 
 /** Punto a una fracción `f` del radio de la costa en el ángulo `a`. */
 export function polar(a: number, f: number): [number, number] {
@@ -232,7 +232,14 @@ export function heightAt(x: number, z: number): number {
   h += (fbm(x * 0.12, z * 0.12) - 0.5) * 1.2 * k;
   // lomas suaves por el interior (el pueblo del centro queda llano y la playa sin tocar)
   const hills = THREE.MathUtils.smoothstep(r, 20, 34) * THREE.MathUtils.smoothstep(t, 0.04, 0.22);
-  if (hills > 0) h += (fbm(x * 0.022 + 5.3, z * 0.022 - 3.1) - 0.42) * 5 * hills;
+  // más lejos del centro el relieve crece (la isla de 105 m tiene lomas altas entre el anillo y la costa)
+  if (hills > 0) {
+    const f = fbm(x * 0.022 + 5.3, z * 0.022 - 3.1);
+    // solo hacia arriba: si las lomas también hundieran más el suelo, saldrían charcos y arena tierra adentro
+    h += ((f - 0.42) * 5 + Math.max(0, f - 0.45) * 7 * THREE.MathUtils.smoothstep(r, 45, 75)) * hills;
+    // tierra adentro, las hondonadas se quedan en pradera llana (sin esto, en la isla grande salían manchas de arena lejos de la playa)
+    h = Math.max(h, 1.35 * THREE.MathUtils.smoothstep(t, 0.1, 0.24));
+  }
   if (t > -0.05) h += plateauHeight(x, z) * THREE.MathUtils.smoothstep(t, -0.02, 0.06);
   // islote de arena
   const isd = (x - ISLET[0]) ** 2 + (z - ISLET[1]) ** 2;
@@ -298,9 +305,17 @@ function samplePoints(): [number, number][] {
   const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const cand: { x: number; z: number; r: number }[] = [];
   const step = 0.6;
-  for (let gz = -half + step; gz < half - step; gz += step) {
-    for (let gx = -half + step; gx < half - step; gx += step) {
+  let iz = 0;
+  for (let gz = -half + step; gz < half - step; gz += step, iz++) {
+    let ix = 0;
+    for (let gx = -half + step; gx < half - step; gx += step, ix++) {
       const x = gx + (rnd() - 0.5) * step, z = gz + (rnd() - 0.5) * step;
+      // mar abierto (lejos de la costa y del islote): llano y sin detalle. Basta un candidato de cada 49, sin calcular la importancia
+      // (con la isla de 105 m, el mar es la mayor parte del mapa y esto era la mitad del tiempo de carga del terreno)
+      if (Math.hypot(x, z) > islandRadius(Math.atan2(z, x)) + 22 && Math.hypot(x - ISLET[0], z - ISLET[1]) > 30) {
+        if (ix % 7 === 0 && iz % 7 === 0) cand.push({ x, z, r: R_MAX });
+        continue;
+      }
       cand.push({ x, z, r: THREE.MathUtils.lerp(R_MAX, R_MIN, importance(x, z)) });
     }
   }
@@ -368,7 +383,7 @@ function terrainGeometry(): THREE.BufferGeometry {
 }
 
 /* ---------- caminos pintados por píxel ----------
-   Los caminos se dibujan en un lienzo que cubre el mundo (1024 px para 320 m: 0,31 m por píxel). El shader del terreno lo lee con
+   Los caminos se dibujan en un lienzo que cubre el mundo (1024 px para 470 m: 0,46 m por píxel; con más píxeles el desenfoque del lienzo tardaba segundos en móviles lentos). El shader del terreno lo lee con
    un umbral que se mueve con ruido: el borde sale nítido e irregular, como tierra pisada, en vez de la mancha de color por vértice. */
 const PATH_PX = 1024;
 let pathCanvas: { tex: THREE.CanvasTexture; data: Uint8ClampedArray } | null = null;

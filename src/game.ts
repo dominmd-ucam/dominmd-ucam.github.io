@@ -32,7 +32,7 @@ import { Dialogue } from './ui/dialogue';
 import { Toasts } from './ui/toasts';
 import { Achievements, ACHIEVEMENTS } from './achievements';
 import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL, BACKENDS } from './settings';
-import { detectQuality } from './quality';
+import { detectQuality, GRAPHICS, GRAPHICS_LABEL } from './quality';
 import { createGfx } from './gfx';
 import { AdaptiveRes, DebugOverlay } from './perf';
 import { afterReveal, initAssets, markRevealed } from './assets/loader';
@@ -60,7 +60,8 @@ const dawn = new Dawn(scene, gfx.envFactory());
 dawn.sun.castShadow = q.shadows;
 dawn.sun.shadow.mapSize.set(q.shadowMap, q.shadowMap);
 const sc = dawn.sun.shadow.camera;
-sc.left = -30; sc.right = 30; sc.top = 30; sc.bottom = -30; sc.near = 1; sc.far = 150;
+const SH = q.ultra ? 42 : 30; // en ultra la sombra cubre más (con el mapa de 4096 sigue nítida)
+sc.left = -SH; sc.right = SH; sc.top = SH; sc.bottom = -SH; sc.near = 1; sc.far = 150;
 dawn.sun.shadow.bias = -0.0004; dawn.sun.shadow.normalBias = 0.04;
 gfx.initShadows(dawn.sun); // la sombra se recalcula a ritmo propio (ver el bucle)
 scene.fog = new THREE.FogExp2(dawn.fogColor, 0.0045);
@@ -82,16 +83,19 @@ const village = buildVillage(staticWorld);
 obstacles.push(...village.obstacles);
 obstacles.push(...buildZones(scene, q.tier).obstacles); // parcelas, cofre, vallas y el interior de la cueva
 const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
-const nature = buildNature(scene, obstacles, q.tier, q.mobile); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
+const nature = buildNature(scene, obstacles, q.tier, q.mobile, q.density, q.view); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
 // en calidad baja, solo la hoja ligera; en móvil, menos hojas, un anillo de bloques menos y la hoja completa solo muy cerca
 // (las hojas son finas, como en la demo de Smyth: casi el doble de hojas por m² cubren lo mismo que antes;
 // en móvil algo más anchas, porque se dibuja a menos resolución y una hoja muy fina se queda en un hilo de píxeles)
+// ultra: más hojas, un anillo más de bloques (64 m alrededor) y la hoja completa hasta más lejos
 const grass = q.mobile && q.tier === 'med'
-  ? buildGrass(18, false, q.shadows, { maxRing: 2, nearFull: 12, sunDir: dawn.sunDir, widthMul: 1.3 })
-  : buildGrass(q.tier === 'high' ? 55 : q.tier === 'med' ? 34 : 10, q.tier === 'low', q.shadows, { sunDir: dawn.sunDir });
+  ? buildGrass(21, false, q.shadows, { maxRing: 2, nearFull: 12, sunDir: dawn.sunDir, widthMul: 1.3 })
+  : q.ultra
+    ? buildGrass(72, false, q.shadows, { maxRing: 4, nearFull: 26, sunDir: dawn.sunDir })
+    : buildGrass(q.tier === 'high' ? 60 : q.tier === 'med' ? 40 : 12, q.tier === 'low', q.shadows, { sunDir: dawn.sunDir });
 scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
@@ -188,13 +192,15 @@ function creditsView(): View {
 function settingsView(): View {
   const s = settings.value;
   return {
-    title: 'Ajustes', sub: 'Se guardan solos',
+    title: 'Ajustes', sub: 'Se guardan solos · GRÁFICOS se aplica al cerrar',
     rows: [
       { type: 'toggle', label: 'SONIDO', get: () => settings.value.sound, set: (v) => settings.set('sound', v) },
       { type: 'bar', label: 'VOLUMEN', max: 8, get: () => settings.value.volume, set: (n) => settings.set('volume', n) },
       { type: 'toggle', label: 'SOMBRAS', get: () => settings.value.shadows, set: (v) => settings.set('shadows', v) },
       { type: 'toggle', label: 'EFECTOS', get: () => settings.value.effects, set: (v) => settings.set('effects', v) },
       ...(apiConfigured ? [{ type: 'toggle' as const, label: 'VISITANTES', get: () => settings.value.ghosts, set: (v: boolean) => settings.set('ghosts', v) }] : []),
+      // el nivel de gráficos cambia qué se construye (vegetación, hierba, sombras): se aplica al recargar
+      { type: 'select', label: 'GRÁFICOS', options: GRAPHICS.map((g) => GRAPHICS_LABEL[g]), get: () => GRAPHICS.indexOf(settings.value.graphics), set: (i) => settings.set('graphics', GRAPHICS[i]) },
       { type: 'select', label: 'RESOLUCIÓN', options: RESOLUTIONS.map((r) => RESOLUTION_LABEL[r]), get: () => RESOLUTIONS.indexOf(s.resolution), set: (i) => settings.set('resolution', RESOLUTIONS[i]) },
       { type: 'select', label: 'CÁMARA', options: ['CERCA', 'MEDIA', 'LEJOS'], get: () => settings.value.camera, set: (i) => settings.set('camera', i) },
       // cambiar de motor gráfico obliga a recargar: el renderer no se puede sustituir en caliente
@@ -220,6 +226,9 @@ function mainView(): View {
   };
 }
 const menu = new Menu(mainView);
+/** nivel de gráficos con el que arrancó la página: si se cambia en Ajustes, se aplica al cerrar el menú (recargando) */
+const bootGraphics = settings.value.graphics;
+menu.onClose = () => { if (settings.value.graphics !== bootGraphics) location.reload(); };
 ui.onPause = () => { if (!blocked()) menu.show(); };
 
 /* ---------- ajustes en vivo ---------- */
@@ -431,7 +440,7 @@ function frame(timestamp: number) {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { nature, presence, ghosts, guestbook, player, input, interactables, renderer, gfx, q, dawn, splash, post, scene, camera, guide, robot, coop, menu, dialogue, achievements, settings, adaptive, charSelect: () => charSelect };
+(window as unknown as { __dbg: unknown }).__dbg = { heightAt, islandRadius, nature, presence, ghosts, guestbook, player, input, interactables, renderer, gfx, q, dawn, splash, post, scene, camera, guide, robot, coop, menu, dialogue, achievements, settings, adaptive, charSelect: () => charSelect };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }

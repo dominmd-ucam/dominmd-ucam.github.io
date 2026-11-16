@@ -147,5 +147,11 @@
   "No se pudo cargar la isla 3D. Puedes seguir con la versión clásica.": "The 3D island couldn't load. You can keep using the classic version.",
   "Tu navegador no admite WebGL 2, necesario para la isla 3D.": "Your browser doesn't support WebGL 2, which the 3D island needs.",
   "No se pudo iniciar WebGL en este dispositivo.": "WebGL couldn't start on this device.",
-  "Tienes activado el ahorro de datos: la isla descarga unos 15 MB.": "Data saver is on: the island downloads about 15 MB."
+  "Tienes activado el ahorro de datos: la isla descarga unos 15 MB.": "Data saver is on: the island downloads about 15 MB.",
+  "Se guardan solos · GRÁFICOS se aplica al cerrar": "Saved automatically · GRAPHICS applies on close",
+  "GRÁFICOS": "GRAPHICS",
+  "BAJOS": "LOW",
+  "MEDIOS": "MEDIUM",
+  "ALTOS": "HIGH",
+  "ULTRA": "ULTRA"
 }

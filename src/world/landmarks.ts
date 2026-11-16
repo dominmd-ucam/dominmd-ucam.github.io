@@ -197,7 +197,7 @@ export function buildLandmarks(scene: THREE.Object3D): Landmarks {
     const shellM = [mat('#ffd7e0'), mat('#fff3e0'), mat('#ffb5a7')], starM = mat('#ff8a5c');
     let seed = 3;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 150; i++) {
       const a = rnd() * Math.PI * 2, r = islandRadius(a) * (0.9 + rnd() * 0.07);
       const x = Math.cos(a) * r, z = Math.sin(a) * r, h = heightAt(x, z);
       if (h < 0.0 || h > 0.9) continue;
