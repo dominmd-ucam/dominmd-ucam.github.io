@@ -32,7 +32,7 @@ Cada botón aparece solo cuando su campo tiene valor.
 `server/` es una API pequeña (Node + SQLite, en Docker) con **libro de visitas moderado**, **formulario de contacto** y **visitantes fantasma** en tiempo real. La web funciona igual sin ella: si `API_URL` no está definida al compilar, esas funciones no aparecen. Guía paso a paso en [server/DEPLOY.md](server/DEPLOY.md). Pruebas: `cd server && npm test`.
 
 ## Cómo añadir o cambiar un proyecto
-Edita `src/data/projects.json`: `type` (`web | bot | plugin | cli | mobile | device`), `short` (nombre que flota sobre la estación), `repo` (`null` si es privado), `credit` y `note` opcionales, `position` `[x, z]` en la isla (los caminos y los carteles se generan solos) y `demo` con el guion simulado. Los esquemas de cada demo están en `src/demos/types.ts`. El mismo demo se ve en la versión clásica y dentro del juego.
+Edita `src/data/projects.json`: `type` (`web | bot | plugin | cli | mobile | device`), `short` (nombre que flota sobre su atril), `repo` (`null` si es privado), `credit` y `note` opcionales y `plot`, la parcela de `src/data/zones.json` donde va su atril en la isla. Cada proyecto tiene su demo interactivo en `src/games/<id>.ts` (regístralo en `src/games/index.ts`); el mismo demo se ve en la versión clásica y dentro del juego. La captura de la tarjeta y de la pantalla del atril es `public/projects/<id>.webp` (640×400): se genera desde el demo con `npm run build && npm run captures`, o pon ahí una captura real.
 
 ## Qué hay dentro
 - `src/world/` — isla, agua, hierba, árboles, estructuras y vida. `dawn.ts` es la luz fija de amanecer.
@@ -40,7 +40,7 @@ Edita `src/data/projects.json`: `type` (`web | bot | plugin | cli | mobile | dev
 - `src/avatar/` — avatar modular (piezas GLB sobre un esqueleto Mixamo) y su editor.
 - `src/world/npc.ts` + `src/data/dialogue.json` — Misu, la gato guía (edita aquí sus diálogos).
 - `src/ui/` — menú, diálogos y logros; `src/achievements.ts` define los logros; `src/settings.ts`, los ajustes.
-- `src/demos/` — los cuatro demos simulados (navegador, chat de bot, panel de plugin y terminal).
+- `src/games/` — un demo interactivo por proyecto (algunos funcionan de verdad: XPath, feeds ATOM/RSS, pixel art, búsqueda en notas, intérprete del depurador).
 - `src/entry.ts`, `src/classic.css`, `src/mode.ts` — versión clásica y selector de modo; `src/game.ts` es el juego.
 - `src/data/` — perfil, proyectos y diálogos.
 

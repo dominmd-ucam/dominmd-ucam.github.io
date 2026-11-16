@@ -1,4 +1,5 @@
-import { mountDemo, type DemoHandle, type DemoSpec } from '../demos';
+import { mountGame, hasGame } from '../games';
+import { t } from '../i18n';
 
 export interface ProjectLike {
   id: string;
@@ -9,16 +10,15 @@ export interface ProjectLike {
   repo: string | null;
   credit?: string;
   note?: string;
-  demo?: DemoSpec;
 }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const TYPE_LABEL: Record<string, string> = { web: 'Web', bot: 'Bot', plugin: 'Plugin', cli: 'Consola', mobile: 'Móvil', device: 'Dispositivo' };
 
-/** Ficha de proyecto con su demo simulado. La usan la versión clásica y el juego. */
+/** Ficha de proyecto con su demo interactivo (src/games). La usan la versión clásica y el juego. */
 export class ProjectModal {
   private root = $('modal');
-  private demo: DemoHandle | null = null;
+  private dispose: (() => void) | null = null;
   private returnFocus: HTMLElement | null = null;
   onClose: () => void = () => {};
   private static inst: ProjectModal | null = null;
@@ -50,12 +50,11 @@ export class ProjectModal {
     const notes = [p.credit, p.note].filter(Boolean).join(' ');
     $('mNote').textContent = notes || (p.repo ? '' : 'Repositorio privado.');
     $('mNote').hidden = !$('mNote').textContent;
-    this.demo?.dispose();
+    this.dispose?.();
     const host = $('mDemo');
-    host.replaceChildren();
-    if (p.demo) this.demo = mountDemo(host, p.demo);
-    else { this.demo = null; host.textContent = 'Demo simulado próximamente'; host.classList.add('empty'); }
-    if (p.demo) host.classList.remove('empty');
+    host.classList.toggle('empty', !hasGame(p.id));
+    if (hasGame(p.id)) this.dispose = mountGame(host, p.id);
+    else { this.dispose = null; host.textContent = t('Demo próximamente', 'Demo coming soon'); }
     this.root.hidden = false;
     $('mClose').focus();
   }
@@ -63,8 +62,8 @@ export class ProjectModal {
   close() {
     if (!this.isOpen) return;
     this.root.hidden = true;
-    this.demo?.dispose();
-    this.demo = null;
+    this.dispose?.();
+    this.dispose = null;
     $('mDemo').replaceChildren();
     this.returnFocus?.focus();
     this.onClose();

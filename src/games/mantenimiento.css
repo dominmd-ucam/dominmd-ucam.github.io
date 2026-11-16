@@ -1,0 +1,43 @@
+.mt-root { background: linear-gradient(135deg, #e7f0f7, #d5e3ee); }
+.mt { display: grid; grid-template-columns: minmax(230px, 280px) 1fr; }
+.mt-phone { height: 100%; min-height: 0; background: none; border-radius: 0; }
+.mt-app { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; background: #f4f6f8; font-size: 12.5px; }
+.mt-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px 8px; background: #0b5cad; color: #fff; }
+.mt-head b { display: block; font-size: 15px; } .mt-head small { font-size: 10.5px; opacity: .8; }
+.mt-net { padding: 2px 8px; border-radius: 99px; background: rgba(255, 255, 255, .2); font-size: 10.5px; font-weight: 700; } .mt-net.off { background: #f59e0b; color: #1d1d1d; }
+.mt-queue { padding: 4px 10px; background: #fff3cd; color: #7a5200; font-size: 11px; font-weight: 700; text-align: center; }
+.mt-list { flex: 1; min-height: 0; padding: 8px; display: grid; gap: 6px; align-content: start; }
+.mt-task { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 8px; padding: 9px; border: 0; border-radius: 10px; background: #fff; text-align: left; box-shadow: 0 1px 2px rgba(0, 0, 0, .06); }
+.mt-task b { display: block; font-size: 12.5px; } .mt-task small { color: #667085; font-size: 11px; }
+.mt-task.done .mt-ic { background: #d8f5e3; color: #146c3c; }
+.mt-ic { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: #e7f0fb; }
+.mt-chev { color: #98a2b3; font-size: 18px; }
+.mt-stock { padding: 6px 8px; border-radius: 8px; background: #e7f0fb; color: #0b5cad; font-weight: 700; font-size: 11.5px; }
+.mt-salt { display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 10px; padding: 9px; border-radius: 10px; background: #fff; }
+.mt-salt.low { box-shadow: inset 0 0 0 2px #ef4444; }
+.mt-salt b { display: block; } .mt-salt small { display: block; color: #667085; font-size: 11px; }
+.mt-tank { position: relative; width: 22px; height: 38px; border: 2px solid #98a2b3; border-radius: 4px 4px 6px 6px; overflow: hidden; }
+.mt-tank i { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(#f4f4f4, #cfd8e3); transition: height .5s; }
+.mt-salt.low .mt-tank i { background: #fca5a5; }
+.mt-salt .btn { background: #0b5cad; }
+.mt-detail { flex: 1; min-height: 0; padding: 10px 12px; display: grid; gap: 8px; align-content: start; }
+.mt-detail h5 { margin: 0; font-size: 14px; } .mt-detail label { display: grid; gap: 3px; font-size: 11.5px; font-weight: 700; color: #475467; }
+.mt-back { justify-self: start; padding: 0; border: 0; background: none; color: #0b5cad; font-weight: 700; }
+.mt-warn { color: #b42318; font-size: 11px; font-weight: 700; } .mt-warn:empty { display: none; }
+.mt-shot { display: grid; place-items: center; aspect-ratio: 3 / 2; border: 2px dashed #b8c4d2; border-radius: 10px; background: #fff; color: #0b5cad; font-weight: 700; cursor: pointer; overflow: hidden; }
+.mt-shot img { width: 100%; height: 100%; object-fit: cover; }
+.mt-done { background: #16a34a !important; }
+.mt-nav { display: flex; flex: none; border-top: 1px solid #e3e7ec; background: #fff; }
+.mt-nav button { position: relative; flex: 1; display: grid; justify-items: center; padding: 5px 0 7px; border: 0; background: none; font-size: 16px; color: #98a2b3; }
+.mt-nav button small { font-size: 10px; font-weight: 700; } .mt-nav button.on { color: #0b5cad; }
+.mt-nav i { position: absolute; top: 2px; left: 55%; min-width: 16px; padding: 0 4px; border-radius: 8px; background: #ef4444; color: #fff; font: 700 10px/16px system-ui; }
+.mt-side { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 16px; }
+.mt-side h4 { margin: 0; font-size: 15px; } .mt-side p { margin: 0; font-size: 12.5px; color: #475467; }
+.mt-ctrls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.mt-sw { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 99px; background: #fff; font-weight: 700; font-size: 12px; cursor: pointer; }
+.mt-server { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 10px; background: #0f1b2a; color: #9fb4cc; font: 11px/1.5 ui-monospace, monospace; }
+.mt-server b { color: #fff; font-family: system-ui; } .mt-srv { overflow: auto; }
+@media (max-width: 640px) {
+  .mt { display: flex; flex-direction: column-reverse; }
+  .mt-phone { flex: 1; } .mt-side { flex: none; padding: 6px 10px; gap: 6px; } .mt-side h4, .mt-side p, .mt-server { display: none; }
+}

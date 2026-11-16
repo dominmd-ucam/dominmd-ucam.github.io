@@ -6,7 +6,7 @@
     "description": "Portfolio of Domin, software developer: websites and apps in PHP, TypeScript and Flutter, bots, plugins and tools. Explore it as a 3D video game or in a classic version.",
     "about": [
       "I'm Domin, a developer. I like building things that work well and look even better: web and mobile apps, bots, plugins for tools I use every day and command-line utilities.",
-      "This portfolio is an island you can explore like a video game, but it also has this classic version, fast and accessible. Every project has a simulated demo you can try."
+      "This portfolio is an island you can explore like a video game, but it also has this classic version, fast and accessible. Every project has an interactive demo you can try."
     ],
     "highlights": [
       { "title": "Web and mobile apps", "text": "Management software for gyms, farms, building maintenance and hospitality, with PHP, React and Flutter." },
@@ -62,7 +62,7 @@
     "fitpro": {
       "title": "FITPro: complete gym management system",
       "description": "Gym management platform with authentication, class scheduling, trainers, progress tracking, nutrition plans and an AI chatbot (Google Gemini API). PHP backend with an MVC architecture and an admin panel.",
-      "note": "Demo classes and answers are fictional."
+      "note": "Fictional classes. In the demo the coach answers from your browser; the project uses the Gemini API."
     },
     "hosteleria": {
       "title": "Digital ecosystem for restaurants (prototype)",
@@ -73,22 +73,22 @@
     "webscraping": {
       "title": "Web scraping tool with XPath",
       "description": "Web tool that extracts information from a page given a URL and an XPath expression, and shows the results in a table. HTML, JavaScript and Tailwind CSS.",
-      "note": "The demo uses sample results: it doesn't download real pages."
+      "note": "Sample pages are bundled; the XPath really runs in your browser."
     },
     "atom": {
       "title": "ATOM Processor: ATOM and RSS feed reader",
       "short": "ATOM feeds",
       "description": "Web app that processes ATOM and RSS feeds (by URL or by pasting the XML) and shows them as cards or a list, with favourites saved in the browser.",
-      "note": "Demo articles are fictional."
+      "note": "The sample feeds are fictional; the XML parsing is real."
     },
     "pixelart": {
       "title": "Image to pixel art converter",
-      "description": "Simple converter that turns an image into pixel art by adjusting the pixel size. In this demo it really works on a sample scene: move the slider."
+      "description": "Simple converter that turns an image into pixel art by adjusting the pixel size. It really works here: upload your image or use a sample, pick a palette and download it."
     },
     "obsidian-rag": {
       "title": "Obsidian RAG: chat with your notes",
       "description": "Turns an Obsidian vault and its documents (PDF, Word, Excel, CSV) into a knowledge base you can query in natural language: local semantic search with embeddings and ChromaDB, an MCP server for coding agents and an OpenAI-compatible API to chat from Open WebUI. Private project.",
-      "note": "Private repository. Demo notes and answers are fictional."
+      "note": "Private repository. The notes are fictional; the search really runs in your browser (TF-IDF instead of embeddings)."
     },
     "streambot": {
       "title": "StreamBot Acestream: stream video to voice channels",
@@ -104,7 +104,7 @@
         "choices": [{ "label": "What's on the island?" }, { "label": "Who is Domin?" }, { "label": "Show me the way" }, { "label": "See you later" }]
       },
       "isla": {
-        "text": "The island has grown: there's a lighthouse, a stranded ship, plateaus you climb by ramps, a cave you can walk through, a chest half-buried on the beach… and an islet you can reach by swimming! The fenced plots are reserved: soon they'll hold Domin's projects.",
+        "text": "The island has grown: there's a lighthouse, a stranded ship, plateaus you climb by ramps, a cave you can walk through, a chest half-buried on the beach… and an islet you can reach by swimming! The four fenced plots hold Domin's projects: walk up to each stand to try them.",
         "choices": [{ "label": "Who is Domin?" }, { "label": "Show me the way" }, { "label": "OK, thanks" }]
       },
       "domin": {

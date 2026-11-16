@@ -12,7 +12,7 @@
       ]
     },
     "isla": {
-      "text": "La isla ha crecido: hay un faro, un barco varado, mesetas a las que se sube por rampas, una cueva que se puede recorrer por dentro, un cofre medio enterrado en la playa… ¡y un islote al que se llega a nado! Los terrenos vallados están reservados: pronto habrá proyectos de Domin en ellos.",
+      "text": "La isla ha crecido: hay un faro, un barco varado, mesetas a las que se sube por rampas, una cueva que se puede recorrer por dentro, un cofre medio enterrado en la playa… ¡y un islote al que se llega a nado! En los cuatro terrenos vallados están los proyectos de Domin: acércate a cada atril para probarlos.",
       "choices": [
         { "label": "¿Quién es Domin?", "next": "domin" },
         { "label": "Enséñame el camino", "next": "camino", "action": "showPaths" },

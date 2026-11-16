@@ -10,6 +10,7 @@
     "models:optimize": "node scripts/optimize-models.mjs",
     "avatar:optimize": "node scripts/optimize-avatar.mjs",
     "og:image": "node scripts/og-image.mjs",
+    "captures": "node scripts/captures.mjs",
     "test": "playwright test"
   },
   "dependencies": {

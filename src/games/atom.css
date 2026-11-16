@@ -1,0 +1,17 @@
+.at { flex-direction: column; background: #f5f6f8; }
+.at-top { display: grid; gap: 8px; padding: 10px 12px; background: #fff; border-bottom: 1px solid #e3e7ec; }
+.at-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.at-row select, .at-row input { flex: 1 1 180px; }
+.at-src summary { font-size: 12px; font-weight: 700; color: #475467; cursor: pointer; }
+.at-xml { width: 100%; height: 120px; margin-top: 6px; font: 12px/1.35 ui-monospace, Consolas, monospace !important; }
+.at-info { font-size: 12px; font-weight: 700; color: #667085; }
+.at-info.ok { color: #146c3c; } .at-info.err { color: #b42318; }
+.at-list { flex: 1; min-height: 0; overflow: auto; padding: 12px; display: grid; gap: 10px; align-content: start; }
+.at-list.cards { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.at-item { position: relative; padding: 10px 34px 10px 12px; background: #fff; border: 1px solid #e3e7ec; border-radius: 10px; animation: gkIn .3s ease both; }
+.at-list.list .at-item { padding: 6px 34px 6px 12px; } .at-list.list .at-item p { display: none; }
+.at-item h4 { margin: 4px 0; font-size: 14px; } .at-item h4 a { color: #1d2939; text-decoration: none; }
+.at-item p { margin: 0; font-size: 12.5px; color: #475467; }
+.at-meta { display: flex; gap: 6px; align-items: center; font-size: 11px; color: #667085; }
+.at-star { position: absolute; top: 6px; right: 6px; border: 0; background: none; font-size: 18px; color: #f59e0b; }
+.at-empty { grid-column: 1 / -1; text-align: center; }
