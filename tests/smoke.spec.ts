@@ -26,7 +26,7 @@ test.describe('versión clásica', () => {
     const img = await page.request.get('./og-image.jpg');
     expect(img.status()).toBe(200);
     // la ficha de un proyecto se abre con su demo
-    await cards.first().locator('[data-project]').click();
+    await cards.first().locator('.btn[data-project]').click();
     await expect(page.locator('#modal')).toBeVisible();
     await expect(page.locator('#mTitle')).not.toBeEmpty();
     await page.locator('#mClose').click();

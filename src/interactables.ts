@@ -24,7 +24,7 @@ interface PlotMark { beam: THREE.Mesh; marker: THREE.Mesh; baseY: number }
 
 const REACH = 2.3;
 /** Temática de cada parcela: se lee en el cartel de la entrada y flotando sobre ella. */
-const THEMES: Record<string, { name: string; color: string }> = {
+export const PLOT_THEMES: Record<string, { name: string; color: string }> = {
   'parcela-1': { name: t('Gestión y negocio', 'Business apps'), color: '#ff7a59' },
   'parcela-2': { name: t('Web y datos', 'Web & data'), color: '#1fb5b0' },
   'parcela-3': { name: t('IA y automatización', 'AI & automation'), color: '#a77bff' },
@@ -85,7 +85,7 @@ export class Interactables {
     const loader = new THREE.TextureLoader();
     const aniso = tier === 'low' ? 1 : 4;
     for (const plot of PLOTS.filter((p) => p.kind === 'project')) {
-      const theme = THEMES[plot.id] ?? { name: plot.id, color: '#4cc9f0' };
+      const theme = PLOT_THEMES[plot.id] ?? { name: plot.id, color: '#4cc9f0' };
       const list = projects.filter((p) => p.plot === plot.id);
       this.buildPlotMarks(scene, plot, theme);
       const gate = Math.atan2(-plot.z, -plot.x); // la entrada mira al centro de la isla
@@ -102,8 +102,8 @@ export class Interactables {
           const o = new THREE.Mesh(geo, m); o.position.set(px, py, pz); o.castShadow = o.receiveShadow = true; group.add(o); return o;
         };
         add(new THREE.CylinderGeometry(0.55, 0.65, 0.18, 7), stoneMat, 0, 0.05, 0); // peana
-        add(new THREE.BoxGeometry(0.22, 1.0, 0.22), woodMat, 0, 0.6, -0.05); // pie
-        const head = new THREE.Group(); head.position.set(0, 1.25, 0); head.rotation.x = -0.32; group.add(head); // atril inclinado
+        add(new THREE.BoxGeometry(0.22, 1.1, 0.22), woodMat, 0, 0.65, -0.05); // pie
+        const head = new THREE.Group(); head.position.set(0, 1.35, 0); head.rotation.x = -0.32; head.scale.setScalar(1.35); group.add(head); // atril inclinado
         const frame = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.74, 0.06), frameMat); frame.castShadow = true; head.add(frame);
         const screenMat = new THREE.MeshBasicMaterial({ map: placeholderTexture(project, theme.color), toneMapped: false });
         const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.04, 0.65), screenMat); screen.position.z = 0.032; head.add(screen);
@@ -115,7 +115,7 @@ export class Interactables {
         }, undefined, () => { /* sin captura: se queda la pantalla provisional */ });
         obstacles.push({ x, z, r: 0.55 });
         const label = makeLabel(project.short, { scale: 2.2 });
-        label.position.set(x, y + 2.25, z);
+        label.position.set(x, y + 2.55, z);
         scene.add(label);
         this.stations.push({ project, group, label, screen, x, z });
       });

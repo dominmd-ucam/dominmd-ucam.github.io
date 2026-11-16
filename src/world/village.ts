@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { heightAt, pathMask } from './terrain';
+import { heightAt, pathMask, PLOTS } from './terrain';
 import type { Obstacle } from './props';
 import { placeHouse } from './houses';
-import projects from '../data/projects.json';
+import { PLOT_THEMES } from '../interactables';
 
 const mat = (color: string, o: THREE.MeshStandardMaterialParameters = {}) =>
   new THREE.MeshStandardMaterial({ color, roughness: 0.9, ...o });
@@ -64,11 +64,11 @@ export function buildVillage(scene: THREE.Object3D): { obstacles: Obstacle[] } {
     fence(scene, [cx + 5, cz + 4.5], [cx + 5, cz - 3]);
   }
 
-  /* ---------- carteles en el cruce de caminos: uno por proyecto, apuntando hacia su estación ---------- */
+  /* ---------- carteles en el cruce de caminos: uno por parcela de proyectos, apuntando hacia ella ---------- */
   {
     const px = 1.8, pz = 1.8;
     const p = new THREE.Group(); p.position.set(px, heightAt(px, pz), pz);
-    const targets: [string, number, number][] = [...(projects as unknown as { short: string; position: [number, number] }[]).map((q) => [q.short, q.position[0], q.position[1]] as [string, number, number]), ['Faro', -8, -8]];
+    const targets: [string, number, number][] = [...PLOTS.filter((q) => q.kind === 'project').map((q) => [PLOT_THEMES[q.id]?.name ?? q.id, q.x, q.z] as [string, number, number]), ['Faro', -8, -8]];
     const top = 0.9 + targets.length * 0.4;
     add(p, new THREE.CylinderGeometry(0.13, 0.17, top + 0.6, 7), WOOD_D, 0, (top + 0.6) / 2, 0);
     // ordenados por ángulo para que los carteles no se crucen unos con otros
