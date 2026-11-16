@@ -33,24 +33,45 @@ export class AdaptiveRes {
   }
 }
 
-/** Indicador de FPS, llamadas de dibujo y triángulos (se abre con ?debug o con F3). */
-export class DebugOverlay {
+/**
+ * Contador de FPS (Ajustes → MOSTRAR FPS, F3 o ?debug). Cada medio segundo muestra:
+ * fps reales (fotogramas dibujados), tiempo medio y peor fotograma, cuánto de ese tiempo es JavaScript (CPU)
+ * y, debajo, nivel de gráficos, motor, resolución, llamadas de dibujo y triángulos del último fotograma.
+ * Si la CPU es mucho menor que el tiempo del fotograma, lo que limita es la tarjeta gráfica.
+ */
+export class FpsOverlay {
   private el = document.getElementById('debug') as HTMLElement;
   private n = 0;
-  private acc = 0;
+  private cpu = 0;
+  private worst = 0;
+  private start = 0;
+  private prev = 0;
+  /** ?debug lo enciende sin tocar los ajustes */
+  private forced = new URLSearchParams(location.search).has('debug');
 
-  constructor() {
-    if (new URLSearchParams(location.search).has('debug')) this.el.hidden = false;
-    addEventListener('keydown', (e) => { if (e.key === 'F3') { this.el.hidden = !this.el.hidden; e.preventDefault(); } });
+  constructor(private label: string, private t: (es: string, en: string) => string) {}
+
+  set enabled(on: boolean) {
+    const show = on || this.forced;
+    if (show === !this.el.hidden) return;
+    this.el.hidden = !show;
+    this.n = 0; this.prev = 0;
+    if (show) this.el.textContent = '… fps';
   }
 
   get visible() { return !this.el.hidden; }
 
-  update(dtMs: number, gfx: Gfx, dpr: number) {
-    this.n++; this.acc += dtMs;
-    if (this.acc < 500 || this.el.hidden) return;
-    const i = gfx.stats();
-    this.el.textContent = `${(1000 / (this.acc / this.n)).toFixed(0)} fps · ${gfx.kind === 'webgpu' ? 'WebGPU' : 'WebGL'}\n${i.calls} llamadas · ${(i.triangles / 1000).toFixed(0)}k tris\n${i.geometries} geom · ${i.textures} tex\ndpr ${dpr.toFixed(2)}`;
-    this.n = 0; this.acc = 0;
+  /** se llama tras dibujar cada fotograma; `cpuMs`: lo que ha tardado el fotograma en JavaScript */
+  update(now: number, cpuMs: number, gfx: Gfx, dpr: number) {
+    if (this.el.hidden) return;
+    if (this.prev) { this.worst = Math.max(this.worst, now - this.prev); this.n++; this.cpu += cpuMs; }
+    else { this.start = now; this.worst = 0; this.cpu = 0; this.n = 0; }
+    this.prev = now;
+    const span = now - this.start;
+    if (span < 500 || !this.n) return;
+    const i = gfx.stats(), t = this.t;
+    const ms = span / this.n;
+    this.el.innerHTML = `<b>${1000 / ms < 10 ? (1000 / ms).toFixed(1) : Math.round(1000 / ms)}</b> fps\n${ms.toFixed(1)} ms · ${t('peor', 'worst')} ${this.worst.toFixed(0)} · CPU ${(this.cpu / this.n).toFixed(1)}\n${this.label} · ${gfx.kind === 'webgpu' ? 'WebGPU' : 'WebGL'} · ${t('res', 'res')} ${dpr.toFixed(2)}\n${i.calls} ${t('llamadas', 'draws')} · ${(i.triangles / 1000).toFixed(0)}k ${t('triáng.', 'tris')}`;
+    this.start = now; this.n = 0; this.cpu = 0; this.worst = 0;
   }
 }

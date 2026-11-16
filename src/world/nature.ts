@@ -351,6 +351,9 @@ function makeLeaves(scene: THREE.Scene, max: number) {
   };
 }
 
+/** Instancia que proyecta sombra: centro y radio de su esfera, y altura de su parte más alta sobre el suelo. */
+interface Caster { id: number; x: number; y: number; z: number; r: number; top: number }
+
 /** Un modelo de Sketchfab ya colocado: centro, altura de apoyo, giro (su eje largo apunta a (sin rot, cos rot)) e inclinación a lo largo de ese eje. */
 interface Prop { name: string; size: number; long: boolean; x: number; y: number; z: number; rot: number; tilt: number }
 
@@ -446,6 +449,10 @@ export interface Nature {
   blocks(p: THREE.Vector3): boolean;
   setInkMask(on: boolean): void;
   ready: Promise<void>;
+  /** árboles, plantas y rocas ya en la escena (los modelos de Sketchfab llegan después, tras la pantalla de carga) */
+  planted: Promise<void>;
+  /** descarte de sombras que no se ven (se puede apagar desde la consola para comparar: __dbg.nature.shadowCull = false) */
+  shadowCull: boolean;
   /** dónde quedaron los modelos de Sketchfab (para depurar) */
   props: readonly Prop[];
 }
@@ -466,10 +473,28 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
   /** instancias con versión lejana: geometría cercana y lejana dentro del mismo BatchedMesh */
   const lodded: { bm: THREE.BatchedMesh; id: number; near: number; far: number; x: number; z: number; isFar: boolean }[] = [];
   /** árboles y rocas grandes: se dejan de dibujar más allá de `view` (la niebla ya los ha borrado casi del todo) */
-  const big: { bm: THREE.BatchedMesh; id: number; x: number; z: number; on: boolean }[] = [];
+  const big: { bm: THREE.BatchedMesh; id: number; x: number; z: number; on: boolean; max: number }[] = [];
+  /** las losas y guijarros de los caminos miden medio metro: más allá de esto no ocupan ni un par de píxeles y la niebla ya los tapa */
+  const pathView = Math.min(view, farSmall * 1.6);
   const treeSet = new Set<Spot>(trees);
   const isSmall = (sp: Spot) => !treeSet.has(sp) && !/^Rock(_|Path)/.test(sp.kit);
   let frame = 0;
+  /* ---------- sombra: solo los que pueden proyectarla sobre lo que se ve ---------- */
+  const viewFrustum = new THREE.Frustum(), m4v = new THREE.Matrix4(), lightDir = new THREE.Vector3();
+  /**
+   * ¿Puede la sombra de este objeto caer dentro del campo de visión? Se toma la esfera del objeto estirada en la dirección de la luz
+   * hasta el suelo (una cápsula): si queda entera fuera de algún plano del frustum de la cámara, su sombra no se ve. Es conservador:
+   * nunca quita una sombra visible. `k` = 1 / seno de la altura del sol (longitud del rayo por metro de altura).
+   */
+  const castsIntoView = (c: Caster, k: number) => {
+    const len = (c.top + 3) * k; // 3 m de margen: cuesta abajo la sombra llega más lejos
+    const bx = c.x + lightDir.x * len, by = c.y + lightDir.y * len, bz = c.z + lightDir.z * len;
+    for (const p of viewFrustum.planes) {
+      const n = p.normal;
+      if (n.x * c.x + n.y * c.y + n.z * c.z + p.constant < -c.r && n.x * bx + n.y * by + n.z * bz + p.constant < -c.r) return false;
+    }
+    return true;
+  };
   /* ---------- hojas y pétalos que saltan al atravesar arbustos, helechos y flores ---------- */
   const SOFT = /^(Bush|Fern|Plant|Flower)/;
   const softGrid = new Map<number, Spot[]>(), sk = (x: number, z: number) => Math.floor(x / 4) * 4096 + Math.floor(z / 4);
@@ -478,6 +503,8 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
   const lastP = new THREE.Vector3(1e9, 0, 0);
   let lastT = 0, lastHit: Spot | null = null;
 
+  let plantedOk!: () => void;
+  const planted = new Promise<void>((ok) => { plantedOk = ok; });
   const ready = (async () => {
     const gltf = await loadGLTF(`${BASE}megakit.glb`);
     // geometrías por modelo y material
@@ -517,7 +544,14 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
       const foliage = /Lea|Flower/.test(name);
       if (foliage) { mat.side = THREE.DoubleSide; mat.alphaTest = Math.max(mat.alphaTest, 0.45); patchFoliage(mat, uTime, uAlpha, uPlayer, /Flower/.test(name) ? 0.05 : /Pine/.test(name) ? 0.012 : 0.02, /Twisted/.test(name) ? new THREE.Color('#2f8a55') : undefined); }
       const bm = new THREE.BatchedMesh(e.count, e.verts, e.idx, mat);
-      for (const kit of e.geos.keys()) e.geos.set(kit, bm.addGeometry(parts.get(kit)!.get(name)!));
+      /** esfera envolvente de cada modelo (para descartar en la sombra lo que no puede verse) */
+      const spheres = new Map<Kit, THREE.Sphere>();
+      for (const kit of e.geos.keys()) {
+        const g = parts.get(kit)!.get(name)!;
+        e.geos.set(kit, bm.addGeometry(g));
+        g.computeBoundingSphere(); spheres.set(kit, g.boundingSphere!.clone());
+      }
+      const casters: Caster[] = [];
       for (const kit of e.lods.keys()) e.lods.set(kit, bm.addGeometry(lodParts.get(kit)!.get(name)!));
       for (const sp of spots) {
         const gid = e.geos.get(sp.kit);
@@ -527,8 +561,10 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
         m4.compose(pos.set(sp.x, sp.y, sp.z), q, scl.setScalar(sp.s));
         const id = bm.addInstance(gid);
         bm.setMatrixAt(id, m4);
+        const bs = spheres.get(sp.kit)!, c = pos.copy(bs.center).applyMatrix4(m4);
+        casters.push({ id, x: c.x, y: c.y, z: c.z, r: bs.radius * sp.s, top: c.y + bs.radius * sp.s - sp.y });
         if (isSmall(sp)) small.push({ bm, id, x: sp.x, z: sp.z });
-        else big.push({ bm, id, x: sp.x, z: sp.z, on: true });
+        else big.push({ bm, id, x: sp.x, z: sp.z, on: true, max: /^(RockPath|Pebble)/.test(sp.kit) ? pathView : view });
         const far = e.lods.get(sp.kit);
         if (far !== undefined) lodded.push({ bm, id, near: gid, far, x: sp.x, z: sp.z, isFar: false });
       }
@@ -539,16 +575,30 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
       bm.name = `nature:${name}`;
       // la corteza es la mitad de los triángulos de la pasada de sombras: ahí siempre va la versión simplificada (en la sombra no se nota)
       const mine = lodded.filter((p) => p.bm === bm);
-      if (mine.length) {
+      if (bm.castShadow) {
+        const hidden: number[] = [];
         bm.onBeforeShadow = (...args) => {
+          // fuera de la sombra se quedan los árboles y plantas cuya sombra no puede caer en lo que ve la cámara (detrás o a los lados):
+          // con el sol tan bajo, el mapa de sombra abarca más de 100 m a lo largo y casi todo lo que hay en él no se ve
+          hidden.length = 0;
+          if (!api.shadowCull) { for (const p of mine) bm.setGeometryIdAt(p.id, p.far); THREE.BatchedMesh.prototype.onBeforeShadow.apply(bm, args); for (const p of mine) bm.setGeometryIdAt(p.id, p.isFar ? p.far : p.near); return; }
+          const camera = args[2] as THREE.Camera, shadowCam = args[3] as THREE.Camera;
+          viewFrustum.setFromProjectionMatrix(m4v.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+          shadowCam.getWorldDirection(lightDir);
+          const k = 1 / Math.max(0.1, -lightDir.y);
+          for (const c of casters) {
+            if (!castsIntoView(c, k) && bm.getVisibleAt(c.id)) { bm.setVisibleAt(c.id, false); hidden.push(c.id); }
+          }
           for (const p of mine) bm.setGeometryIdAt(p.id, p.far);
           THREE.BatchedMesh.prototype.onBeforeShadow.apply(bm, args); // aquí se calculan las listas de dibujo de la sombra
           for (const p of mine) bm.setGeometryIdAt(p.id, p.isFar ? p.far : p.near);
+          for (const id of hidden) bm.setVisibleAt(id, true);
         };
       }
       scene.add(bm);
     }
 
+    plantedOk();
     // Sketchfab: después de la pantalla de carga (sus obstáculos ya existen desde el principio)
     await afterReveal;
     for (const pr of props) {
@@ -567,10 +617,12 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
         floats.push({ o: isle, y: 24, ph: 0 });
       }
     }
-  })().catch((e) => console.warn('naturaleza: no se pudo cargar el MegaKit', e));
+  })().catch((e) => console.warn('naturaleza: no se pudo cargar el MegaKit', e)).finally(() => plantedOk());
 
-  return {
+  const api: Nature = {
+    shadowCull: true,
     ready,
+    planted,
     props,
     update: (t, player) => {
       const dt = Math.min(0.1, t - lastT); lastT = t;
@@ -590,7 +642,7 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
         if (frame++ % 30 === 0) {
           for (const p of small) p.bm.setVisibleAt(p.id, Math.hypot(p.x - player.x, p.z - player.z) < farSmall);
           for (const p of big) {
-            const on = Math.hypot(p.x - player.x, p.z - player.z) < view;
+            const on = Math.hypot(p.x - player.x, p.z - player.z) < p.max;
             if (on !== p.on) { p.on = on; p.bm.setVisibleAt(p.id, on); }
           }
           for (const p of lodded) {
@@ -619,4 +671,5 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
       return false;
     },
   };
+  return api;
 }

@@ -185,7 +185,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #f6c9a0; col
 .acts .hex.on { background: var(--coral); color: var(--foam); }
 @media (pointer: coarse) { .acts { display: flex; } }
 #joy i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; background: rgba(255, 250, 240, .8); transform: translate(-50%, -50%); clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); }
-#debug { position: fixed; right: 12px; bottom: 12px; z-index: 60; padding: 6px 10px; font: 12px/1.4 ui-monospace, Consolas, monospace; color: #bfffd8; background: rgba(0, 0, 0, .65); white-space: pre; pointer-events: none; }
+#debug { position: fixed; right: 16px; top: calc(max(14px, env(safe-area-inset-top)) + 64px); z-index: 60; padding: 6px 10px; font: 11.5px/1.45 ui-monospace, Consolas, monospace; color: #d6ffe6; background: rgba(8, 30, 38, .72); border-radius: 6px; white-space: pre; text-align: right; pointer-events: none; font-variant-numeric: tabular-nums; }
+#debug b { font-size: 20px; line-height: 1.1; color: #fff; }
+@media (max-width: 640px) { #debug { right: 10px; top: calc(max(14px, env(safe-area-inset-top)) + 150px); font-size: 10.5px; padding: 5px 8px; } #debug b { font-size: 17px; } }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
 

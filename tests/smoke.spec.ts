@@ -93,6 +93,9 @@ test.describe('isla 3D', () => {
       expect(await page.evaluate(() => (window as unknown as { __dbg: { interactables: { stations: unknown[] } } }).__dbg.interactables.stations.length)).toBe(14);
       expect(state.classicHidden).toBe(true);
       if (path.includes('en.html')) expect(state.hint).toContain('to move');
+      // Ajustes → MOSTRAR FPS enciende el contador
+      await page.evaluate(() => (window as unknown as { __dbg: { settings: { set(k: string, v: boolean): void } } }).__dbg.settings.set('fps', true));
+      await expect.poll(() => page.evaluate(() => document.getElementById('debug')?.textContent ?? ''), { timeout: 60_000, intervals: [1000] }).toMatch(/fps[\s\S]*(llamadas|draws)/);
       expect(errors).toEqual([]);
     });
   }
