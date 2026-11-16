@@ -188,3 +188,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #f6c9a0; col
 #debug { position: fixed; right: 12px; bottom: 12px; z-index: 60; padding: 6px 10px; font: 12px/1.4 ui-monospace, Consolas, monospace; color: #bfffd8; background: rgba(0, 0, 0, .65); white-space: pre; pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+
+/* ---------- misiones (src/quests.ts) ---------- */
+.quest { top: calc(max(14px, env(safe-area-inset-top)) + 64px); left: 16px; z-index: 2; display: flex; align-items: center; gap: .6em; max-width: min(320px, calc(100vw - 32px)); padding: .45em 1.6em .45em .6em; border: 0; cursor: pointer; text-align: left; font: inherit; color: var(--deep); background: var(--paper); clip-path: polygon(0 0, 100% 0, 94% 100%, 0 100%); filter: drop-shadow(0 4px 0 var(--shadow)); animation: fadeUp .35s var(--pop) both; }
+.quest .q-arrow { flex: none; display: grid; place-items: center; width: 2.1em; height: 2.1em; color: var(--coral); background: var(--paper-2); clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%); transition: transform .15s linear; }
+.quest .q-arrow svg { width: 62%; height: 62%; }
+.quest .q-body { display: grid; line-height: 1.15; min-width: 0; }
+.quest .q-kicker { font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--coral-d); }
+.quest b { font: 600 16px var(--disp); }
+.quest .q-goal { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.quest .q-dist { flex: none; font-style: normal; font-size: 12px; font-weight: 800; color: var(--sea); }
+.quest.all-done .q-arrow { color: var(--sun); }
+.note-wrap { pointer-events: auto; cursor: pointer; max-width: calc(100vw - 24px); }
+.toast.note { min-width: 0; max-width: 30em; padding: .7em 2.2em .7em 1.6em; }
+.toast.note img { flex: none; width: 7.5em; border-radius: 6px; }
+@media (max-width: 640px) { .quest { top: calc(max(14px, env(safe-area-inset-top)) + 50px); padding: .35em 1.3em .35em .45em; } .quest b { font-size: 14px; } .quest .q-goal { font-size: 11.5px; } .toast.note { flex-direction: column; align-items: flex-start; } }

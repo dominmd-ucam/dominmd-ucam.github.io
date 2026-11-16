@@ -1,7 +1,10 @@
 import './style.css';
 import * as THREE from 'three';
-import { buildTerrain, heightAt, islandRadius, HILL, ISLET, DOCK, dockStart, onDock, caveFloor, caveLocal, CAVE } from './world/terrain';
+import { buildTerrain, heightAt, islandRadius, HILL, ISLET, DOCK, dockStart, onDock, caveFloor, caveLocal, CAVE, PLOTS, PLATEAUS, CHEST } from './world/terrain';
 import { buildZones } from './world/zones';
+import { Puzzles } from './world/puzzles';
+import { Quests, QuestStore, type QuestDef } from './quests';
+import { t as tl } from './i18n';
 import { Robot } from './world/robot';
 import { buildWater } from './world/water';
 import { buildScenery } from './world/props';
@@ -82,6 +85,8 @@ obstacles.push(...diorama.obstacles);
 const village = buildVillage(staticWorld);
 obstacles.push(...village.obstacles);
 obstacles.push(...buildZones(scene, q.tier).obstacles); // parcelas, cofre, vallas y el interior de la cueva
+const questStore = new QuestStore();
+const puzzles = new Puzzles(scene, obstacles, questStore.puzzles, () => questStore.save()); // losas, tótems, tablilla y cofre
 const interactables = new Interactables(scene, obstacles, q.tier); // antes que los árboles: así no se plantan encima
 const nature = buildNature(scene, obstacles, q.tier, q.mobile, q.density, q.view); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
@@ -123,6 +128,41 @@ ui.setCounter(achievements.opened.size);
 ui.setTotal(interactables.stations.length);
 const player = new Player(obstacles, [6, 12]);
 scene.add(player.group);
+
+/* ---------- misiones secundarias ---------- */
+const v3 = (x: number, z: number, dy = 0) => new THREE.Vector3(x, heightAt(x, z) + dy, z);
+const projectPlots = PLOTS.filter((p) => p.kind === 'project');
+const plotsLeft = () => projectPlots.filter((p) => !questStore.visited.has(p.id));
+const QUESTS: QuestDef[] = [
+  { id: 'misu', title: tl('Saluda a Misu', 'Say hi to Misu'), goal: () => tl('La gata guía te espera junto al camino de entrada', 'The guide cat is waiting by the entrance path'),
+    target: () => guide.pos, done: () => achievements.has('friend') },
+  { id: 'plots', title: tl('Recorre las parcelas de proyectos', 'Visit the project plots'),
+    goal: () => tl(`Los terrenos vallados guardan los proyectos de Domin · ${projectPlots.length - plotsLeft().length}/${projectPlots.length}`, `The fenced plots hold Domin's projects · ${projectPlots.length - plotsLeft().length}/${projectPlots.length}`),
+    target: () => {
+      const p = player.group.position, left = plotsLeft();
+      let best = left[0]; for (const pl of left) if (Math.hypot(pl.x - p.x, pl.z - p.z) < Math.hypot(best.x - p.x, best.z - p.z)) best = pl;
+      return best ? v3(best.x, best.z) : null;
+    }, done: () => plotsLeft().length === 0 },
+  { id: 'lighthouse', title: tl('Sube al faro', 'Climb the lighthouse'), goal: () => tl('Desde la colina rocosa se ve toda la isla', 'From the rocky hill you can see the whole island'),
+    target: () => v3(HILL[0], HILL[1]), done: () => achievements.has('lighthouse') },
+  { id: 'cave', title: tl('El secreto de la cueva', 'The secret of the cave'), goal: () => tl('Entra en la cueva de la meseta y lee la tablilla del fondo', 'Go into the plateau cave and read the tablet at the back'),
+    target: () => player.inCave ? puzzles.tablet : v3(CAVE.x, CAVE.z), done: () => questStore.done.has('cave') || puzzles.tabletRead },
+  { id: 'totems', title: tl('Los tótems del sol', 'The sun totems'), goal: () => tl('En la meseta oeste: gira cada tótem hasta el símbolo de la tablilla', 'On the west plateau: turn each totem to the symbol on the tablet'),
+    target: () => v3(PLATEAUS[1].x, PLATEAUS[1].z), done: () => questStore.puzzles.west },
+  { id: 'echo', title: tl('Las losas del eco', 'The echo slabs'), goal: () => tl('En la meseta este: pisa las losas en el orden en que brilla el cristal', 'On the east plateau: step on the slabs in the order the crystal glows'),
+    target: () => v3(PLATEAUS[0].x, PLATEAUS[0].z), done: () => questStore.puzzles.east },
+  { id: 'chest', title: tl('El cofre de la playa', 'The beach chest'), goal: () => tl(`Con las dos runas encendidas (${puzzles.solvedRunes}/2), ábrelo`, `With both runes lit (${puzzles.solvedRunes}/2), open it`),
+    target: () => v3(CHEST.x, CHEST.z), done: () => questStore.puzzles.chest },
+];
+const quests = new Quests(scene, QUESTS, questStore);
+quests.onComplete = (qd) => toasts.show({ title: qd.title, desc: tl('Misión completada', 'Quest complete'), xp: 0, icon: 'compass' }, tl('Misión', 'Quest'));
+puzzles.onNote = (title, body, img) => toasts.note(title, body, img);
+puzzles.onSolve = (id) => {
+  if (id === 'east') { achievements.unlock('echo'); toasts.note(tl('Losas del eco', 'Echo slabs'), tl('¡Correcto! Una columna de luz sale de la meseta y la runa dorada del cofre de la playa se enciende.', 'Correct! A pillar of light rises from the plateau and the gold rune on the beach chest lights up.')); }
+  else if (id === 'west') { achievements.unlock('totems'); toasts.note(tl('Tótems del sol', 'Sun totems'), tl('Los tótems brillan alineados y la runa turquesa del cofre de la playa se enciende.', 'The totems glow in line and the teal rune on the beach chest lights up.')); }
+  else { achievements.unlock('treasure'); toasts.note(tl('¡Tesoro!', 'Treasure!'), tl('Dentro hay una gema y una nota: «Gracias por explorar la isla hasta el último rincón. Si te ha gustado, échale un vistazo a mis proyectos o escríbeme. — Domin»', 'Inside there is a gem and a note: "Thanks for exploring every corner of the island. If you liked it, have a look at my projects or drop me a line. — Domin"')); }
+};
+
 const coop = new Coop(scene, obstacles, player.group); // invitados con el móvil como mando (QR)
 const post = gfx.createPost(scene, camera, q);
 post.setSun(dawn.sunDir);
@@ -168,6 +208,19 @@ function achievementsView(): View {
     rows: [
       ...ACHIEVEMENTS.map((a) => ({ type: 'info' as const, label: `${achievements.has(a.id) ? '✓' : '·'} ${a.title}`, value: achievements.has(a.id) ? `+${a.xp}` : '???' })),
       { type: 'action', label: 'Atrás', run: () => menu.back() },
+    ],
+  };
+}
+function questsView(): View {
+  const cur = quests.current;
+  return {
+    title: tl('Misiones', 'Quests'), sub: tl(`${quests.completed}/${QUESTS.length} hechas · elige cuál seguir`, `${quests.completed}/${QUESTS.length} done · pick one to follow`),
+    hint: tl('Esc volver', 'Esc back'),
+    rows: [
+      ...QUESTS.map((qd) => qd.done()
+        ? { type: 'info' as const, label: `✓ ${qd.title}`, value: tl('hecha', 'done') }
+        : { type: 'action' as const, label: `${qd === cur ? '➤' : '·'} ${qd.title}`, run: () => { quests.track(qd.id); menu.close(); } }),
+      { type: 'action', label: tl('Atrás', 'Back'), run: () => menu.back() },
     ],
   };
 }
@@ -219,6 +272,7 @@ function mainView(): View {
       { type: 'action', label: 'Mi avatar', run: () => { menu.close(); avatarUI?.toggle(true); } },
       ...(charSelect ? [{ type: 'action' as const, label: 'Cambiar de personaje', run: () => { menu.close(); charSelect?.toggle(true); } }] : []),
       { type: 'action', label: 'Ajustes', run: () => menu.push(settingsView()) },
+      { type: 'action', label: tl('Misiones', 'Quests'), run: () => menu.push(questsView()) },
       { type: 'action', label: 'Logros', run: () => menu.push(achievementsView()) },
       { type: 'action', label: 'Créditos', run: () => menu.push(creditsView()) },
       { type: 'action', label: 'Versión clásica', run: () => goClassic() },
@@ -226,6 +280,7 @@ function mainView(): View {
   };
 }
 const menu = new Menu(mainView);
+quests.onOpenList = () => { if (!blocked()) { menu.show(); menu.push(questsView()); } };
 /** nivel de gráficos con el que arrancó la página: si se cambia en Ajustes, se aplica al cerrar el menú (recargando) */
 const bootGraphics = settings.value.graphics;
 menu.onClose = () => { if (settings.value.graphics !== bootGraphics) location.reload(); };
@@ -269,8 +324,9 @@ settings.onChange((_, key) => applySettings(key));
 
 /* ---------- interacción ---------- */
 const blocked = () => menu.open || dialogue.open || ui.isOpen || (guestbook?.open ?? false) || (avatarUI?.open ?? false) || (charSelect?.open ?? false);
-type Target = { kind: 'station'; project: Project } | { kind: 'npc' } | { kind: 'guestbook' } | null;
+type Target = { kind: 'station'; project: Project } | { kind: 'npc' } | { kind: 'guestbook' } | { kind: 'zone'; label: string; run: () => void } | null;
 const NPC_TARGET: Target = { kind: 'npc' }, GUESTBOOK_TARGET: Target = { kind: 'guestbook' };
+const ZONE_TARGET = { kind: 'zone' as const, label: '', run: () => {} };
 const stationTargets = new Map<Project, Target>(); // se llama cada fotograma: no se crean objetos nuevos
 function pickTarget(): Target {
   const s = interactables.nearest;
@@ -279,6 +335,8 @@ function pickTarget(): Target {
   const dG = infoPoint ? infoPoint.distanceTo(player.group.position) : 99;
   if (dG < InfoPoint.REACH && dG <= dN && dG <= dS) return GUESTBOOK_TARGET;
   if (dN < CatGuide.REACH && dN <= dS) return NPC_TARGET;
+  const z = puzzles.nearest(player.group.position); // tótems, tablilla de la cueva y cofre
+  if (z && z.d <= dS) { ZONE_TARGET.label = z.label; ZONE_TARGET.run = z.run; return ZONE_TARGET; }
   if (!s) return null;
   let t = stationTargets.get(s.project);
   if (!t) { t = { kind: 'station', project: s.project }; stationTargets.set(s.project, t); }
@@ -289,6 +347,7 @@ function interact() {
   const t = pickTarget();
   if (!t) return;
   ui.setPrompt(null);
+  if (t.kind === 'zone') { t.run(); shownPrompt = null; return; }
   if (t.kind === 'npc') dialogue.start();
   else if (t.kind === 'guestbook') guestbook?.openPanel();
   else {
@@ -330,6 +389,7 @@ function checkZones(p: THREE.Vector3) {
   if (near(HILL, 3.2) && p.y > 5) achievements.unlock('lighthouse');
   if (near(ISLET, 5)) achievements.unlock('islet');
   if (onDock(p.x, p.z) && near(DOCK_END, 1.8)) achievements.unlock('sailor');
+  for (const pl of projectPlots) if (!questStore.visited.has(pl.id) && near([pl.x, pl.z], pl.r + 0.6)) { questStore.visited.add(pl.id); questStore.save(); }
 }
 
 /* ---------- bucle ---------- */
@@ -361,6 +421,8 @@ function frame(timestamp: number) {
   player.update(dt, input, t);
   coop.update(dt, t, input.yaw);
   interactables.update(t, player.group.position);
+  puzzles.update(t, dt, player.group.position);
+  quests.update(t, dt, player.group.position, input.yaw);
   guide.update(dt, t, player.group.position);
   robot.update(dt, t, player.group.position);
   infoPoint?.update(t, player.group.position);
@@ -418,7 +480,7 @@ function frame(timestamp: number) {
 
   // aviso de interacción
   const tg = blocked() ? null : pickTarget();
-  const label = tg ? (tg.kind === 'npc' ? 'Hablar con Misu' : tg.kind === 'guestbook' ? 'Libro de visitas y contacto' : tg.project.title) : null;
+  const label = tg ? (tg.kind === 'npc' ? 'Hablar con Misu' : tg.kind === 'guestbook' ? 'Libro de visitas y contacto' : tg.kind === 'zone' ? tg.label : tg.project.title) : null;
   if (label !== shownPrompt) { shownPrompt = label; ui.setPrompt(label); }
 
   // con el menú o una ficha abiertas basta con 30 fps; la sombra se recalcula en fotogramas alternos
@@ -440,7 +502,7 @@ function frame(timestamp: number) {
 renderer.setAnimationLoop(frame);
 
 // útil para depurar sin tocar el código
-(window as unknown as { __dbg: unknown }).__dbg = { heightAt, islandRadius, nature, presence, ghosts, guestbook, player, input, interactables, renderer, gfx, q, dawn, splash, post, scene, camera, guide, robot, coop, menu, dialogue, achievements, settings, adaptive, charSelect: () => charSelect };
+(window as unknown as { __dbg: unknown }).__dbg = { puzzles, quests, heightAt, islandRadius, nature, presence, ghosts, guestbook, player, input, interactables, renderer, gfx, q, dawn, splash, post, scene, camera, guide, robot, coop, menu, dialogue, achievements, settings, adaptive, charSelect: () => charSelect };
 
 /** El módulo se inicializa al importarse; `start` existe para que la entrada pueda esperar a que termine la carga. */
 export function start() { /* sin acciones adicionales */ }

@@ -153,5 +153,11 @@
   "BAJOS": "LOW",
   "MEDIOS": "MEDIUM",
   "ALTOS": "HIGH",
-  "ULTRA": "ULTRA"
+  "ULTRA": "ULTRA",
+  "Buen oído": "Good ear",
+  "Resuelve las losas del eco de la meseta este": "Solve the echo slabs on the east plateau",
+  "Lector de runas": "Rune reader",
+  "Alinea los tótems del sol de la meseta oeste": "Align the sun totems on the west plateau",
+  "Tesoro de la isla": "Island treasure",
+  "Abre el cofre de la playa": "Open the beach chest"
 }
