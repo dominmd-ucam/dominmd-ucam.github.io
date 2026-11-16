@@ -1,0 +1,25 @@
+.ws-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ws { display: grid; grid-template-columns: minmax(260px, 1fr) 1.1fr; }
+.ws-panel { display: flex; flex-direction: column; gap: 8px; min-height: 0; padding: 12px; border-right: 1px solid #e3e7ec; background: #f7f9fb; }
+.ws-form { display: grid; gap: 8px; }
+.ws-form label { display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #475467; }
+.ws-xp { font-family: ui-monospace, Consolas, monospace !important; font-size: 13px !important; }
+.ws-actions { display: flex; gap: 8px; }
+.ws-chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; font-size: 12px; }
+.ws-chip { padding: 2px 9px; border: 1px solid #c7d2fe; border-radius: 99px; background: #eef2ff; color: #3730a3; font-size: 12px; }
+.ws-status { font-size: 12px; font-weight: 600; color: #146c3c; }
+.ws-status.err { color: #b42318; }
+.ws-out { flex: 1; min-height: 0; background: #fff; border: 1px solid #e3e7ec; border-radius: 8px; }
+.ws-out td:last-child { white-space: normal; }
+.ws-scalar { padding: 18px; font: 700 28px ui-monospace, monospace; color: #1d4ed8; }
+.ws-view { min-height: 0; display: flex; }
+.ws-frame { flex: 1; border: 0; background: #fafafa; }
+.ws-tabs { display: none; }
+@media (max-width: 640px) {
+  .ws { display: flex; }
+  .ws > * { flex: 1; }
+  .ws[data-show="panel"] .ws-view, .ws[data-show="view"] .ws-panel { display: none; }
+  .ws-tabs { display: flex; flex: none; border-bottom: 1px solid #e3e7ec; }
+  .ws-tabs button { flex: 1; padding: 7px; border: 0; background: #f2f4f7; font-weight: 700; color: #667085; }
+  .ws-tabs button.on { background: #fff; color: #1d4ed8; box-shadow: inset 0 -2px #1d4ed8; }
+}

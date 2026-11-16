@@ -131,7 +131,7 @@ export function renderClassic(profile, projects, lang = 'es') {
 
     <section id="proyectos" aria-labelledby="h-projects">
       <h2 id="h-projects">${t('Proyectos', 'Projects')}</h2>
-      <p class="section-lede">${t('Cada proyecto tiene un demo simulado que puedes probar aquí mismo, sin salir de la página. Los proyectos privados se muestran con datos ficticios.', 'Every project has a simulated demo you can try right here, without leaving the page. Private projects are shown with fictional data.')}</p>
+      <p class="section-lede">${t('Cada proyecto tiene un demo interactivo que reproduce cómo funciona de verdad, aquí mismo y sin salir de la página. Los proyectos privados usan datos ficticios.', 'Every project has an interactive demo that works like the real thing, right here without leaving the page. Private projects use fictional data.')}</p>
       <div class="filters" role="group" aria-label="${t('Filtrar por tipo', 'Filter by type')}">
         <button type="button" class="chip on" data-filter="all">${t('Todos', 'All')}</button>
         ${[...new Set(projects.map((p) => p.type))].map((ty) => `<button type="button" class="chip" data-filter="${esc(ty)}">${esc(TL[ty] ?? ty)}</button>`).join('')}
@@ -139,6 +139,7 @@ export function renderClassic(profile, projects, lang = 'es') {
       <div class="cards">
         ${projects.map((p) => `
         <article class="card" data-type="${esc(p.type)}">
+          <button class="card-shot" type="button" data-project="${esc(p.id)}" aria-label="${t('Abrir el demo de', 'Open the demo of')} ${esc(p.short ?? p.title)}"><img src="projects/${esc(p.id)}.webp" alt="" width="640" height="400" loading="lazy" decoding="async" /></button>
           <span class="tag" data-type="${esc(p.type)}">${esc(TL[p.type] ?? p.type)}</span>
           <h3>${esc(p.title)}</h3>
           <p>${esc(p.description)}</p>

@@ -26,7 +26,7 @@ test.describe('versión clásica', () => {
     const img = await page.request.get('./og-image.jpg');
     expect(img.status()).toBe(200);
     // la ficha de un proyecto se abre con su demo
-    await cards.first().locator('[data-project]').click();
+    await cards.first().locator('.btn[data-project]').click();
     await expect(page.locator('#modal')).toBeVisible();
     await expect(page.locator('#mTitle')).not.toBeEmpty();
     await page.locator('#mClose').click();
@@ -53,6 +53,28 @@ test.describe('versión clásica', () => {
   });
 });
 
+test('los 14 demos de proyectos se abren y funcionan sin errores', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('./?modo=clasico');
+  const ids = await page.locator('.card .btn[data-project]').evaluateAll((b) => b.map((x) => (x as HTMLElement).dataset.project!));
+  expect(ids.length).toBe(14);
+  for (const id of ids) {
+    await page.locator(`.card .btn[data-project="${id}"]`).click();
+    await expect(page.locator('#mDemo > .gk')).toBeVisible();
+    await page.locator('#mClose').click();
+  }
+  // un par de demos que funcionan de verdad: XPath y feeds
+  await page.locator('.card .btn[data-project="webscraping"]').click();
+  await expect(page.locator('.ws-out tbody tr').first()).toBeVisible();
+  await page.locator('#mClose').click();
+  await page.locator('.card .btn[data-project="atom"]').click();
+  await expect(page.locator('.at-item')).toHaveCount(5);
+  await page.locator('#mClose').click();
+  const shot = await page.request.get('./projects/atom.webp');
+  expect(shot.status()).toBe(200);
+  expect(errors).toEqual([]);
+});
+
 test.describe('isla 3D', () => {
   for (const path of ['./?modo=3d', './en.html?modo=3d']) {
     test(`arranca y muestra el HUD (${path})`, async ({ page }) => {
@@ -67,6 +89,8 @@ test.describe('isla 3D', () => {
         hint: document.getElementById('hint')?.textContent ?? '',
       }));
       expect(state.canvas).toBeGreaterThan(0);
+      // los 14 proyectos están en sus parcelas (logro «Explorador» alcanzable)
+      expect(await page.evaluate(() => (window as unknown as { __dbg: { interactables: { stations: unknown[] } } }).__dbg.interactables.stations.length)).toBe(14);
       expect(state.classicHidden).toBe(true);
       if (path.includes('en.html')) expect(state.hint).toContain('to move');
       expect(errors).toEqual([]);
