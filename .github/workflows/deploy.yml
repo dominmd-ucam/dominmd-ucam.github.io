@@ -2,13 +2,14 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request: # en los PR solo compila y pasa las pruebas, no despliega
   workflow_dispatch:
 permissions:
   contents: read
   pages: write
   id-token: write
 concurrency:
-  group: pages
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'pages' }}
   cancel-in-progress: true
 jobs:
   build:
@@ -23,11 +24,28 @@ jobs:
       - run: npm run build
         env:
           VITE_API_URL: ${{ vars.API_URL }}
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
+      # pruebas de humo (tests/smoke.spec.ts): versión clásica en español e inglés y arranque de la isla 3D,
+      # en escritorio y en móvil vertical 390x844. Si fallan, no se despliega
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+        env:
+          CI: true
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: informe-pruebas
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+      - if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v6
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-24.04 # fijo: ubuntu-latest pasa a la 26 a partir del 19-oct-2026 y así el cambio de sistema lo decides tú
     environment:

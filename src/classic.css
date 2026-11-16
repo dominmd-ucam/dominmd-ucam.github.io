@@ -71,3 +71,8 @@ h3 { font: 600 20px var(--disp); margin: 0 0 6px; }
 
 @media (max-width: 760px) { .hero, .about { grid-template-columns: 1fr; } .hero-art { order: -1; } .hero-art svg { max-width: 200px; margin: 0 auto; } .site-header nav { display: none; } }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* selector de idioma (ES/EN) en la cabecera */
+.lang-switch { display: inline-grid; place-items: center; min-width: 44px; min-height: 36px; padding: 0 10px; border-radius: 10px; border: 2px solid rgba(15, 52, 64, .18); color: var(--ink); font-weight: 900; font-size: .9rem; letter-spacing: .04em; text-decoration: none; }
+.lang-switch:hover, .lang-switch:focus-visible { border-color: var(--coral); color: var(--coral); }
+.contact-links { flex-wrap: wrap; }
