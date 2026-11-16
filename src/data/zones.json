@@ -1,5 +1,5 @@
 {
-  "_comment": "Zonas reservadas del modo 3D, sin funcionalidad todavía. Posiciones en polares: a = ángulo (rad), f = fracción del radio de la costa en ese ángulo.",
+  "_comment": "Zonas reservadas del modo 3D, sin funcionalidad todavía. Posiciones en polares: a = ángulo (rad), f = fracción del radio de la costa en ese ángulo. Como son fracciones, escalan solas con la isla (ISLAND_R = 105 m desde la ampliación de noviembre de 2026): f 0.42 queda a ~44 m del centro y f 0.8 a ~84 m. Entre la vuelta a la isla (f 0.62) y la playa (f ~0.9) hay ~30 m de franja libre por todo el contorno para nuevas parcelas, misiones o estaciones; los árboles respetan RESERVED (terrain.ts), así que basta con añadir aquí la parcela y su sendero.",
   "plots": [
     { "id": "parcela-1", "kind": "project", "a": 1.05, "f": 0.42, "r": 3.2 },
     { "id": "parcela-2", "kind": "project", "a": -1.6, "f": 0.42, "r": 3.2 },

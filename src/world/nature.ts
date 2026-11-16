@@ -72,15 +72,33 @@ function groundNormal(x: number, z: number, out = new THREE.Vector3()) {
 }
 
 /** Calcula dónde va cada cosa. No necesita los modelos. */
-function plan(obstacles: Obstacle[], tier: Tier) {
+function plan(obstacles: Obstacle[], tier: Tier, density: number) {
   const rand = rng(424242);
   const spots: Spot[] = [];
   const trees: Spot[] = [];
-  const amount = tier === 'low' ? 0.5 : tier === 'med' ? 0.8 : 1;
-  const treeAmount = tier === 'low' ? 0.7 : 1;
+  // `density` (quality.ts): 0,6 bajo · 1,1 medio · 1,3 alto · 1,6 ultra. Los árboles crecen menos que el sotobosque (son más caros)
+  const amount = 0.75 * density * (tier === 'low' ? 0.9 : 1);
+  const treeAmount = Math.min(1.35, 0.55 + 0.5 * density);
+  const gapK = 1 / Math.sqrt(Math.max(0.8, density)); // más densidad, árboles algo más juntos
   const w = {} as Record<Biome, number>;
   const up = new THREE.Vector3(0, 1, 0), n = new THREE.Vector3();
-  const blocked = (x: number, z: number, pad: number) => obstacles.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + pad);
+  // rejilla de 8 m: con la isla de 105 m hay miles de obstáculos y árboles; comprobar todos en cada candidato era cuadrático
+  const G = 8, grid = new Map<number, Obstacle[]>(), gk = (i: number, j: number) => i * 4096 + j;
+  const addObs = (o: Obstacle) => {
+    const r = o.r + 2;
+    for (let i = Math.floor((o.x - r) / G); i <= Math.floor((o.x + r) / G); i++) for (let j = Math.floor((o.z - r) / G); j <= Math.floor((o.z + r) / G); j++) {
+      const k = gk(i, j); (grid.get(k) ?? grid.set(k, []).get(k)!).push(o);
+    }
+  };
+  for (const o of obstacles) addObs(o);
+  const pushObs = (o: Obstacle) => { obstacles.push(o); addObs(o); };
+  const blocked = (x: number, z: number, pad: number) => (grid.get(gk(Math.floor(x / G), Math.floor(z / G))) ?? []).some((o) => Math.hypot(o.x - x, o.z - z) < o.r + pad);
+  const tgrid = new Map<number, Spot[]>();
+  const nearTree = (x: number, z: number, d: number) => {
+    const i0 = Math.floor(x / G), j0 = Math.floor(z / G);
+    for (let i = i0 - 1; i <= i0 + 1; i++) for (let j = j0 - 1; j <= j0 + 1; j++) for (const t of tgrid.get(gk(i, j)) ?? []) if (Math.hypot(t.x - x, t.z - z) < d) return true;
+    return false;
+  };
   // plaza, punto de inicio y explanadas que deben quedar despejadas
   const OPEN: [number, number, number][] = [[0, 0, 7], [6, 12, 7], [-7, -6, 4], ...RESERVED]; // + parcelas, cofre, boca de la cueva y vallas
   const open = (x: number, z: number) => OPEN.some(([ox, oz, r]) => Math.hypot(x - ox, z - oz) < r);
@@ -110,13 +128,14 @@ function plan(obstacles: Obstacle[], tier: Tier) {
     const b = wall ?? pickBiome(x, z), f = FLORA[b];
     if (rand() > (wall ? 0.95 : f.density * treeAmount)) continue;
     if (blocked(x, z, 1.6)) continue;
-    if (trees.some((t) => Math.hypot(t.x - x, t.z - z) < f.gap * (wall ? 0.75 : 1))) continue;
+    if (nearTree(x, z, f.gap * gapK * (wall ? 0.75 : 1))) continue;
     const kit = f.trees[Math.floor(rand() * f.trees.length)];
     const s = lerp(f.treeScale[0], f.treeScale[1], rand());
     const t: Spot = { kit, x, y: h - 0.15, z, rot: rand() * Math.PI * 2, s };
     trees.push(t); spots.push(t);
+    const tk = gk(Math.floor(x / G), Math.floor(z / G)); (tgrid.get(tk) ?? tgrid.set(tk, []).get(tk)!).push(t);
   }
-  for (const t of trees) obstacles.push({ x: t.x, z: t.z, r: (SOLID[t.kit] ?? 0.5) * t.s });
+  for (const t of trees) pushObs({ x: t.x, z: t.z, r: (SOLID[t.kit] ?? 0.5) * t.s });
 
   // ---------- caminos de piedra ----------
   for (const poly of STONE_PATHS) {
@@ -156,7 +175,7 @@ function plan(obstacles: Obstacle[], tier: Tier) {
     if (blocked(x, z, solid ? 0.6 : 0.2)) continue;
     const isRock = kit.startsWith('Rock');
     spots.push({ kit, x, y: h - (isRock ? 0.25 * s : 0.03), z, rot: rand() * 6.28, s, tilt: isRock ? undefined : new THREE.Quaternion().setFromUnitVectors(up, groundNormal(x, z, n).lerp(up, 0.5).normalize()) });
-    if (solid) obstacles.push({ x, z, r: solid * s * 0.8 });
+    if (solid) pushObs({ x, z, r: solid * s * 0.8 });
   }
   return { spots, trees };
 }
@@ -278,6 +297,60 @@ function patchFoliage(m: THREE.MeshStandardMaterial, uTime: { value: number }, u
   m.customProgramCacheKey = () => `foliage${amp}${tint ? 't' : ''}`;
 }
 
+/** Partículas de hojas y pétalos (una sola malla instanciada; caen girando y se desvanecen encogiéndose). */
+function makeLeaves(scene: THREE.Scene, max: number) {
+  if (!max) return { burst: () => {}, update: () => {} };
+  const geo = new THREE.PlaneGeometry(0.11, 0.07);
+  const mat = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 1 });
+  const mesh = new THREE.InstancedMesh(geo, mat, max);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  mesh.count = 0; mesh.frustumCulled = false; mesh.name = 'nature:leaves';
+  scene.add(mesh);
+  const LEAF = [new THREE.Color('#5fae3e'), new THREE.Color('#7cc24a'), new THREE.Color('#a8cf52')];
+  const PETAL = [new THREE.Color('#ffd0e0'), new THREE.Color('#fff1a8'), new THREE.Color('#ffffff')];
+  const ps = Array.from({ length: max }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Euler(), w: new THREE.Vector3(), life: 0 }));
+  for (let i = 0; i < max; i++) mesh.setColorAt(i, LEAF[0]);
+  let next = 0, alive = 0;
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  return {
+    burst(at: THREE.Vector3, kind: 'leaf' | 'petal', n: number) {
+      const pal = kind === 'leaf' ? LEAF : PETAL;
+      for (let k = 0; k < n; k++) {
+        const i = next++ % max, p = ps[i], a = Math.random() * Math.PI * 2;
+        p.p.set(at.x + Math.cos(a) * 0.3, at.y + 0.4 + Math.random() * 0.5, at.z + Math.sin(a) * 0.3);
+        p.v.set(Math.cos(a) * (0.6 + Math.random()), 1.2 + Math.random() * 1.2, Math.sin(a) * (0.6 + Math.random()));
+        p.r.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+        p.w.set(Math.random() * 8 - 4, Math.random() * 8 - 4, Math.random() * 8 - 4);
+        p.life = 1.6 + Math.random() * 0.8;
+        mesh.setColorAt(i, pal[Math.floor(Math.random() * pal.length)]);
+      }
+      mesh.instanceColor!.needsUpdate = true;
+      alive = max;
+    },
+    update(dt: number) {
+      if (!alive) return;
+      let any = false;
+      for (let i = 0; i < max; i++) {
+        const p = ps[i];
+        if (p.life > 0) {
+          p.life -= dt; any = true;
+          // caída lenta con rozamiento y balanceo, como una hoja
+          p.v.y -= 3.2 * dt; p.v.multiplyScalar(1 - 2.2 * dt);
+          p.p.addScaledVector(p.v, dt);
+          p.p.x += Math.sin(p.life * 5 + i) * 0.4 * dt;
+          p.r.x += p.w.x * dt; p.r.y += p.w.y * dt; p.r.z += p.w.z * dt;
+        }
+        const s = Math.max(0, Math.min(1, p.life * 2));
+        m4.compose(p.p, q.setFromEuler(p.r), sc.setScalar(s));
+        mesh.setMatrixAt(i, m4);
+      }
+      mesh.count = max;
+      mesh.instanceMatrix.needsUpdate = true;
+      if (!any) { alive = 0; mesh.count = 0; }
+    },
+  };
+}
+
 /** Un modelo de Sketchfab ya colocado: centro, altura de apoyo, giro (su eje largo apunta a (sin rot, cos rot)) e inclinación a lo largo de ese eje. */
 interface Prop { name: string; size: number; long: boolean; x: number; y: number; z: number; rot: number; tilt: number }
 
@@ -377,10 +450,12 @@ export interface Nature {
   props: readonly Prop[];
 }
 
-export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tier, mobile = false): Nature {
+/** `density` y `view` salen de quality.ts: cuánta vegetación se planta y hasta qué distancia se dibujan árboles y rocas. */
+export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tier, mobile = false, density = 1, view = 999): Nature {
   // los modelos de Sketchfab van antes que los árboles (así no se plantan encima) y fuera de los caminos
   const props = placeProps(obstacles);
-  const { spots, trees } = plan(obstacles, tier);
+  const { spots, trees } = plan(obstacles, tier, density);
+  const farSmall = FAR_SMALL * (tier === 'low' ? 0.7 : density > 1.4 ? 1.35 : 1);
   spots.push(...undergrowth(props, obstacles));
   const uTime = { value: 0 }, uAlpha = { value: 1 }, uPlayer = { value: new THREE.Vector3(0, -99, 0) };
   const floats: { o: THREE.Object3D; y: number; ph: number }[] = [];
@@ -390,9 +465,18 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
   const small: { bm: THREE.BatchedMesh; id: number; x: number; z: number }[] = [];
   /** instancias con versión lejana: geometría cercana y lejana dentro del mismo BatchedMesh */
   const lodded: { bm: THREE.BatchedMesh; id: number; near: number; far: number; x: number; z: number; isFar: boolean }[] = [];
+  /** árboles y rocas grandes: se dejan de dibujar más allá de `view` (la niebla ya los ha borrado casi del todo) */
+  const big: { bm: THREE.BatchedMesh; id: number; x: number; z: number; on: boolean }[] = [];
   const treeSet = new Set<Spot>(trees);
   const isSmall = (sp: Spot) => !treeSet.has(sp) && !/^Rock(_|Path)/.test(sp.kit);
   let frame = 0;
+  /* ---------- hojas y pétalos que saltan al atravesar arbustos, helechos y flores ---------- */
+  const SOFT = /^(Bush|Fern|Plant|Flower)/;
+  const softGrid = new Map<number, Spot[]>(), sk = (x: number, z: number) => Math.floor(x / 4) * 4096 + Math.floor(z / 4);
+  for (const sp of spots) if (SOFT.test(sp.kit)) { const k = sk(sp.x, sp.z); (softGrid.get(k) ?? softGrid.set(k, []).get(k)!).push(sp); }
+  const leaves = makeLeaves(scene, tier === 'low' ? 0 : mobile ? 24 : 64);
+  const lastP = new THREE.Vector3(1e9, 0, 0);
+  let lastT = 0, lastHit: Spot | null = null;
 
   const ready = (async () => {
     const gltf = await loadGLTF(`${BASE}megakit.glb`);
@@ -444,6 +528,7 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
         const id = bm.addInstance(gid);
         bm.setMatrixAt(id, m4);
         if (isSmall(sp)) small.push({ bm, id, x: sp.x, z: sp.z });
+        else big.push({ bm, id, x: sp.x, z: sp.z, on: true });
         const far = e.lods.get(sp.kit);
         if (far !== undefined) lodded.push({ bm, id, near: gid, far, x: sp.x, z: sp.z, isFar: false });
       }
@@ -488,11 +573,26 @@ export function buildNature(scene: THREE.Scene, obstacles: Obstacle[], tier: Tie
     ready,
     props,
     update: (t, player) => {
+      const dt = Math.min(0.1, t - lastT); lastT = t;
       uTime.value = t;
+      leaves.update(dt);
       if (player) {
+        // al entrar en una planta blanda (o moverse dentro de ella) suelta unas hojas o pétalos
+        const moved = player.distanceTo(lastP);
+        if (moved > 0.35 && moved < 5) {
+          let hit: Spot | null = null;
+          for (const sp of softGrid.get(sk(player.x, player.z)) ?? []) if (Math.abs(sp.y - player.y) < 1.2 && Math.hypot(sp.x - player.x, sp.z - player.z) < 0.5 + sp.s * 0.6) { hit = sp; break; }
+          if (hit && (hit !== lastHit || moved > 1.5)) leaves.burst(player, hit.kit.startsWith('Flower') ? 'petal' : 'leaf', hit.kit.startsWith('Bush') ? 6 : 3);
+          if (hit !== lastHit || moved > 1.5) lastP.copy(player);
+          lastHit = hit;
+        } else if (moved >= 5) lastP.copy(player);
         uPlayer.value.copy(player);
         if (frame++ % 30 === 0) {
-          for (const p of small) p.bm.setVisibleAt(p.id, Math.hypot(p.x - player.x, p.z - player.z) < FAR_SMALL);
+          for (const p of small) p.bm.setVisibleAt(p.id, Math.hypot(p.x - player.x, p.z - player.z) < farSmall);
+          for (const p of big) {
+            const on = Math.hypot(p.x - player.x, p.z - player.z) < view;
+            if (on !== p.on) { p.on = on; p.bm.setVisibleAt(p.id, on); }
+          }
           for (const p of lodded) {
             const d = Math.hypot(p.x - player.x, p.z - player.z);
             if (p.isFar ? d < LOD_DIST - 3 : d > LOD_DIST) { p.isFar = !p.isFar; p.bm.setGeometryIdAt(p.id, p.isFar ? p.far : p.near); } // 3 m de histéresis

@@ -38,6 +38,26 @@ class InkEffect extends Effect {
   }
 }
 
+/**
+ * Perspectiva aérea (BotW): lo lejano se funde con el azul del horizonte según la profundidad, antes de los contornos.
+ * Más suave que la niebla y solo en la lejanía: las montañas y los bosques del fondo se ven azulados, como en Hyrule.
+ */
+class AerialEffect extends Effect {
+  constructor(strength: number) {
+    super('AerialEffect', /* glsl */ `
+      uniform vec3 haze;
+      uniform float strength;
+      void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth, out vec4 outputColor) {
+        outputColor = inputColor;
+        if (depth >= 1.0) return;
+        float z = -getViewZ(depth);
+        float k = smoothstep(35.0, 260.0, z) * strength;
+        outputColor.rgb = mix(inputColor.rgb, haze, k);
+      }`, { attributes: EffectAttribute.DEPTH, uniforms: new Map<string, THREE.Uniform>([['haze', new THREE.Uniform(new THREE.Color('#9fc7e6'))], ['strength', new THREE.Uniform(strength)]]) });
+  }
+  set color(c: THREE.Color) { (this.uniforms.get('haze') as THREE.Uniform).value = c; }
+}
+
 export interface Post {
   render(dt: number): void;
   setSize(w: number, h: number): void;
@@ -46,6 +66,8 @@ export interface Post {
   setEnabled(on: boolean): void;
   /** dirección hacia el sol para los rayos de luz (se guarda la referencia: basta llamarlo una vez) */
   setSun(dir: THREE.Vector3): void;
+  /** color del horizonte para la perspectiva aérea (se guarda la referencia) */
+  setHaze?(c: THREE.Color): void;
   /** efectos ajustables en vivo (solo niveles medio/alto) */
   fx?: { bloom: BloomEffect; hue: HueSaturationEffect; contrast: BrightnessContrastEffect; vignette: VignetteEffect; ink: Effect };
 }
@@ -73,7 +95,8 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const vignette = new VignetteEffect({ offset: 0.35, darkness: 0.28 });
   // rayos de sol entre los árboles: solo en escritorio (en móvil es otra máscara y 32 lecturas de textura por píxel)
   const rays = q.mobile ? null : new GodRaysEffect(camera, q.tier === 'high' ? 40 : 28);
-  composer.addPass(new EffectPass(camera, ink, ...(rays ? [rays] : []), exposure, bloom, tone, hue, contrast, vignette));
+  const aerial = new AerialEffect(q.ultra ? 0.5 : q.tier === 'high' ? 0.42 : 0.32);
+  composer.addPass(new EffectPass(camera, aerial, ink, ...(rays ? [rays] : []), exposure, bloom, tone, hue, contrast, vignette));
   // en móvil la densidad de píxeles ya disimula los dientes de sierra: el SMAA es un pase de pantalla completa más (tres, con sus texturas de búsqueda)
   if (!q.mobile) composer.addPass(new EffectPass(camera, new SMAAEffect()));
   let enabled = true, expo = 0.5;
@@ -86,6 +109,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
     setExposure: (v) => { expo = v; exposure.exposure = v; },
     setEnabled: (on) => { enabled = on; },
     setSun: (dir) => { if (rays) rays.sunDir = dir; },
+    setHaze: (c) => { aerial.color = c; },
     fx: { bloom, hue, contrast, vignette, ink },
   };
 }

@@ -122,6 +122,8 @@ export function buildScenery(scene: THREE.Object3D) {
     // en la franja de playa (dentro, los bosques del MegaKit) y un par junto a la plaza
     [0.3, 0.84], [0.8, 0.86], [1.5, 0.8], [2.0, 0.78], [2.8, 0.85], [3.5, 0.83],
     [4.2, 0.86], [4.9, 0.84], [5.6, 0.85], [1.2, 0.82], [0.1, 0.3], [4.1, 0.34],
+    // la isla de 105 m tiene el doble de costa: más palmeras en la playa
+    [0.55, 0.88], [1.05, 0.9], [1.75, 0.86], [2.35, 0.87], [3.15, 0.88], [3.85, 0.87], [4.55, 0.9], [5.25, 0.88], [5.95, 0.87],
   ];
   for (const [a, f] of spots) {
     const r = islandRadius(a) * f;

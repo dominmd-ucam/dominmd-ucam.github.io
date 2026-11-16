@@ -114,10 +114,21 @@ const HOOKS: Record<TslTag['kind'], Hooks> = {
       const wave = sin(along.mul(0.8).sub(uTime.mul(2.3)).add(ip.y.mul(0.15))).mul(0.5).add(0.5);
       const sway = gust.mul(0.8).add(0.2).mul(wave.mul(0.55).add(0.45));
       const dp = ip.sub(uPlayer.xz), dist = length(dp);
-      const push = float(1).sub(smoothstep(0.2, 1.0, dist)).mul(step(abs(uPlayer.y.sub(py)), 1.5));
-      const off = windDir.mul(sway.mul(0.38))
+      let push: N = float(1).sub(smoothstep(0.2, 1.0, dist)).mul(step(abs(uPlayer.y.sub(py)), 1.5));
+      let off: N = windDir.mul(sway.mul(0.38))
         .add(vec2(windDir.y.negate(), windDir.x).mul(sin(uTime.mul(1.7).add(ip.x.mul(1.3)).add(ip.y.mul(0.7))).mul(0.06)))
         .add(dp.div(max(dist, 0.001)).mul(push.mul(0.75)));
+      // pisadas recientes (grass.ts, uTrail): hierba tumbada que se levanta poco a poco
+      const trail = t.u.uTrail?.value as THREE.Vector4[] | undefined;
+      if (trail) {
+        const tr = uniformArray(trail, 'vec4'), free = float(1).sub(push);
+        for (let i = 0; i < trail.length; i++) {
+          const tp = tr.element(i), dq = ip.sub(tp.xy), dd = length(dq);
+          const k = float(1).sub(smoothstep(0.1, 0.85, dd)).mul(float(1).sub(smoothstep(0.0, 3.5, uTime.sub(tp.z)))).mul(step(abs(tp.w.sub(py)), 1.5)).mul(free);
+          off = off.add(dq.div(max(dd, 0.001)).mul(k.mul(0.55)));
+          push = max(push, k.mul(0.6));
+        }
+      }
       positionLocal.addAssign(vec3(off.x, dot(off, off).mul(-0.45), off.y).mul(bend.mul(bladeH)));
       m.vars = {
         vGust: varying(gust.mul(wave).mul(y).mul(float(1).sub(push)), 'vGust'), vCloud: varying(cloudShadow(ip, uTime), 'vCloud'),

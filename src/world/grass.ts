@@ -3,7 +3,9 @@ import { fbm, groundColor, heightAt, pathCover, pathDist } from './terrain';
 import { CLOUD_GLSL } from './toon';
 import { tagTsl } from '../gfx/tag';
 
-const NEAR_FULL = 18; // metros hasta los que se dibuja la hoja completa
+const NEAR_FULL = 18;
+const TRAIL_N = 6;
+const TRAIL_LIFE = 3.5; // segundos que tarda la hierba pisada en levantarse // metros hasta los que se dibuja la hoja completa
 // degradado por altura: la raíz más oscura (oclusión entre hojas) y la punta más clara y amarilla, como en BotW
 const ROOT = new THREE.Color(0.5, 0.56, 0.5), MID = new THREE.Color(0.92, 0.97, 0.86), TIP = new THREE.Color(1.36, 1.3, 0.9);
 
@@ -64,14 +66,19 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
   const geoFull = liteOnly ? null : bladeFull(), geoLite = bladeLite();
 
   const uTime = { value: 0 }, uPlayer = { value: new THREE.Vector3(0, -99, 0) }, uAlpha = { value: 1 };
+  // rastro: las últimas pisadas (x, z, instante, y). La hierba pisada tarda unos segundos en levantarse, como en BotW
+  const uTrail = { value: Array.from({ length: TRAIL_N }, () => new THREE.Vector4(0, 0, -99, -99)) };
+  let trailN = 0;
+  const lastStep = new THREE.Vector3(1e9, 0, 0);
   // el vector del sol se comparte con dawn.ts (cambia con la hora); el color de la luz que atraviesa la hoja va en lineal
   const uSunDir = { value: opts.sunDir ?? new THREE.Vector3(0.5, 0.25, -0.7).normalize() }, uTrans = { value: new THREE.Color('#d8f06a') };
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1 });
   mat.defines = { TOON_NO_RIM: '' };
-  tagTsl(mat, 'grass', { uTime, uPlayer, uAlpha, uSunDir, uTrans });
+  tagTsl(mat, 'grass', { uTime, uPlayer, uAlpha, uSunDir, uTrans, uTrail });
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = uTime;
     sh.uniforms.uPlayer = uPlayer;
+    sh.uniforms.uTrail = uTrail;
     sh.uniforms.uAlpha = uAlpha;
     sh.uniforms.uSunDir = uSunDir;
     sh.uniforms.uTrans = uTrans;
@@ -79,6 +86,7 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
       .replace('#include <common>', `#include <common>
         uniform float uTime;
         uniform vec3 uPlayer;
+        uniform vec4 uTrail[${TRAIL_N}];
         varying float vGust;
         varying float vCloud;
         varying float vBH;
@@ -101,6 +109,16 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
         float dist = length(dp);
         float push = (1.0 - smoothstep(0.2, 1.0, dist)) * step(abs(uPlayer.y - instanceMatrix[3].y), 1.5);
         off += dp / max(dist, 0.001) * push * 0.75;
+        // pisadas recientes: la hierba queda tumbada (sin dirección preferente, hacia fuera de la pisada) y se levanta poco a poco
+        for (int i = 0; i < ${TRAIL_N}; i++) {
+          vec4 tp = uTrail[i];
+          vec2 dq = ip - tp.xy;
+          float dq2 = dot(dq, dq);
+          if (dq2 > 1.0) continue;
+          float k = (1.0 - smoothstep(0.1, 0.85, sqrt(dq2))) * (1.0 - smoothstep(0.0, ${TRAIL_LIFE.toFixed(1)}, uTime - tp.z)) * step(abs(tp.w - instanceMatrix[3].y), 1.5) * (1.0 - push);
+          off += dq / max(sqrt(dq2), 0.001) * k * 0.55;
+          push = max(push, k * 0.6);
+        }
         vec3 w = vec3(off.x, -dot(off, off) * 0.45, off.y) * bend * bladeH; // al inclinarse, la punta baja
         transformed += vec3(dot(bm[0], w) / dot(bm[0], bm[0]), dot(bm[1], w) / dot(bm[1], bm[1]), dot(bm[2], w) / dot(bm[2], bm[2]));
         vGust = gust * wave * position.y * (1.0 - push);
@@ -143,7 +161,7 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
 
   const CELL = 16;
   /** fracción de la densidad según el anillo de bloques (distancia de Chebyshev al bloque del jugador): 0–1, 2, 3 */
-  const RING_FRAC = [1, 1, 0.5, 0.22];
+  const RING_FRAC = [1, 1, 0.5, 0.22, 0.12]; // el anillo 4 solo existe en ultra
   const MAX_RING = opts.maxRing ?? (liteOnly ? 2 : 3);
   const nearFull = opts.nearFull ?? NEAR_FULL;
   const widthMul = opts.widthMul ?? 1;
@@ -263,7 +281,13 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
     setInkMask: (on: boolean) => { uAlpha.value = on ? 0 : 1; },
     update: (t: number, cam?: THREE.Vector3, player?: THREE.Vector3) => {
       uTime.value = t;
-      if (player) uPlayer.value.copy(player);
+      if (player) {
+        uPlayer.value.copy(player);
+        if (player.distanceToSquared(lastStep) > 0.5 * 0.5) {
+          lastStep.copy(player);
+          uTrail.value[trailN++ % TRAIL_N].set(player.x, player.z, t, player.y);
+        }
+      }
       const focus = player ?? cam;
       if (!focus) return;
       const cx = Math.floor(focus.x / CELL), cz = Math.floor(focus.z / CELL);
