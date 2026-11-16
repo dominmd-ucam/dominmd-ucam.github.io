@@ -73,3 +73,38 @@ test.describe('isla 3D', () => {
     });
   }
 });
+
+test.describe('misiones y puzles', () => {
+  test('las losas, los tótems y el cofre funcionan y las misiones avanzan', async ({ page }, info) => {
+    test.skip(info.project.name !== 'escritorio', 'la lógica es la misma en móvil; basta con una pasada');
+    const errors = trackErrors(page);
+    await skipCharSelect(page);
+    await page.goto('./?modo=3d');
+    await expect.poll(() => page.evaluate(() => document.getElementById('hud')?.hidden === false), { timeout: 200_000, intervals: [2000] }).toBe(true);
+    type Dbg = { player: { group: { position: { set(x: number, y: number, z: number): void } } }; heightAt(x: number, z: number): number; puzzles: { plateCenters: number[][]; plateStep: number; plateOn: number; debugTotems(s: number[]): void; state: Record<string, boolean> }; quests: { current: { id: string } | null } };
+    // tracker visible con la primera misión
+    await expect.poll(() => page.evaluate(() => document.getElementById('quest')?.textContent ?? '')).toContain('Misu');
+    // losas del eco: pisar en el orden 2, 0, 3, 1 (saliendo de cada una)
+    const plates = await page.evaluate(() => ((window as unknown as { __dbg: Dbg }).__dbg).puzzles.plateCenters);
+    const goTo = (x: number, z: number) => page.evaluate(([x, z]) => { const d = (window as unknown as { __dbg: Dbg }).__dbg; d.player.group.position.set(x, d.heightAt(x, z), z); }, [x, z]);
+    const plate = () => page.evaluate(() => { const p = (window as unknown as { __dbg: Dbg }).__dbg.puzzles; return [p.plateStep, p.plateOn]; });
+    for (const [k, i] of [2, 0, 3, 1].entries()) {
+      // las losas se comprueban en el bucle de render: se espera a que lo note antes de salir de ella
+      await goTo(plates[i][0], plates[i][1]);
+      await expect.poll(plate, { timeout: 20_000 }).toEqual([k + 1, i]);
+      await goTo(plates[i][0] + 1, plates[i][1] + 1);
+      await expect.poll(plate, { timeout: 20_000 }).toEqual([k + 1, -1]);
+    }
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __dbg: Dbg }).__dbg.puzzles.state.east), { timeout: 20_000 }).toBe(true);
+    // tótems: misma ruta que con E (girar cada uno hasta su símbolo)
+    await page.evaluate(() => (window as unknown as { __dbg: Dbg }).__dbg.puzzles.debugTotems([1, 2, 3]));
+    expect(await page.evaluate(() => (window as unknown as { __dbg: Dbg }).__dbg.puzzles.state.west)).toBe(true);
+    // cofre: acercarse y pulsar E
+    const chest = await page.evaluate(() => { const s = (window as unknown as { __dbg: { puzzles: { spots: { x: number; z: number }[] } } }).__dbg.puzzles.spots; return s[s.length - 1]; });
+    await page.evaluate(([x, z]) => { const d = (window as unknown as { __dbg: Dbg }).__dbg; d.player.group.position.set(x, d.heightAt(x, z), z); }, [chest.x + 1.4, chest.z + 0.6]);
+    await expect.poll(() => page.evaluate(() => document.getElementById('prompt')?.textContent ?? ''), { timeout: 20_000 }).toContain('Abrir el cofre');
+    await page.keyboard.press('e');
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __dbg: Dbg }).__dbg.puzzles.state.chest), { timeout: 20_000 }).toBe(true);
+    expect(errors).toEqual([]);
+  });
+});

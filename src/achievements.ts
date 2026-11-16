@@ -12,6 +12,9 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'lighthouse', title: 'Guardafaro', desc: 'Sube al faro', xp: 25, icon: 'star' },
   { id: 'company', title: 'Compañía', desc: 'Coincide con otro visitante en la isla', xp: 30, icon: 'cat' },
   { id: 'islet', title: 'Robinson', desc: 'Llega nadando al islote', xp: 40, icon: 'wave' },
+  { id: 'echo', title: 'Buen oído', desc: 'Resuelve las losas del eco de la meseta este', xp: 40, icon: 'star' },
+  { id: 'totems', title: 'Lector de runas', desc: 'Alinea los tótems del sol de la meseta oeste', xp: 40, icon: 'key' },
+  { id: 'treasure', title: 'Tesoro de la isla', desc: 'Abre el cofre de la playa', xp: 60, icon: 'key' },
 ];
 
 const KEY = 'portfolio-achievements-v1';

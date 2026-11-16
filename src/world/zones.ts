@@ -5,7 +5,8 @@ import { batchStatic } from './batch';
 import { stoneGeometry, stoneMaterial } from './stone';
 
 /*
- * Zonas reservadas (src/data/zones.json): de momento solo decorado, sin funcionalidad.
+ * Zonas reservadas (src/data/zones.json): el decorado fijo. Lo que se mueve (puzles de las mesetas, cofre y tablilla
+ * de la cueva) está en puzzles.ts; las misiones que llevan hasta ellos, en src/quests.ts.
  * - parcelas para proyectos (estacas y cuerda) y parcelas de puzle en lo alto de las mesetas (círculo de losas)
  * - cofre medio enterrado en la arena
  * - senderos sin salida, que acaban en una valla
@@ -70,19 +71,9 @@ function puzzlePlot(root: THREE.Object3D, p: Plot, obstacles: Obstacle[]) {
   obstacles.push({ x: p.x, z: p.z, r: 0.75 });
 }
 
-/** Cofre medio enterrado en la arena, con la tapa entreabierta y un montoncito de arena delante. */
+/** Arena amontonada alrededor del cofre de la playa (el cofre, que se abre, lo pone puzzles.ts). */
 function chest(root: THREE.Object3D, obstacles: Obstacle[]) {
-  const g = new THREE.Group(), y = heightAt(CHEST.x, CHEST.z);
-  g.position.set(CHEST.x, y - 0.32, CHEST.z);
-  g.rotation.set(0.18, Math.atan2(-CHEST.x, -CHEST.z) + 0.4, -0.12, 'YXZ'); // inclinado, mirando hacia tierra
-  const metal = mat('#c9a14a', { metalness: 0.5, roughness: 0.45 });
-  add(g, new THREE.BoxGeometry(1.1, 0.6, 0.7), WOOD_D, 0, 0.3, 0);
-  for (const x of [-0.42, 0.42]) add(g, new THREE.BoxGeometry(0.08, 0.62, 0.72), metal, x, 0.3, 0);
-  const lid = new THREE.Group(); lid.position.set(0, 0.6, -0.35); lid.rotation.x = -0.35; g.add(lid);
-  const top = new THREE.CylinderGeometry(0.35, 0.35, 1.1, 10, 1, false, 0, Math.PI); top.rotateZ(Math.PI / 2);
-  add(lid, top, WOOD, 0, 0, 0.35);
-  add(lid, new THREE.BoxGeometry(0.16, 0.18, 0.06), metal, 0, -0.02, 0.72);
-  root.add(g);
+  const y = heightAt(CHEST.x, CHEST.z);
   // arena amontonada alrededor (oculta la base)
   const sand = mat('#ecc985', { flatShading: false });
   for (let i = 0; i < 5; i++) {
@@ -175,7 +166,7 @@ function caveInterior(root: THREE.Object3D, tier: string) {
     const m = add(root, new THREE.OctahedronGeometry(0.22 * k, 0), glowCrys, p.x, p.y, p.z);
     m.scale.y = 2.2; m.rotation.set(hash(s, 1) - 0.5, hash(s, 2) * 3, (hash(s, 3) - 0.5) * 1.2); m.castShadow = false;
   }
-  // pedestal vacío en el centro de la sala (reservado)
+  // pedestal en el centro de la sala: encima va la tablilla con la clave de los tótems (puzzles.ts)
   const ped = at(SC, 0), stone = stoneMaterial('#8f7d6e', 0.3);
   add(root, new THREE.CylinderGeometry(0.45, 0.6, 0.75, 8), stone, ped.x, ped.y + 0.37, ped.z);
   add(root, new THREE.CylinderGeometry(0.58, 0.5, 0.1, 8), stone, ped.x, ped.y + 0.78, ped.z);
