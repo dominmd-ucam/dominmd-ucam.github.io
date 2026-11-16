@@ -69,6 +69,8 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
   // rastro: las últimas pisadas (x, z, instante, y). La hierba pisada tarda unos segundos en levantarse, como en BotW
   const uTrail = { value: Array.from({ length: TRAIL_N }, () => new THREE.Vector4(0, 0, -99, -99)) };
   let trailN = 0;
+  // círculo que contiene todas las pisadas vivas (x, z, radio; radio < 0 si no hay ninguna): las hojas fuera de él se saltan el bucle
+  const uTrailBox = { value: new THREE.Vector3(0, 0, -1) };
   const lastStep = new THREE.Vector3(1e9, 0, 0);
   // el vector del sol se comparte con dawn.ts (cambia con la hora); el color de la luz que atraviesa la hoja va en lineal
   const uSunDir = { value: opts.sunDir ?? new THREE.Vector3(0.5, 0.25, -0.7).normalize() }, uTrans = { value: new THREE.Color('#d8f06a') };
@@ -79,6 +81,7 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
     sh.uniforms.uTime = uTime;
     sh.uniforms.uPlayer = uPlayer;
     sh.uniforms.uTrail = uTrail;
+    sh.uniforms.uTrailBox = uTrailBox;
     sh.uniforms.uAlpha = uAlpha;
     sh.uniforms.uSunDir = uSunDir;
     sh.uniforms.uTrans = uTrans;
@@ -87,6 +90,7 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
         uniform float uTime;
         uniform vec3 uPlayer;
         uniform vec4 uTrail[${TRAIL_N}];
+        uniform vec3 uTrailBox;
         varying float vGust;
         varying float vCloud;
         varying float vBH;
@@ -110,7 +114,9 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
         float push = (1.0 - smoothstep(0.2, 1.0, dist)) * step(abs(uPlayer.y - instanceMatrix[3].y), 1.5);
         off += dp / max(dist, 0.001) * push * 0.75;
         // pisadas recientes: la hierba queda tumbada (sin dirección preferente, hacia fuera de la pisada) y se levanta poco a poco
-        for (int i = 0; i < ${TRAIL_N}; i++) {
+        // casi todas las hojas están lejos de las pisadas: una sola comprobación en vez de recorrerlas todas
+        vec2 dtb = ip - uTrailBox.xy;
+        if (uTrailBox.z > 0.0 && dot(dtb, dtb) < uTrailBox.z * uTrailBox.z) for (int i = 0; i < ${TRAIL_N}; i++) {
           vec4 tp = uTrail[i];
           vec2 dq = ip - tp.xy;
           float dq2 = dot(dq, dq);
@@ -287,6 +293,10 @@ export function buildGrass(density: number, liteOnly = false, receiveShadow = fa
           lastStep.copy(player);
           uTrail.value[trailN++ % TRAIL_N].set(player.x, player.z, t, player.y);
         }
+        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+        for (const tp of uTrail.value) if (t - tp.z < TRAIL_LIFE) { x0 = Math.min(x0, tp.x); x1 = Math.max(x1, tp.x); z0 = Math.min(z0, tp.y); z1 = Math.max(z1, tp.y); }
+        if (x0 === Infinity) uTrailBox.value.set(0, 0, -1);
+        else uTrailBox.value.set((x0 + x1) / 2, (z0 + z1) / 2, Math.hypot(x1 - x0, z1 - z0) / 2 + 0.9); // 0,85 m: alcance de una pisada
       }
       const focus = player ?? cam;
       if (!focus) return;

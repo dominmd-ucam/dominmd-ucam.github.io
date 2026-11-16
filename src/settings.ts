@@ -19,6 +19,8 @@ export interface Settings {
   backend: Backend;
   /** se aplica al recargar la página */
   graphics: Graphics;
+  /** contador de fps y tiempos por fotograma (también con F3 o ?debug) */
+  fps: boolean;
 }
 
 export const CAMERA_DIST = [5.5, 8.5, 13];
@@ -27,7 +29,7 @@ export const RESOLUTIONS: Resolution[] = ['auto', 'high', 'medium', 'low'];
 export const RESOLUTION_LABEL: Record<Resolution, string> = { auto: 'AUTO', high: 'ALTA', medium: 'MEDIA', low: 'BAJA' };
 
 const KEY = 'portfolio-settings-v1';
-const defaults: Settings = { sound: true, volume: 6, shadows: true, effects: true, ghosts: true, resolution: 'auto', camera: 1, backend: 'webgl', graphics: 'auto' };
+const defaults: Settings = { sound: true, volume: 6, shadows: true, effects: true, ghosts: true, resolution: 'auto', camera: 1, backend: 'webgl', graphics: 'auto', fps: false };
 
 type Listener = (s: Settings, key: keyof Settings) => void;
 

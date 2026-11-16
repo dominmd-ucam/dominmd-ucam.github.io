@@ -4,7 +4,7 @@ import { buildTerrain, heightAt, islandRadius, HILL, ISLET, DOCK, dockStart, onD
 import { buildZones } from './world/zones';
 import { Puzzles } from './world/puzzles';
 import { Quests, QuestStore, type QuestDef } from './quests';
-import { t as tl } from './i18n';
+import { t as tl, tr } from './i18n';
 import { Robot } from './world/robot';
 import { buildWater } from './world/water';
 import { buildScenery } from './world/props';
@@ -37,7 +37,7 @@ import { Achievements, ACHIEVEMENTS } from './achievements';
 import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL, BACKENDS } from './settings';
 import { detectQuality, GRAPHICS, GRAPHICS_LABEL } from './quality';
 import { createGfx } from './gfx';
-import { AdaptiveRes, DebugOverlay } from './perf';
+import { AdaptiveRes, FpsOverlay } from './perf';
 import { afterReveal, initAssets, markRevealed } from './assets/loader';
 import { Avatar } from './avatar/avatar';
 import { hasSavedConfig, loadConfig, saveConfig } from './avatar/config';
@@ -53,6 +53,9 @@ const { renderer, canvas } = gfx;
 renderer.setPixelRatio(q.dpr);
 renderer.shadowMap.enabled = q.shadows;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+// comprobar los errores de cada shader obliga a esperar a que termine de compilar (un tirón la primera vez que se ve algo):
+// solo en desarrollo o con ?debug
+if (gfx.kind === 'webgl' && import.meta.env.PROD && !new URLSearchParams(location.search).has('debug')) (renderer as THREE.WebGLRenderer).debug.checkShaderErrors = false;
 initAssets();
 
 const scene = new THREE.Scene();
@@ -105,7 +108,7 @@ scene.add(grass.group);
 const guide = new CatGuide(scene, obstacles, 7.6, 10.4, [6, 12]);
 void guide.load().catch((e) => console.warn('Misu no disponible:', e));
 const robot = new Robot(scene, obstacles, [-1.2, -0.8], 2.2); // pasea por la plaza y saluda
-void afterReveal.then(() => robot.load()).catch((e) => console.warn('robot no disponible:', e));
+const robotLoaded = afterReveal.then(() => robot.load()).catch((e) => console.warn('robot no disponible:', e));
 
 /* backend opcional: libro de visitas, contacto y visitantes fantasma (solo si hay API configurada) */
 const infoPoint = apiConfigured ? new InfoPoint(scene, obstacles, 3.2, 12.2) : null;
@@ -166,7 +169,8 @@ puzzles.onSolve = (id) => {
 const coop = new Coop(scene, obstacles, player.group); // invitados con el móvil como mando (QR)
 const post = gfx.createPost(scene, camera, q);
 post.setSun(dawn.sunDir);
-const debug = new DebugOverlay();
+const fps = new FpsOverlay(tr(q.ultra ? 'ULTRA' : GRAPHICS_LABEL[q.tier]), tl);
+addEventListener('keydown', (e) => { if (e.key === 'F3') { settings.set('fps', !settings.value.fps); e.preventDefault(); } });
 if (new URLSearchParams(location.search).has('tune')) {
   void import('./tune').then((m) => m.openTune({ dawn, scene, terrain, water, post }));
 }
@@ -177,11 +181,29 @@ avatarBtn.disabled = true;
 /* pantalla de carga: se mantiene hasta que el avatar esté puesto (o falle) y pasen al menos 2 s, para que no se vea al personaje de respaldo cambiar de golpe */
 const loadStart = performance.now();
 const MIN_LOAD_MS = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 2000, MAX_LOAD_MS = 10000;
-let avatarSettled = false, revealed = false;
+let avatarSettled = false, revealed = false, shadersWarm = false;
+/**
+ * Compila de antemano los shaders de todo lo que hay en la escena (también lo que aún no se ve), en paralelo si el navegador puede.
+ * Sin esto, cada material se compila la primera vez que entra en pantalla y el juego da un tirón al girar la cámara o al llegar a otra zona.
+ * Se compila como lo dibuja el postprocesado (a una textura intermedia, en lineal y sin tone mapping) para que valgan los mismos programas.
+ */
+const warmTarget = q.tier !== 'low' && gfx.kind === 'webgl' ? new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType }) : null;
+async function warmShaders() {
+  const r = renderer as THREE.WebGLRenderer;
+  if (typeof r.compileAsync !== 'function') return;
+  const prev = gfx.kind === 'webgl' ? r.getRenderTarget() : null;
+  if (gfx.kind === 'webgl') r.setRenderTarget(settings.value.effects ? warmTarget : null);
+  const job = r.compileAsync(scene, camera); // la parte síncrona (crear los programas) termina aquí; luego se espera a que compilen
+  if (gfx.kind === 'webgl') r.setRenderTarget(prev);
+  await job;
+}
+// antes de quitar la pantalla de carga (con la vegetación ya puesta) y otra vez cuando llegan los modelos que se cargan después
+void nature.planted.then(warmShaders).catch((e) => console.warn('precompilación de shaders:', e)).finally(() => { shadersWarm = true; });
+void Promise.all([nature.ready, robotLoaded]).then(warmShaders).catch(() => {});
 function checkReveal() {
   if (revealed || first) return; // hace falta al menos un fotograma dibujado
   const elapsed = performance.now() - loadStart;
-  if (!avatarSettled && elapsed < MAX_LOAD_MS) return;
+  if ((!avatarSettled || !shadersWarm) && elapsed < MAX_LOAD_MS) return;
   revealed = true;
   markRevealed();
   ui.setLoad(1, 'Todo listo');
@@ -251,6 +273,7 @@ function settingsView(): View {
       { type: 'bar', label: 'VOLUMEN', max: 8, get: () => settings.value.volume, set: (n) => settings.set('volume', n) },
       { type: 'toggle', label: 'SOMBRAS', get: () => settings.value.shadows, set: (v) => settings.set('shadows', v) },
       { type: 'toggle', label: 'EFECTOS', get: () => settings.value.effects, set: (v) => settings.set('effects', v) },
+      { type: 'toggle', label: tl('MOSTRAR FPS', 'SHOW FPS'), get: () => settings.value.fps, set: (v) => settings.set('fps', v) },
       ...(apiConfigured ? [{ type: 'toggle' as const, label: 'VISITANTES', get: () => settings.value.ghosts, set: (v: boolean) => settings.set('ghosts', v) }] : []),
       // el nivel de gráficos cambia qué se construye (vegetación, hierba, sombras): se aplica al recargar
       { type: 'select', label: 'GRÁFICOS', options: GRAPHICS.map((g) => GRAPHICS_LABEL[g]), get: () => GRAPHICS.indexOf(settings.value.graphics), set: (i) => settings.set('graphics', GRAPHICS[i]) },
@@ -313,6 +336,7 @@ function applySettings(key?: string) {
   grass.setInkMask(s.effects && q.tier !== 'low'); // la máscara de contornos solo sirve (y solo es segura) con el postprocesado
   nature.setInkMask(s.effects && q.tier !== 'low');
   setPresence(s.ghosts);
+  fps.enabled = s.fps;
   if (key === undefined || key === 'resolution') {
     if (s.resolution === 'auto') adaptive.setMax(q.dpr);
     else adaptive.fix(s.resolution === 'high' ? Math.min(devicePixelRatio || 1, 2) : s.resolution === 'medium' ? 1.25 : 0.85);
@@ -412,6 +436,7 @@ let first = true, frameNo = 0, traveled = 0, swimT = 0, zoneT = 0, rippleT = 0, 
 const last = player.group.position.clone();
 
 function frame(timestamp: number) {
+  const cpu0 = performance.now();
   if (first) timer.reset(); // el primer fotograma llega tras una carga larga: sin esto el primer delta sería de varios segundos
   timer.update(timestamp);
   const raw = Math.max(0, timer.getDelta()), dt = Math.min(raw, 0.05), t = timer.getElapsed();
@@ -494,7 +519,7 @@ function frame(timestamp: number) {
     if (q.mobile && !moving ? (frameNo & 3) === 0 : (frameNo & 1) === 0) gfx.requestShadow(dawn.sun);
     gfx.resetStats();
     post.render(dt);
-    debug.update(raw * 1000, gfx, adaptive.dpr);
+    fps.update(timestamp, performance.now() - cpu0, gfx, adaptive.dpr);
   }
   if (first) { first = false; ui.setLoad(avatarSettled ? 0.95 : 0.6, avatarSettled ? 'Todo listo' : 'Vistiendo al personaje…'); }
   checkReveal();
