@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "models:optimize": "node scripts/optimize-models.mjs",
-    "avatar:optimize": "node scripts/optimize-avatar.mjs"
+    "avatar:optimize": "node scripts/optimize-avatar.mjs",
+    "og:image": "node scripts/og-image.mjs",
+    "test": "playwright test"
   },
   "dependencies": {
     "@fontsource/fredoka": "^5.3.0",
@@ -24,6 +26,7 @@
     "@gltf-transform/core": "^4.5.1",
     "@gltf-transform/extensions": "^4.5.1",
     "@gltf-transform/functions": "^4.5.1",
+    "@playwright/test": "^1.63.0",
     "@types/d3-delaunay": "^6.0.4",
     "@types/three": "^0.186.0",
     "draco3dgltf": "^1.5.9",

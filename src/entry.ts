@@ -1,6 +1,9 @@
 import './shared.css';
 import './classic.css';
 import projects from './data/projects.json';
+import dialogue from './data/dialogue.json';
+import { lang, rememberLang, storedLang, langUrl, translateData, t, i18nReady } from './i18n';
+import { autoTranslateDom } from './i18n/dom';
 import type { ProjectLike } from './ui/projectModal';
 import { gameSupport, rememberMode, storedMode } from './mode';
 import { apiConfigured } from './net/api';
@@ -12,7 +15,22 @@ import { mountContact, mountGuestbook } from './net/forms';
  */
 // la ficha de proyecto y los demos simulados se descargan al abrir el primero (no pesan en la carga de la página)
 let modalReady: Promise<{ open(p: ProjectLike): void }> | null = null;
-const getModal = () => (modalReady ??= import('./ui/projectModal').then((m) => m.ProjectModal.get()));
+const getModal = () => (modalReady ??= ready.then(() => import('./ui/projectModal')).then((m) => m.ProjectModal.get()));
+// versión inglesa (en.html): los datos se traducen antes de que nadie los lea y el DOM del juego se traduce solo
+const ready = i18nReady.then(() => { translateData({ projects, dialogue }); autoTranslateDom(); });
+// selector de idioma: recuerda la elección; si alguien eligió inglés y vuelve a la portada en español, va a en.html
+document.addEventListener('click', (e) => {
+  const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-lang]');
+  if (!a) return;
+  e.preventDefault();
+  const l = a.dataset.lang === 'en' ? 'en' : 'es';
+  rememberLang(l);
+  location.href = langUrl(l);
+});
+const chosen = storedLang();
+const redirecting = chosen !== null && chosen !== lang;
+if (redirecting) location.replace(langUrl(chosen));
+
 const byId = new Map((projects as unknown as ProjectLike[]).map((p) => [p.id, p]));
 
 document.addEventListener('click', (e) => {
@@ -28,7 +46,7 @@ if (apiConfigured) {
   const gb = document.querySelector<HTMLElement>('[data-guestbook]');
   const ct = document.querySelector<HTMLElement>('[data-contact]');
   if (gb) mountGuestbook(gb);
-  if (ct) { const h = document.createElement('h3'); h.textContent = 'O escríbeme directamente'; ct.before(h); mountContact(ct); }
+  if (ct) { const h = document.createElement('h3'); h.textContent = t('O escríbeme directamente', 'Or write to me directly'); ct.before(h); mountContact(ct); }
 }
 
 // filtros de la lista de proyectos
@@ -62,6 +80,7 @@ async function startGame() {
   try {
     document.getElementById('classic')?.setAttribute('hidden', '');
     document.getElementById('game')?.removeAttribute('hidden');
+    await ready;
     const game = await import('./game');
     game.start();
     veil.remove();
@@ -80,4 +99,4 @@ buttons.forEach((b) => b.addEventListener('click', () => void startGame()));
 const params = new URLSearchParams(location.search);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const want = params.get('modo') === '3d' || location.hash === '#isla' || (params.get('modo') !== 'clasico' && storedMode() === 'game' && !reduced);
-if (want && support.ok) void startGame();
+if (want && support.ok && !redirecting) void startGame();

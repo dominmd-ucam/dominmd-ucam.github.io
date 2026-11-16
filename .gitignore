@@ -4,3 +4,5 @@ dist
 assets-hq
 assets-src/avatar
 .tmp
+test-results
+playwright-report

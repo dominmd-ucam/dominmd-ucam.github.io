@@ -1,0 +1,120 @@
+{
+  "_comment": "Traducción al inglés de src/data/*.json. Solo los campos de texto: se mezclan por clave (objetos) y por posición (listas). Los proyectos van por id.",
+  "profile": {
+    "role": "Software developer",
+    "headline": "Websites, apps, bots, plugins and tools, built with care for the details.",
+    "description": "Portfolio of Domin, software developer: websites and apps in PHP, TypeScript and Flutter, bots, plugins and tools. Explore it as a 3D video game or in a classic version.",
+    "about": [
+      "I'm Domin, a developer. I like building things that work well and look even better: web and mobile apps, bots, plugins for tools I use every day and command-line utilities.",
+      "This portfolio is an island you can explore like a video game, but it also has this classic version, fast and accessible. Every project has a simulated demo you can try."
+    ],
+    "highlights": [
+      { "title": "Web and mobile apps", "text": "Management software for gyms, farms, building maintenance and hospitality, with PHP, React and Flutter." },
+      { "title": "Bots, plugins and agents", "text": "Plugins for Dispatcharr and for debuggers, Discord bots and semantic search over notes." },
+      { "title": "Hardware and tools", "text": "Firmware for an ESP32 display and command-line utilities, deployed with Docker on Linux." }
+    ],
+    "skills": [
+      { "group": "Languages" },
+      { "group": "Data and services", "items": [null, null, null, null, "REST APIs"] },
+      { "group": "Environment" },
+      { "group": "Graphics and web", "items": [null, null, null, null, "HTML and CSS"] }
+    ]
+  },
+  "projects": {
+    "clawdmeter": {
+      "title": "Clawdmeter Plus (custom version)",
+      "description": "AMOLED desk display with an ESP32-S3 that shows live Claude Code usage, the time, the weather and the status of several services, next to a pixel-art mascot. It's my custom version of an open-source project, with a much simpler install on Windows.",
+      "credit": "Based on Clawdmeter Plus by sorryhumans and Clawdmeter by Hermann Bjorgvin. Personal, unofficial project: not affiliated with Anthropic.",
+      "note": "The data shown in the demo is fictional."
+    },
+    "studens": {
+      "title": "University matchmaking app",
+      "description": "Flutter mobile app with a swipe mechanic to connect with other students through shared interests, see campus events and chat in real time. Private project.",
+      "note": "Private repository. The demo profiles are fictional."
+    },
+    "vs-immediate": {
+      "title": "vs-immediate: the Immediate Window for your AI agent",
+      "description": "Plugin that lets an AI agent (Claude Code, Codex) do what you do in the debugger's Immediate Window: evaluate expressions, inspect variables, the call stack, threads and exceptions, and control execution. Works with Visual Studio and JetBrains Rider.",
+      "note": "Sample session with fictional data."
+    },
+    "auto-match": {
+      "title": "Auto Match All Channels (Dispatcharr plugin)",
+      "description": "Plugin that automates Dispatcharr's EPG Auto Match: it walks through the channels one by one using the same function as the single-channel button, with a group filter, live progress and a final summary, without freezing the interface.",
+      "note": "Demo channels and results are fictional."
+    },
+    "elsaview": {
+      "title": "ElsaView: workflow monitoring dashboard",
+      "description": "Central dashboard, inspired by Portainer, to watch the health of several workflow-engine instances: alerts, execution history and server metrics. Includes agents with outbound connections for servers behind a VPN. Private project.",
+      "note": "Private repository. Demo servers and data are fictional."
+    },
+    "ganaderia": {
+      "title": "Complete livestock farm management",
+      "short": "Livestock",
+      "description": "Web application that tracks everything from the arrival of a delivery note until the animal is assigned to a pen, moved, lost or shipped: stock and weight per pen, losses and transfers with photo evidence, load planning and profitability simulation. PHP with an MVC architecture. Private project.",
+      "note": "Private repository. The demo data is fictional."
+    },
+    "mantenimiento": {
+      "title": "Building maintenance PWA",
+      "short": "Maintenance",
+      "description": "Progressive web app to manage recurring building maintenance: assigned workers, tasks with forms and photos, and salt level and stock tracking with low-level alerts. React, TypeScript and Supabase. Private project.",
+      "note": "Private repository. Demo buildings and tasks are fictional."
+    },
+    "fitpro": {
+      "title": "FITPro: complete gym management system",
+      "description": "Gym management platform with authentication, class scheduling, trainers, progress tracking, nutrition plans and an AI chatbot (Google Gemini API). PHP backend with an MVC architecture and an admin panel.",
+      "note": "Demo classes and answers are fictional."
+    },
+    "hosteleria": {
+      "title": "Digital ecosystem for restaurants (prototype)",
+      "short": "Restaurants",
+      "description": "Interactive prototype of a restaurant ecosystem: QR digital menu, kitchen display, waiter view and back office, with an order flow kept in sync across views. React with simulated in-memory state. Private project.",
+      "note": "Private repository. Demo dishes and orders are fictional."
+    },
+    "webscraping": {
+      "title": "Web scraping tool with XPath",
+      "description": "Web tool that extracts information from a page given a URL and an XPath expression, and shows the results in a table. HTML, JavaScript and Tailwind CSS.",
+      "note": "The demo uses sample results: it doesn't download real pages."
+    },
+    "atom": {
+      "title": "ATOM Processor: ATOM and RSS feed reader",
+      "short": "ATOM feeds",
+      "description": "Web app that processes ATOM and RSS feeds (by URL or by pasting the XML) and shows them as cards or a list, with favourites saved in the browser.",
+      "note": "Demo articles are fictional."
+    },
+    "pixelart": {
+      "title": "Image to pixel art converter",
+      "description": "Simple converter that turns an image into pixel art by adjusting the pixel size. In this demo it really works on a sample scene: move the slider."
+    },
+    "obsidian-rag": {
+      "title": "Obsidian RAG: chat with your notes",
+      "description": "Turns an Obsidian vault and its documents (PDF, Word, Excel, CSV) into a knowledge base you can query in natural language: local semantic search with embeddings and ChromaDB, an MCP server for coding agents and an OpenAI-compatible API to chat from Open WebUI. Private project.",
+      "note": "Private repository. Demo notes and answers are fictional."
+    },
+    "streambot": {
+      "title": "StreamBot Acestream: stream video to voice channels",
+      "description": "Discord selfbot that streams videos, live streams and streaming links (including Acestream) to voice or video channels: local folder, YouTube search, arbitrary links and an event list. Based on StreamBot by ysdragon. Private project.",
+      "credit": "Based on StreamBot by ysdragon.",
+      "note": "Private repository. Demo conversation is fictional."
+    }
+  },
+  "dialogue": {
+    "nodes": {
+      "hola": {
+        "text": "Meow! I'm Misu, this island's guide. Welcome to Domin's portfolio. Have you seen the robot in the square? It waves at everyone who walks by.",
+        "choices": [{ "label": "What's on the island?" }, { "label": "Who is Domin?" }, { "label": "Show me the way" }, { "label": "See you later" }]
+      },
+      "isla": {
+        "text": "The island has grown: there's a lighthouse, a stranded ship, plateaus you climb by ramps, a cave you can walk through, a chest half-buried on the beach… and an islet you can reach by swimming! The fenced plots are reserved: soon they'll hold Domin's projects.",
+        "choices": [{ "label": "Who is Domin?" }, { "label": "Show me the way" }, { "label": "OK, thanks" }]
+      },
+      "domin": {
+        "text": "Domin is a developer who likes building all sorts of things: websites, bots, plugins and tools. This island shows them off without a boring CV.",
+        "choices": [{ "label": "What's on the island?" }, { "label": "Show me the way" }, { "label": "See you later" }]
+      },
+      "camino": {
+        "text": "Stone paths leave the central crossroads and go around the island, and dirt trails branch off them towards the hidden corners. The signs tell you which is which. Have a good trip!",
+        "choices": [{ "label": "Thanks, Misu!" }]
+      }
+    }
+  }
+}
