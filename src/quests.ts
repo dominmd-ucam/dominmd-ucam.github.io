@@ -45,6 +45,9 @@ export class Quests {
   private titleEl: HTMLElement;
   private goalEl: HTMLElement;
   private distEl: HTMLElement;
+  private moreEl: HTMLElement;
+  private narrow = matchMedia('(max-width: 640px)');
+  private foldT: number | undefined;
   private beacon: THREE.Group;
   private beaconMat: THREE.MeshBasicMaterial;
   private shown = '';
@@ -61,7 +64,16 @@ export class Quests {
     this.titleEl = this.el.querySelector('b') as HTMLElement;
     this.goalEl = this.el.querySelector('.q-goal') as HTMLElement;
     this.distEl = this.el.querySelector('.q-dist') as HTMLElement;
-    this.el.addEventListener('click', () => this.onOpenList());
+    this.el.insertAdjacentHTML('beforeend', '<span class="q-more" role="button" tabindex="0"></span>');
+    this.moreEl = this.el.querySelector('.q-more') as HTMLElement;
+    this.moreEl.textContent = t('Ver todas ›', 'All quests ›');
+    // en pantalla estrecha la tarjeta es una sola línea: tocarla la despliega (objetivo + «Ver todas»), no abre la lista
+    this.el.addEventListener('click', (e) => {
+      if (!this.narrow.matches) { this.onOpenList(); return; }
+      if (this.el.classList.contains('open') && (e.target as HTMLElement).closest('.q-more')) { this.fold(); this.onOpenList(); }
+      else if (this.el.classList.contains('open')) this.fold();
+      else this.unfold(6000);
+    });
     document.getElementById('hud')?.append(this.el);
 
     // columna de luz con un rombo encima, en el destino de la misión que se sigue
@@ -85,6 +97,14 @@ export class Quests {
 
   set visible(v: boolean) { this.el.hidden = !v; }
 
+  /** Despliega la tarjeta (objetivo y «Ver todas») y la pliega sola pasado un rato. */
+  private unfold(ms: number) {
+    this.el.classList.add('open');
+    clearTimeout(this.foldT);
+    this.foldT = window.setTimeout(() => this.fold(), ms);
+  }
+  private fold() { clearTimeout(this.foldT); this.el.classList.remove('open'); }
+
   /** `yaw` = giro de la cámara (input.yaw): la flecha del HUD gira con ella. */
   update(time: number, dt: number, p: THREE.Vector3, yaw: number) {
     if ((this.checkT += dt) > 0.25) {
@@ -106,6 +126,7 @@ export class Quests {
       this.titleEl.textContent = q ? q.title : t('¡Isla completada!', 'Island complete!');
       this.goalEl.textContent = q ? q.goal() : t('Has hecho todas las misiones. Gracias por explorar.', 'You finished every quest. Thanks for exploring.');
       this.el.classList.toggle('all-done', !q);
+      this.unfold(4000); // una misión nueva o un progreso nuevo se anuncian desplegando la tarjeta un momento
     }
     if (!target) { this.beacon.visible = false; this.arrow.style.visibility = 'hidden'; this.distEl.textContent = ''; return; }
     const dx = target.x - p.x, dz = target.z - p.z, d = Math.hypot(dx, dz);

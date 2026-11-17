@@ -205,3 +205,21 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #f6c9a0; col
 .toast.note { min-width: 0; max-width: 30em; padding: .7em 2.2em .7em 1.6em; }
 .toast.note img { flex: none; width: 7.5em; border-radius: 6px; }
 @media (max-width: 640px) { .quest { top: calc(max(14px, env(safe-area-inset-top)) + 50px); padding: .35em 1.3em .35em .45em; } .quest b { font-size: 14px; } .quest .q-goal { font-size: 11.5px; } .toast.note { flex-direction: column; align-items: flex-start; } }
+
+/* ---------- táctil: avisos, pistas y misión plegable ---------- */
+.quest .q-more { display: none; }
+.talk kbd.tap { display: grid; place-items: center; width: 1.7em; height: 1.5em; padding: 0; }
+.talk kbd.tap svg { width: 1.15em; height: 1.15em; }
+#tip { left: 50%; bottom: calc(max(20px, env(safe-area-inset-bottom)) + 132px); transform: translateX(-50%); z-index: 3; width: max-content; max-width: calc(100vw - 32px); padding: .5em 1.4em; text-align: center; font-size: 14px; font-weight: 800; line-height: 1.25; color: var(--foam); background: rgba(15, 52, 64, .86); clip-path: polygon(3% 0, 97% 0, 100% 50%, 97% 100%, 3% 100%, 0 50%); pointer-events: none; animation: fadeUp .35s var(--pop) both; transition: opacity .3s; }
+#tip.out { opacity: 0; }
+@media (pointer: coarse) { .hint { display: none; } }
+@media (max-width: 640px) {
+  /* los avisos bajan bajo la fila de botones (avatar, sonido, QR, menú) y la tarjeta de misión, para no tapar ninguno */
+  #toasts { top: calc(max(14px, env(safe-area-inset-top)) + 136px); }
+  .quest { top: calc(max(14px, env(safe-area-inset-top)) + 58px); max-width: calc(100vw - 32px); }
+  .quest .q-kicker, .quest .q-goal, .quest .q-more { display: none; }
+  .quest.open .q-kicker, .quest.open .q-goal { display: block; }
+  .quest.open .q-more { display: block; position: absolute; right: 2.2em; bottom: .25em; font-size: 11.5px; font-weight: 800; color: var(--sea); }
+  .quest.open { padding-bottom: 1.35em; }
+  .quest .q-dist { margin-left: auto; }
+}
