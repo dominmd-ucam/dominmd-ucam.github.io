@@ -21,15 +21,20 @@ export interface Settings {
   graphics: Graphics;
   /** contador de fps y tiempos por fotograma (también con F3 o ?debug) */
   fps: boolean;
+  /** índice en LOOK_SENS: velocidad de giro de la cámara con el dedo o el ratón */
+  lookSens: number;
+  /** invertir el eje vertical de la cámara */
+  invertY: boolean;
 }
 
+export const LOOK_SENS = [0.5, 0.75, 1, 1.5, 2];
 export const CAMERA_DIST = [5.5, 8.5, 13];
 export const BACKENDS: Backend[] = ['webgl', 'webgpu'];
 export const RESOLUTIONS: Resolution[] = ['auto', 'high', 'medium', 'low'];
 export const RESOLUTION_LABEL: Record<Resolution, string> = { auto: 'AUTO', high: 'ALTA', medium: 'MEDIA', low: 'BAJA' };
 
 const KEY = 'portfolio-settings-v1';
-const defaults: Settings = { sound: true, volume: 6, shadows: true, effects: true, ghosts: true, resolution: 'auto', camera: 1, backend: 'webgl', graphics: 'auto', fps: false };
+const defaults: Settings = { sound: true, volume: 6, shadows: true, effects: true, ghosts: true, resolution: 'auto', camera: 1, backend: 'webgl', graphics: 'auto', fps: false, lookSens: 2, invertY: false };
 
 type Listener = (s: Settings, key: keyof Settings) => void;
 

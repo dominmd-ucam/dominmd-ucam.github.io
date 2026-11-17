@@ -13,6 +13,7 @@ import { installToon } from './world/toon';
 import { buildLandmarks } from './world/landmarks';
 import { buildLife } from './world/life';
 import { buildSplash } from './world/splash';
+import { buildDust } from './world/dust';
 import { buildDiorama } from './world/diorama';
 import { buildNature } from './world/nature';
 import { buildVillage } from './world/village';
@@ -34,7 +35,7 @@ import { Menu, type View } from './ui/menu';
 import { Dialogue } from './ui/dialogue';
 import { Toasts } from './ui/toasts';
 import { Achievements, ACHIEVEMENTS } from './achievements';
-import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL, BACKENDS } from './settings';
+import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL, BACKENDS, LOOK_SENS } from './settings';
 import { detectQuality, GRAPHICS, GRAPHICS_LABEL } from './quality';
 import { createGfx } from './gfx';
 import { AdaptiveRes, FpsOverlay } from './perf';
@@ -94,6 +95,7 @@ const interactables = new Interactables(scene, obstacles, q.tier); // antes que 
 const nature = buildNature(scene, obstacles, q.tier, q.mobile, q.density, q.view); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
+const dust = buildDust(scene);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
 // en calidad baja, solo la hoja ligera; en móvil, menos hojas, un anillo de bloques menos y la hoja completa solo muy cerca
 // (las hojas son finas, como en la demo de Smyth: casi el doble de hojas por m² cubren lo mismo que antes;
@@ -130,6 +132,12 @@ achievements.onUnlock = (a) => toasts.show(a);
 ui.setCounter(achievements.opened.size);
 ui.setTotal(interactables.stations.length);
 const player = new Player(obstacles, [6, 12]);
+// despegue y aterrizaje: polvo y golpecito suave (el polvo se apaga con EFECTOS; el sonido, con SONIDO)
+player.onJump = (x, y, z) => { if (settings.value.effects) dust.puff(x, y, z, 0.2); };
+player.onLand = (x, y, z, power) => {
+  if (settings.value.effects && y > -0.3) dust.puff(x, y, z, power);
+  audio.land(power);
+};
 scene.add(player.group);
 
 /* ---------- misiones secundarias ---------- */
@@ -279,6 +287,8 @@ function settingsView(): View {
       { type: 'select', label: 'GRÁFICOS', options: GRAPHICS.map((g) => GRAPHICS_LABEL[g]), get: () => GRAPHICS.indexOf(settings.value.graphics), set: (i) => settings.set('graphics', GRAPHICS[i]) },
       { type: 'select', label: 'RESOLUCIÓN', options: RESOLUTIONS.map((r) => RESOLUTION_LABEL[r]), get: () => RESOLUTIONS.indexOf(s.resolution), set: (i) => settings.set('resolution', RESOLUTIONS[i]) },
       { type: 'select', label: 'CÁMARA', options: ['CERCA', 'MEDIA', 'LEJOS'], get: () => settings.value.camera, set: (i) => settings.set('camera', i) },
+      { type: 'select', label: tl('SENSIBILIDAD DE MIRADA', 'LOOK SENSITIVITY'), options: LOOK_SENS.map((v) => `${v}×`), get: () => settings.value.lookSens, set: (i) => settings.set('lookSens', i) },
+      { type: 'toggle', label: tl('INVERTIR EJE Y', 'INVERT Y AXIS'), get: () => settings.value.invertY, set: (v) => settings.set('invertY', v) },
       // cambiar de motor gráfico obliga a recargar: el renderer no se puede sustituir en caliente
       'gpu' in navigator
         ? { type: 'select' as const, label: 'MOTOR', options: ['WEBGL', 'WEBGPU β'], get: () => BACKENDS.indexOf(settings.value.backend), set: (i: number) => { settings.set('backend', BACKENDS[i]); location.reload(); } }
@@ -500,6 +510,7 @@ function frame(timestamp: number) {
   diorama.update(t);
   life.update(t, dt, pp, 0, dawn.waterEnv.horizon);
   splash.update(t, dt);
+  dust.update(dt);
   water.update(t, camera.position, dawn.waterEnv);
   post.setExposure(dawn.exposure);
 

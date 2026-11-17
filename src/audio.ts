@@ -49,6 +49,22 @@ export class Ambience {
     if (this.ac && !this.muted) this.master.gain.setTargetAtTime(this.volume, this.ac.currentTime, 0.1);
   }
 
+  /** Golpecito suave de un aterrizaje: un "thud" grave y un soplo de ruido. `power` 0–1. */
+  land(power: number) {
+    const ac = this.ac; if (!ac || this.muted || ac.state !== 'running') return;
+    const t = ac.currentTime, v = 0.1 + 0.25 * Math.min(1, Math.max(0, power));
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(55, t + 0.12);
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    o.connect(g).connect(this.master); o.start(t); o.stop(t + 0.18);
+    const len = Math.floor(ac.sampleRate * 0.08), buf = ac.createBuffer(1, len, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const n = ac.createBufferSource(); n.buffer = buf;
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700;
+    const ng = ac.createGain(); ng.gain.value = v * 0.8;
+    n.connect(f).connect(ng).connect(this.master); n.start(t);
+  }
+
   /** 0 de día → 1 de noche: de noche hay menos pájaros. */
   setNight(n: number) { this.night = n; }
 

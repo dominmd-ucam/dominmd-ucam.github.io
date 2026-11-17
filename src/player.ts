@@ -16,6 +16,9 @@ const SPRINT = 1.45;     // multiplicador de velocidad al esprintar
 const CROUCH = 0.38;     // y al ir agachado
 const JUMP_V = 7.2, GRAVITY = 22; // salto de ~1,2 m
 const ROLL_T = 0.75, ROLL_V = 9;   // voltereta: duración y velocidad
+const JUMP_BUFFER = 0.12; // si pulsas saltar un poco antes de tocar el suelo, el salto se guarda y sale al aterrizar
+const COYOTE = 0.1;       // tras caminar por un borde aún puedes saltar durante este tiempo
+const LEDGE = 0.7;        // desnivel (m) a partir del cual se deja de pegar al suelo y se cae
 
 export class Player {
   group = new THREE.Group();
@@ -63,6 +66,13 @@ export class Player {
   private vy = 0;
   airborne = false;
   private rollT = 0;
+  private jumpBuf = 0;
+  private coyote = 0;
+  /** aplastamiento al aterrizar (0–1) y estiramiento al saltar: se relajan solos */
+  private squash = 0;
+  /** aviso de despegue y aterrizaje: `power` 0–1 según la velocidad vertical */
+  onLand: ((x: number, y: number, z: number, power: number) => void) | null = null;
+  onJump: ((x: number, y: number, z: number) => void) | null = null;
   private tgt = new THREE.Vector2();
   private motion: Motion = { speed: 0, swimming: false, t: 0 };
   avatar: Avatar | null = null;
@@ -128,15 +138,33 @@ export class Player {
     // con los clips de natación el cuerpo va tumbado: flota más arriba que el muñeco de respaldo
     const swimY = this.avatar?.animated ? -0.25 : -0.85;
     const targetY = dock ? DOCK.y : this.swimming ? waveHeight(p.x, p.z, t) * 0.7 + swimY : Math.max(h, -0.4);
-    if (input.jump) {
-      input.jump = false;
-      if (!this.airborne && !this.swimming && this.rollT <= 0) { this.airborne = true; this.vy = JUMP_V; }
+    if (input.jump) { input.jump = false; this.jumpBuf = JUMP_BUFFER; }
+    else if (this.jumpBuf > 0) this.jumpBuf -= dt;
+    if (this.coyote > 0) this.coyote -= dt;
+    // al caminar por un borde alto se cae en vez de pegarse al suelo (y queda un instante para saltar)
+    if (!this.airborne && !this.swimming && !dock && !this.inCave && p.y - targetY > LEDGE) { this.airborne = true; this.vy = 0; this.coyote = COYOTE; }
+    if (this.jumpBuf > 0 && !this.swimming && this.rollT <= 0 && (!this.airborne || (this.coyote > 0 && this.vy <= 0))) {
+      this.jumpBuf = 0; this.coyote = 0;
+      this.airborne = true; this.vy = JUMP_V; this.squash = -0.5;
+      this.onJump?.(p.x, p.y, p.z);
     }
     if (this.airborne) {
       this.vy -= GRAVITY * dt;
       p.y += this.vy * dt;
-      if (p.y <= targetY && this.vy < 0) { p.y = targetY; this.airborne = false; this.vy = 0; }
+      if (p.y <= targetY && this.vy < 0) {
+        const impact = -this.vy;
+        p.y = targetY; this.airborne = false; this.vy = 0; this.coyote = 0;
+        if (impact > 3 && !this.swimming) {
+          const power = Math.min(1, impact / 12);
+          this.squash = Math.max(this.squash, power);
+          this.onLand?.(p.x, p.y, p.z, power);
+        }
+      }
     } else p.y += (targetY - p.y) * (1 - Math.exp(-(dock || this.swimming ? 10 : 40) * dt));
+    // squash & stretch: el cuerpo se achata al aterrizar y se estira al despegar, y vuelve a su forma como un muelle amortiguado
+    this.squash -= this.squash * (1 - Math.exp(-14 * dt));
+    if (Math.abs(this.squash) < 0.002) this.squash = 0;
+    this.group.scale.set(1 + this.squash * 0.12, 1 - this.squash * 0.2, 1 + this.squash * 0.12);
 
     const speed = this.vel.length();
     if (speed > 0.4) {
