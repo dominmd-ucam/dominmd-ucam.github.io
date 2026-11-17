@@ -18,7 +18,7 @@ export function detectQuality(): Quality {
   const level: Exclude<Graphics, 'auto'> = pick !== 'auto' ? pick : mobile ? 'med' : cores >= 8 ? 'high' : 'med';
   const ultra = level === 'ultra';
   const tier: Tier = ultra ? 'high' : level;
-  const dpr = Math.min(devicePixelRatio || 1, tier === 'high' ? 2 : tier === 'med' ? 1.5 : 1);
+  const dpr = Math.min(devicePixelRatio || 1, tier === 'high' ? 2 : tier === 'med' ? (mobile ? 1.25 : 1.5) : 1); // móvil medio: 1,25 ahorra ~30 % de píxeles frente a 1,5 con casi igual nitidez en pantalla pequeña
   const shadowMap = tier === 'high' ? 4096 : tier === 'med' && !mobile ? 2048 : 1024;
   const density = ultra ? 1.6 : tier === 'high' ? 1.3 : tier === 'med' ? (mobile ? 0.9 : 1.1) : 0.6;
   const view = ultra ? 400 : tier === 'high' ? 220 : tier === 'med' ? (mobile ? 120 : 170) : 90;
