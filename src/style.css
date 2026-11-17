@@ -214,12 +214,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #f6c9a0; col
 #tip.out { opacity: 0; }
 @media (pointer: coarse) { .hint { display: none; } }
 @media (max-width: 640px) {
-  /* los avisos bajan bajo la fila de botones (avatar, sonido, QR, menú) y la tarjeta de misión, para no tapar ninguno */
   #toasts { top: calc(max(14px, env(safe-area-inset-top)) + 136px); }
+}
+@media (max-width: 640px) and (pointer: coarse) {
+  /* los avisos bajan bajo la fila de botones (avatar, sonido, QR, menú) y la tarjeta de misión, para no tapar ninguno */
   .quest { top: calc(max(14px, env(safe-area-inset-top)) + 58px); max-width: calc(100vw - 32px); }
   .quest .q-kicker, .quest .q-goal, .quest .q-more { display: none; }
   .quest.open .q-kicker, .quest.open .q-goal { display: block; }
-  .quest.open .q-more { display: block; position: absolute; right: 2.2em; bottom: .25em; font-size: 11.5px; font-weight: 800; color: var(--sea); }
-  .quest.open { padding-bottom: 1.35em; }
+  .quest.open .q-more { display: block; text-align: right; margin-top: .2em; font-size: 11.5px; font-weight: 800; color: var(--sea); }
   .quest .q-dist { margin-left: auto; }
 }

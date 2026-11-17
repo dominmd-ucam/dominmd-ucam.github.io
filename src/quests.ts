@@ -46,7 +46,7 @@ export class Quests {
   private goalEl: HTMLElement;
   private distEl: HTMLElement;
   private moreEl: HTMLElement;
-  private narrow = matchMedia('(max-width: 640px)');
+  private narrow = matchMedia('(max-width: 640px) and (pointer: coarse)');
   private foldT: number | undefined;
   private beacon: THREE.Group;
   private beaconMat: THREE.MeshBasicMaterial;
@@ -64,7 +64,7 @@ export class Quests {
     this.titleEl = this.el.querySelector('b') as HTMLElement;
     this.goalEl = this.el.querySelector('.q-goal') as HTMLElement;
     this.distEl = this.el.querySelector('.q-dist') as HTMLElement;
-    this.el.insertAdjacentHTML('beforeend', '<span class="q-more" role="button" tabindex="0"></span>');
+    (this.el.querySelector('.q-body') as HTMLElement).insertAdjacentHTML('beforeend', '<span class="q-more"></span>');
     this.moreEl = this.el.querySelector('.q-more') as HTMLElement;
     this.moreEl.textContent = t('Ver todas ›', 'All quests ›');
     // en pantalla estrecha la tarjeta es una sola línea: tocarla la despliega (objetivo + «Ver todas»), no abre la lista
@@ -126,7 +126,7 @@ export class Quests {
       this.titleEl.textContent = q ? q.title : t('¡Isla completada!', 'Island complete!');
       this.goalEl.textContent = q ? q.goal() : t('Has hecho todas las misiones. Gracias por explorar.', 'You finished every quest. Thanks for exploring.');
       this.el.classList.toggle('all-done', !q);
-      this.unfold(4000); // una misión nueva o un progreso nuevo se anuncian desplegando la tarjeta un momento
+      if (!document.querySelector('#toasts .toast-wrap')) this.unfold(4000); // (con un aviso en pantalla no, para no pisarlo); una misión nueva o un progreso nuevo se anuncian desplegando la tarjeta un momento
     }
     if (!target) { this.beacon.visible = false; this.arrow.style.visibility = 'hidden'; this.distEl.textContent = ''; return; }
     const dx = target.x - p.x, dz = target.z - p.z, d = Math.hypot(dx, dz);

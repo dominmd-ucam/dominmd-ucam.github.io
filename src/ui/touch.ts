@@ -47,6 +47,8 @@ export class TouchTips {
   private show(id: string, text: string) {
     if (!this.el.hidden && this.el.dataset.id === id) return;
     this.mark(id);
+    window.clearTimeout(this.hideT);
+    this.el.classList.remove('out');
     this.el.dataset.id = id;
     this.el.textContent = text;
     this.el.hidden = false;
