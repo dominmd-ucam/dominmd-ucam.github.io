@@ -56,15 +56,24 @@ export class JoinError extends Error {
  * Servidores para atravesar el router. STUN basta cuando el móvil y el PC están en la misma wifi o en redes caseras;
  * con datos móviles (CGNAT) o redes de universidad hace falta un relevo TURN. El TURN gratuito que trae PeerJS
  * (eu-0/us-0.turn.peerjs.com) no responde desde nov. 2026, así que no se usa: solo retrasaba la conexión.
- * Se puede añadir uno propio al compilar (ver README): VITE_TURN_URLS + VITE_TURN_USER + VITE_TURN_PASS,
- * o VITE_TURN_API, una dirección que devuelve la lista de iceServers en JSON (p. ej. la de Metered).
+ * Relevo: TURN de Metered (cuenta gratuita de Domingo, credenciales estáticas pensadas para el navegador; quedan
+ * públicas en la web igualmente). Se pueden cambiar al compilar sin tocar código (ver README):
+ * VITE_TURN_URLS + VITE_TURN_USER + VITE_TURN_PASS, o VITE_TURN_API, una dirección que devuelve los iceServers en JSON.
  */
 const STUN: RTCIceServer[] = [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
   { urls: 'stun:stun.cloudflare.com:3478' },
 ];
 const env = import.meta.env as Record<string, string | undefined>;
-const TURN_URLS = (env.VITE_TURN_URLS ?? '').split(',').map((u) => u.trim()).filter(Boolean);
+const METERED = {
+  urls: 'turn:global.relay.metered.ca:80,turn:global.relay.metered.ca:80?transport=tcp,turn:global.relay.metered.ca:443,turns:global.relay.metered.ca:443?transport=tcp',
+  user: '79e4757489734226c1a4e63e',
+  pass: 'dn+6JFK0h4eS/IZ9',
+};
+const custom = !!env.VITE_TURN_URLS?.trim();
+const TURN_URLS = (custom ? env.VITE_TURN_URLS! : METERED.urls).split(',').map((u) => u.trim()).filter(Boolean);
+const TURN_USER = custom ? env.VITE_TURN_USER ?? '' : METERED.user;
+const TURN_PASS = custom ? env.VITE_TURN_PASS ?? '' : METERED.pass;
 const TURN_API = (env.VITE_TURN_API ?? '').trim();
 /** hay relevo configurado: si no, el mando aconseja usar la misma wifi */
 export const hasRelay = TURN_URLS.length > 0 || !!TURN_API;
@@ -73,7 +82,7 @@ let iceCache: Promise<RTCIceServer[]> | null = null;
 function iceServers(): Promise<RTCIceServer[]> {
   return (iceCache ??= (async () => {
     const list = [...STUN];
-    if (TURN_URLS.length) list.push({ urls: TURN_URLS, username: env.VITE_TURN_USER ?? '', credential: env.VITE_TURN_PASS ?? '' });
+    if (TURN_URLS.length) list.push({ urls: TURN_URLS, username: TURN_USER, credential: TURN_PASS });
     if (TURN_API) {
       try {
         const r = await fetch(TURN_API, { signal: AbortSignal.timeout(5000) });
