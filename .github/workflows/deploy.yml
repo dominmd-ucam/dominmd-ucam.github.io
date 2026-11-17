@@ -24,6 +24,11 @@ jobs:
       - run: npm run build
         env:
           VITE_API_URL: ${{ vars.API_URL }}
+          # relevo TURN opcional para el mando por QR con datos móviles (ver README, «Mando móvil»)
+          VITE_TURN_API: ${{ vars.TURN_API }}
+          VITE_TURN_URLS: ${{ vars.TURN_URLS }}
+          VITE_TURN_USER: ${{ vars.TURN_USER }}
+          VITE_TURN_PASS: ${{ vars.TURN_PASS }}
       # pruebas de humo (tests/smoke.spec.ts): versión clásica en español e inglés y arranque de la isla 3D,
       # en escritorio y en móvil vertical 390x844. Si fallan, no se despliega
       - run: npx playwright install --with-deps chromium

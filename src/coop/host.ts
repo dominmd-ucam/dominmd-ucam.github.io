@@ -7,7 +7,7 @@ import { randomConfig } from '../avatar/config';
 import type { Obstacle } from '../world/props';
 import { applyDeadzone } from '../deadzone';
 import { GUEST_COLORS } from './colors';
-import { openRoom, newCode, cleanCode, type Link, type LinkKind, type PadMsg, type HostMsg, type Room } from './link';
+import { openRoom, newCode, cleanCode, hasRelay, type Link, type LinkKind, type PadMsg, type HostMsg, type Room } from './link';
 
 const MAX_GUESTS = 4;
 /** sin noticias del mando durante este tiempo, el invitado se va (el mando manda la entrada 10 veces por segundo) */
@@ -103,7 +103,7 @@ export class Coop {
         <div class="coop-row"><input class="coop-url" readonly aria-label="Dirección del mando"><button class="coop-copy">Copiar</button></div>
         <p class="coop-status" role="status"></p>
         <ul class="coop-list"></ul>
-        <p class="coop-foot">Hasta ${MAX_GUESTS} invitados. El móvil necesita internet; los datos van directos entre el móvil y este PC.</p>
+        <p class="coop-foot">Hasta ${MAX_GUESTS} invitados. El móvil necesita internet; los datos van directos entre el móvil y este PC.${hasRelay ? '' : ' Para que conecte, ponlo en la misma wifi que este PC (con datos móviles no suele funcionar).'}</p>
       </div>`;
     document.getElementById('game')?.append(this.panel);
     this.panel.querySelector('.coop-x')!.addEventListener('click', () => this.toggle(false));
@@ -140,6 +140,16 @@ export class Coop {
       }
       try { sessionStorage.setItem('coop-room', this.room.code); } catch { /* ignorar */ }
       this.room.onJoin = (l) => this.join(l);
+      this.room.onFail = () => this.status(hasRelay
+        ? 'Un móvil ha encontrado la sala pero no ha podido conectarse. Prueba con el móvil en la misma wifi que este PC.'
+        : 'Un móvil ha encontrado la sala pero no ha podido conectarse: con datos móviles no suele funcionar. Conéctalo a la misma wifi que este PC.', true);
+      // la sala se perdió en el broker (otra pestaña cogió el código, sesión caducada): se abre otra con un QR nuevo
+      this.room.onLost = () => {
+        this.room = null; this.opening = null;
+        try { sessionStorage.removeItem('coop-room'); } catch { /* ignorar */ }
+        this.status('Se perdió la sala. Abriendo otra…', true);
+        setTimeout(() => void this.start(), 1000);
+      };
       const url = new URL('mando.html', location.href);
       url.search = ''; url.hash = '';
       url.searchParams.set('sala', this.room.code);
