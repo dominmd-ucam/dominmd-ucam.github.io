@@ -1,5 +1,5 @@
 import './pad.css';
-import { joinRoom, cleanCode, type Link, type HostMsg, type PadMsg } from './link';
+import { joinRoom, cleanCode, hasRelay, JoinError, type JoinFail, type Link, type HostMsg, type PadMsg } from './link';
 import { GUEST_COLORS } from './colors';
 
 /** Mando táctil: joystick y botones que viajan al PC 10 veces por segundo (y al instante cuando cambian). */
@@ -27,13 +27,30 @@ let wantOut = false, timer = 0, lock: { release(): Promise<void> } | null = null
 const send = () => link?.send({ t: 'in', ...st });
 const buzz = (ms: number) => navigator.vibrate?.(ms);
 
+/** Qué decirle al invitado según lo que falló. Ya no se culpa al QR cuando el problema es la red. */
+const ADVICE: Record<JoinFail, string> = {
+  broker: 'El móvil no llega al servidor de enlace. Comprueba que tiene internet y vuelve a intentarlo.',
+  missing: `La sala ${code} ya no está abierta en el PC. Abre «Invitar jugadores» en el PC y escanea el QR que salga.`,
+  p2p: hasRelay
+    ? 'El móvil encuentra la partida pero no consigue conectarse con el PC. Prueba con la misma wifi que el PC.'
+    : 'El móvil encuentra la partida pero vuestras redes no dejan conectar directo (pasa con datos móviles). Conecta el móvil a la misma wifi que el PC y vuelve a intentarlo.',
+};
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function connect() {
-  go.disabled = true; msg.textContent = 'Conectando con la isla…';
-  try {
-    link = await joinRoom(kind, code);
-  } catch (e) {
-    msg.textContent = `${(e as Error).message}. Vuelve a escanear el QR.`; go.disabled = false; return;
+  go.disabled = true;
+  // la conexión directa a veces falla a la primera; y si el PC estaba reconectando con el broker, la sala vuelve enseguida
+  const tries = 3;
+  for (let i = 1; ; i++) {
+    msg.textContent = i === 1 ? 'Conectando con la isla…' : `Conectando con la isla… (intento ${i} de ${tries})`;
+    try { link = await joinRoom(kind, code); break; }
+    catch (e) {
+      const why: JoinFail = e instanceof JoinError ? e.why : 'broker';
+      if (i < tries && !wantOut) { await sleep(why === 'missing' ? 3000 : 1500); continue; }
+      msg.textContent = ADVICE[why]; go.textContent = 'Reintentar'; go.disabled = false; return;
+    }
   }
+  go.textContent = 'Entrar a jugar';
   link.onMessage = (m) => {
     if (m.t === 'dentro') {
       $('join').hidden = true; $('ctrl').hidden = false;

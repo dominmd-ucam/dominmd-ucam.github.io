@@ -31,6 +31,13 @@ Cada botón aparece solo cuando su campo tiene valor.
 ## Backend opcional (tu servidor)
 `server/` es una API pequeña (Node + SQLite, en Docker) con **libro de visitas moderado**, **formulario de contacto** y **visitantes fantasma** en tiempo real. La web funciona igual sin ella: si `API_URL` no está definida al compilar, esas funciones no aparecen. Guía paso a paso en [server/DEPLOY.md](server/DEPLOY.md). Pruebas: `cd server && npm test`.
 
+## Mando móvil (QR) y datos móviles
+El mando por QR usa el broker gratuito de PeerJS solo para presentar el móvil al PC; después los datos van directos. Con el móvil **en la misma wifi que el PC** funciona sin configurar nada. Con **datos móviles** la operadora suele impedir la conexión directa (CGNAT) y hace falta un relevo TURN; el gratuito de PeerJS ya no responde. Para activarlo, crea en GitHub (*Settings → Secrets and variables → Actions → Variables*) una de estas opciones y vuelve a desplegar:
+- `TURN_API`: dirección que devuelve los `iceServers` en JSON. Con una cuenta gratuita de [Metered](https://www.metered.ca/stun-turn) es `https://<tu-app>.metered.live/api/v1/turn/credentials?apiKey=<clave>`.
+- o `TURN_URLS` (separadas por comas, p. ej. `turn:turn.ejemplo.com:443?transport=tcp`), `TURN_USER` y `TURN_PASS`.
+
+Estas credenciales acaban en la web publicada (las ve cualquiera): usa una clave pensada para el navegador y con límite de uso.
+
 ## Cómo añadir o cambiar un proyecto
 Edita `src/data/projects.json`: `type` (`web | bot | plugin | cli | mobile | device`), `short` (nombre que flota sobre su atril), `repo` (`null` si es privado), `credit` y `note` opcionales y `plot`, la parcela de `src/data/zones.json` donde va su atril en la isla. Cada proyecto tiene su demo interactivo en `src/games/<id>.ts` (regístralo en `src/games/index.ts`); el mismo demo se ve en la versión clásica y dentro del juego. La captura de la tarjeta y de la pantalla del atril es `public/projects/<id>.webp` (640×400): se genera desde el demo con `npm run build && npm run captures`, o pon ahí una captura real.
 
