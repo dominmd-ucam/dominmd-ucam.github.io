@@ -101,6 +101,31 @@ test.describe('isla 3D', () => {
   }
 });
 
+test.describe('cámara y velo', () => {
+  test('el FOV se abre en vertical y el menú congela el dibujado de la isla', async ({ page }, info) => {
+    const errors = trackErrors(page);
+    await skipCharSelect(page);
+    await page.goto('./?modo=3d');
+    await expect.poll(() => page.evaluate(() => document.getElementById('hud')?.hidden === false), { timeout: 200_000, intervals: [2000] }).toBe(true);
+    type Dbg = { camera: { fov: number }; menu: { open: boolean; show(): void; close(): void }; post: { render(dt: number): void } };
+    const fov = await page.evaluate(() => (window as unknown as { __dbg: Dbg }).__dbg.camera.fov);
+    if (info.project.name === 'movil-390x844') expect(fov).toBeGreaterThan(70); else expect(fov).toBe(50);
+    // con el menú abierto la isla queda tapada por el desenfoque: tras unos fotogramas no se vuelve a dibujar
+    const frozen = await page.evaluate(async () => {
+      const d = (window as unknown as { __dbg: Dbg }).__dbg;
+      let n = 0; const orig = d.post.render.bind(d.post); d.post.render = (dt: number) => { n++; orig(dt); };
+      d.menu.show();
+      // con la GPU emulada cada fotograma tarda: se espera a que se agote el presupuesto de fotogramas y se quede quieto 4 s
+      let still = false;
+      for (let i = 0; i < 20 && !still; i++) { n = 0; await new Promise((r) => setTimeout(r, 4000)); still = n === 0; }
+      d.menu.close(); d.post.render = orig;
+      return still;
+    });
+    expect(frozen).toBe(true);
+    expect(errors).toEqual([]);
+  });
+});
+
 test.describe('misiones y puzles', () => {
   test('las losas, los tótems y el cofre funcionan y las misiones avanzan', async ({ page }, info) => {
     test.skip(info.project.name !== 'escritorio', 'la lógica es la misma en móvil; basta con una pasada');
