@@ -13,6 +13,7 @@ import { installToon } from './world/toon';
 import { buildLandmarks } from './world/landmarks';
 import { buildLife } from './world/life';
 import { buildSplash } from './world/splash';
+import { buildDust } from './world/dust';
 import { buildDiorama } from './world/diorama';
 import { buildNature } from './world/nature';
 import { buildVillage } from './world/village';
@@ -35,7 +36,7 @@ import { Dialogue } from './ui/dialogue';
 import { Toasts } from './ui/toasts';
 import { TouchTips, isTouch } from './ui/touch';
 import { Achievements, ACHIEVEMENTS } from './achievements';
-import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL, BACKENDS } from './settings';
+import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL, BACKENDS, LOOK_SENS } from './settings';
 import { detectQuality, GRAPHICS, GRAPHICS_LABEL } from './quality';
 import { createGfx } from './gfx';
 import { AdaptiveRes, FpsOverlay } from './perf';
@@ -95,6 +96,7 @@ const interactables = new Interactables(scene, obstacles, q.tier); // antes que 
 const nature = buildNature(scene, obstacles, q.tier, q.mobile, q.density, q.view); // MegaKit + Sketchfab: árboles por biomas, claros, caminos de piedra
 batchStatic(staticWorld, 22); // por celdas de 22 m: la cámara descarta las zonas que no se ven
 const splash = buildSplash(scene);
+const dust = buildDust(scene);
 const life = buildLife(scene, q.tier === 'high' ? 90 : q.tier === 'med' ? 60 : 24);
 // en calidad baja, solo la hoja ligera; en móvil, menos hojas, un anillo de bloques menos y la hoja completa solo muy cerca
 // (las hojas son finas, como en la demo de Smyth: casi el doble de hojas por m² cubren lo mismo que antes;
@@ -132,6 +134,12 @@ achievements.onUnlock = (a) => toasts.show(a);
 ui.setCounter(achievements.opened.size);
 ui.setTotal(interactables.stations.length);
 const player = new Player(obstacles, [6, 12]);
+// despegue y aterrizaje: polvo y golpecito suave (el polvo se apaga con EFECTOS; el sonido, con SONIDO)
+player.onJump = (x, y, z) => { if (settings.value.effects) dust.puff(x, y, z, 0.2); };
+player.onLand = (x, y, z, power) => {
+  if (settings.value.effects && y > -0.3) dust.puff(x, y, z, power);
+  audio.land(power);
+};
 scene.add(player.group);
 
 /* ---------- misiones secundarias ---------- */
@@ -283,6 +291,8 @@ function settingsView(): View {
       { type: 'select', label: 'GRÁFICOS', options: GRAPHICS.map((g) => GRAPHICS_LABEL[g]), get: () => GRAPHICS.indexOf(settings.value.graphics), set: (i) => settings.set('graphics', GRAPHICS[i]) },
       { type: 'select', label: 'RESOLUCIÓN', options: RESOLUTIONS.map((r) => RESOLUTION_LABEL[r]), get: () => RESOLUTIONS.indexOf(s.resolution), set: (i) => settings.set('resolution', RESOLUTIONS[i]) },
       { type: 'select', label: 'CÁMARA', options: ['CERCA', 'MEDIA', 'LEJOS'], get: () => settings.value.camera, set: (i) => settings.set('camera', i) },
+      { type: 'select', label: tl('SENSIBILIDAD DE MIRADA', 'LOOK SENSITIVITY'), options: LOOK_SENS.map((v) => `${v}×`), get: () => settings.value.lookSens, set: (i) => settings.set('lookSens', i) },
+      { type: 'toggle', label: tl('INVERTIR EJE Y', 'INVERT Y AXIS'), get: () => settings.value.invertY, set: (v) => settings.set('invertY', v) },
       // cambiar de motor gráfico obliga a recargar: el renderer no se puede sustituir en caliente
       'gpu' in navigator
         ? { type: 'select' as const, label: 'MOTOR', options: ['WEBGL', 'WEBGPU β'], get: () => BACKENDS.indexOf(settings.value.backend), set: (i: number) => { settings.set('backend', BACKENDS[i]); location.reload(); } }
@@ -315,6 +325,9 @@ ui.onPause = () => { if (!blocked()) menu.show(); };
 
 /* ---------- ajustes en vivo ---------- */
 let camDistChanged = true;
+let camAspectDist = 1;
+/** segundos con un velo con desenfoque encima sin cambios en pantalla (ver el bucle) */
+let stillT = 0;
 const adaptive = new AdaptiveRes(q.dpr, 0.55, (dpr) => { renderer.setPixelRatio(dpr); resize(); });
 const onlineEl = document.getElementById('online') as HTMLElement;
 function setPresence(on: boolean) {
@@ -348,7 +361,7 @@ function applySettings(key?: string) {
   if (key === undefined || key === 'camera') { input.dist = CAMERA_DIST[s.camera]; camDistChanged = true; }
   menu.refresh();
 }
-settings.onChange((_, key) => applySettings(key));
+settings.onChange((_, key) => { stillT = 0; applySettings(key); });
 
 /* ---------- interacción ---------- */
 const blocked = () => menu.open || dialogue.open || ui.isOpen || (guestbook?.open ?? false) || (avatarUI?.open ?? false) || (charSelect?.open ?? false);
@@ -400,7 +413,12 @@ function resize() {
   renderer.setSize(w, h, false);
   post.setSize(w, h);
   camera.aspect = w / h;
+  // en vertical un FOV vertical fijo deja un ancho ridículo (50° a 390x844 ≈ 25° horizontal): se abre el campo y se aleja la cámara
+  const tall = THREE.MathUtils.clamp((1 - camera.aspect) / 0.55, 0, 1);
+  camera.fov = THREE.MathUtils.lerp(50, 76, tall);
+  camAspectDist = THREE.MathUtils.lerp(1, 1.3, tall);
   camera.updateProjectionMatrix();
+  stillT = 0; // hay que volver a dibujar el fotograma congelado
 }
 addEventListener('resize', resize);
 resize();
@@ -444,7 +462,9 @@ function frame(timestamp: number) {
   if (first) timer.reset(); // el primer fotograma llega tras una carga larga: sin esto el primer delta sería de varios segundos
   timer.update(timestamp);
   const raw = Math.max(0, timer.getDelta()), dt = Math.min(raw, 0.05), t = timer.getElapsed();
-  adaptive.tick(raw * 1000, settings.value.resolution === 'auto');
+  // con un velo con desenfoque a pantalla completa (menú, ficha de proyecto, libro de visitas) la isla no se ve
+  const veiled = menu.open || ui.isOpen || (guestbook?.open ?? false);
+  adaptive.tick(raw * 1000, settings.value.resolution === 'auto' && !veiled); // congelada, los fotogramas son baratos y subiría el dpr sin motivo
   input.enabled = !blocked();
   input.update();
   touchTips.update(dt, Math.hypot(input.move.x, input.move.y) > 0.3, input.sprint, blocked());
@@ -488,7 +508,7 @@ function frame(timestamp: number) {
   if (avatarUI?.open) { input.yaw = player.group.rotation.y; input.pitch = 0.12; input.dist = 3.8; camDistChanged = true; }
   else if (camDistChanged && !avatarUI?.open) { input.dist = CAMERA_DIST[settings.value.camera]; camDistChanged = false; }
   const fp = coop.focus(pp); // con invitados, la cámara se aleja para que quepan todos
-  const camDist = player.inCave ? Math.min(input.dist, 4.5) : input.dist + coop.spread, camPitch = player.inCave ? Math.min(input.pitch, 0.3) : input.pitch;
+  const camDist = player.inCave ? Math.min(input.dist, 4.5) : (input.dist + coop.spread) * camAspectDist, camPitch = player.inCave ? Math.min(input.pitch, 0.3) : input.pitch;
   const cp = Math.cos(camPitch);
   camPos.set(fp.x + Math.sin(input.yaw) * cp * camDist, fp.y + EYE + Math.sin(camPitch) * camDist, fp.z + Math.cos(input.yaw) * cp * camDist);
   if (player.inCave) camPos.y = THREE.MathUtils.clamp(camPos.y, pp.y + 0.6, pp.y + 2.3); // bajo el techo
@@ -505,6 +525,7 @@ function frame(timestamp: number) {
   diorama.update(t);
   life.update(t, dt, pp, 0, dawn.waterEnv.horizon);
   splash.update(t, dt);
+  dust.update(dt);
   water.update(t, camera.position, dawn.waterEnv);
   post.setExposure(dawn.exposure);
 
@@ -515,8 +536,10 @@ function frame(timestamp: number) {
 
   // con el menú o una ficha abiertas basta con 30 fps; la sombra se recalcula en fotogramas alternos
   frameNo++;
-  const idle = menu.open || ui.isOpen;
-  if (!idle || (frameNo & 1) === 0) {
+  // bajo el velo se dibuja ~0,6 s (fundido, sombra y cámara asentándose) y se congela, en vez de pintar 200+ llamadas y 400k
+  // triángulos que el desenfoque tapa
+  stillT = veiled ? stillT + raw : 0;
+  if (!veiled || stillT <= 0.6 || camera.position.distanceToSquared(camPos) > 1e-4) {
     // en móvil la sombra se recalcula a 30 Hz solo mientras el personaje se mueve; quieto basta con 15 Hz (los NPC se mueven despacio)
     const moving = player.vel.lengthSq() > 0.01;
     // solo se pide, nunca se cancela aquí: three la marca como hecha tras dibujarla. Antes se asignaba y en el primer fotograma

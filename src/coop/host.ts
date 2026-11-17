@@ -5,6 +5,7 @@ import { Player, type Controls } from '../player';
 import { Avatar } from '../avatar/avatar';
 import { randomConfig } from '../avatar/config';
 import type { Obstacle } from '../world/props';
+import { applyDeadzone } from '../deadzone';
 import { GUEST_COLORS } from './colors';
 import { openRoom, newCode, cleanCode, type Link, type LinkKind, type PadMsg, type HostMsg, type Room } from './link';
 
@@ -44,7 +45,7 @@ class RemoteControls implements Controls {
     const len = Math.hypot(m.x, m.y), f = len > 1 ? 1 / len : 1;
     this.move.x = Number.isFinite(m.x) ? m.x * f : 0;
     this.move.y = Number.isFinite(m.y) ? m.y * f : 0;
-    if (len < 0.12) this.move.x = this.move.y = 0;
+    applyDeadzone(this.move);
     if (m.j !== this.j) { this.j = m.j; this.jump = true; }
     if (m.k !== this.k) {
       this.k = m.k;
