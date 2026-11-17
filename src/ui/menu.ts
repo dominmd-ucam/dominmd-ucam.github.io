@@ -1,3 +1,6 @@
+import { t } from '../i18n';
+import { isTouch } from './touch';
+
 export type Row =
   | { type: 'action'; label: string; run: () => void; warn?: boolean }
   | { type: 'toggle'; label: string; get: () => boolean; set: (v: boolean) => void }
@@ -72,7 +75,7 @@ export class Menu {
     this.title.textContent = v.title;
     this.title.classList.remove('pop'); void this.title.offsetWidth; this.title.classList.add('pop');
     this.sub.textContent = v.sub;
-    this.hint.textContent = v.hint ?? '↑ ↓ elegir · ← → cambiar · Enter aceptar · Esc volver';
+    this.hint.textContent = v.hint ?? (isTouch ? t('Toca una opción · ◀ ▶ para cambiar · toca fuera para cerrar', 'Tap an option · ◀ ▶ to change · tap outside to close') : t('↑ ↓ elegir · ← → cambiar · Enter aceptar · Esc volver', '↑ ↓ select · ← → change · Enter accept · Esc back'));
     this.items = v.rows.map((r, i) => {
       const li = document.createElement('li');
       li.className = 'mi' + (r.type === 'action' && r.warn ? ' warn' : '');

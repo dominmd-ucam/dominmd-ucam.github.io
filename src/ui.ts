@@ -1,6 +1,10 @@
 import type { Project } from './interactables';
 import { ProjectModal } from './ui/projectModal';
 import { ICONS } from './ui/icons';
+import { isTouch } from './ui/touch';
+
+/** Icono de toque (dedo sobre círculo) que sustituye a la tecla E en pantallas táctiles. */
+const TAP = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -52,7 +56,7 @@ export class UI {
   setPrompt(text: string | null) {
     if (!text) { this.prompt.hidden = true; return; }
     this.prompt.hidden = false;
-    this.prompt.innerHTML = '<kbd>E</kbd><span></span>';
+    this.prompt.innerHTML = (isTouch ? `<kbd class="tap">${TAP}</kbd>` : '<kbd>E</kbd>') + '<span></span>';
     (this.prompt.querySelector('span') as HTMLElement).textContent = text;
   }
 

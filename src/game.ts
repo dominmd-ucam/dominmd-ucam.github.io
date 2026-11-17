@@ -34,6 +34,7 @@ import { UI } from './ui';
 import { Menu, type View } from './ui/menu';
 import { Dialogue } from './ui/dialogue';
 import { Toasts } from './ui/toasts';
+import { TouchTips, isTouch } from './ui/touch';
 import { Achievements, ACHIEVEMENTS } from './achievements';
 import { settings, CAMERA_DIST, RESOLUTIONS, RESOLUTION_LABEL, BACKENDS, LOOK_SENS } from './settings';
 import { detectQuality, GRAPHICS, GRAPHICS_LABEL } from './quality';
@@ -126,6 +127,7 @@ addEventListener('keydown', () => audio.start());
 const input = new Input(canvas);
 const ui = new UI();
 const toasts = new Toasts();
+const touchTips = new TouchTips();
 const dialogue = new Dialogue();
 const achievements = new Achievements();
 achievements.onUnlock = (a) => toasts.show(a);
@@ -231,10 +233,12 @@ void Avatar.create().then(async (a) => {
 }).catch((e) => console.warn('Avatar modular no disponible, uso el de respaldo:', e)).finally(() => { avatarSettled = true; ui.setLoad(0.95, 'Todo listo'); });
 
 /* ---------- menú ---------- */
+/** Pista al pie de los submenús: en táctil no hay Esc, se vuelve con la fila «Atrás». */
+const backHint = () => isTouch ? tl('Toca «Atrás» para volver', 'Tap “Back” to go back') : tl('Esc volver', 'Esc back');
 function achievementsView(): View {
   return {
     title: 'Logros', sub: `${achievements.count}/${ACHIEVEMENTS.length} · ${achievements.xp} XP`,
-    hint: 'Esc volver',
+    hint: backHint(),
     rows: [
       ...ACHIEVEMENTS.map((a) => ({ type: 'info' as const, label: `${achievements.has(a.id) ? '✓' : '·'} ${a.title}`, value: achievements.has(a.id) ? `+${a.xp}` : '???' })),
       { type: 'action', label: 'Atrás', run: () => menu.back() },
@@ -245,7 +249,7 @@ function questsView(): View {
   const cur = quests.current;
   return {
     title: tl('Misiones', 'Quests'), sub: tl(`${quests.completed}/${QUESTS.length} hechas · elige cuál seguir`, `${quests.completed}/${QUESTS.length} done · pick one to follow`),
-    hint: tl('Esc volver', 'Esc back'),
+    hint: backHint(),
     rows: [
       ...QUESTS.map((qd) => qd.done()
         ? { type: 'info' as const, label: `✓ ${qd.title}`, value: tl('hecha', 'done') }
@@ -256,7 +260,7 @@ function questsView(): View {
 }
 function creditsView(): View {
   return {
-    title: 'Créditos', sub: 'Gracias', hint: 'Esc volver',
+    title: 'Créditos', sub: 'Gracias', hint: backHint(),
     rows: [
       { type: 'info', label: 'Avatar y modelos', value: 'Wawa Sensei' },
       { type: 'info', label: 'Naturaleza, casas y animaciones', value: 'Quaternius (CC0)' },
@@ -463,6 +467,7 @@ function frame(timestamp: number) {
   adaptive.tick(raw * 1000, settings.value.resolution === 'auto' && !veiled); // congelada, los fotogramas son baratos y subiría el dpr sin motivo
   input.enabled = !blocked();
   input.update();
+  touchTips.update(dt, Math.hypot(input.move.x, input.move.y) > 0.3, input.sprint, blocked());
   player.update(dt, input, t);
   coop.update(dt, t, input.yaw);
   interactables.update(t, player.group.position);
